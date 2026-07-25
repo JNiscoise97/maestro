@@ -33,8 +33,10 @@ function toChecklistItem(row: {
   estimated_end_date: string | null
   estimated_end_time: string | null
   assignee_guest_id: string | null
+  assignee_person_id?: string | null
   task_scheduling_type: string | null
   task_phase: string | null
+  ros_message_id?: string | null
 }): ChecklistItem {
   return {
     id: row.id,
@@ -49,8 +51,10 @@ function toChecklistItem(row: {
     estimatedEndDate: row.estimated_end_date,
     estimatedEndTime: row.estimated_end_time,
     assigneeGuestId: row.assignee_guest_id,
+    assigneePersonId: row.assignee_person_id ?? null,
     taskSchedulingType: (row.task_scheduling_type as ChecklistItem["taskSchedulingType"]) ?? null,
     taskPhase: row.task_phase,
+    rosMessageId: row.ros_message_id ?? null,
   }
 }
 
@@ -65,9 +69,11 @@ type ChecklistItemRowPatch = Partial<{
   estimated_start_time: string | null
   estimated_end_date: string | null
   estimated_end_time: string | null
-  assignee_guest_id: string | null
+  assignee_guest_id?: string | null
+  assignee_person_id?: string | null
   task_scheduling_type: string | null
   task_phase: string | null
+  ros_message_id?: string | null
 }>
 
 function toItemRow(input: Partial<ChecklistItem>): ChecklistItemRowPatch {
@@ -83,8 +89,10 @@ function toItemRow(input: Partial<ChecklistItem>): ChecklistItemRowPatch {
   if (input.estimatedEndDate !== undefined) row.estimated_end_date = input.estimatedEndDate ?? null
   if (input.estimatedEndTime !== undefined) row.estimated_end_time = input.estimatedEndTime ?? null
   if (input.assigneeGuestId !== undefined) row.assignee_guest_id = input.assigneeGuestId ?? null
+  if (input.assigneePersonId !== undefined) row.assignee_person_id = input.assigneePersonId ?? null
   if (input.taskSchedulingType !== undefined) row.task_scheduling_type = input.taskSchedulingType ?? null
   if (input.taskPhase !== undefined) row.task_phase = input.taskPhase ?? null
+  if (input.rosMessageId !== undefined) row.ros_message_id = input.rosMessageId ?? null
   return row
 }
 
@@ -164,14 +172,16 @@ export const checklistsSupabaseService: ChecklistsService = {
   },
   async createItem(input) {
     const row = toItemRow(input) as ChecklistItemRowPatch & { checklist_id: string; label: string }
-    const { data, error } = await db.from("_20260725_checklist_items").insert(row).select("*").single()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await db.from("_20260725_checklist_items").insert(row as any).select("*").single()
     if (error) throw error
     return toChecklistItem(data)
   },
   async updateItem(id, patch) {
     const { data, error } = await db
       .from("_20260725_checklist_items")
-      .update(toItemRow(patch))
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .update(toItemRow(patch) as any)
       .eq("id", id)
       .select("*")
       .single()

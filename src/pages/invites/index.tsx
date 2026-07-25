@@ -16,6 +16,7 @@ import { GuestCreateDialog } from "@/components/invites/GuestCreateDialog"
 import { PlanTablePage } from "@/pages/plan-table"
 import { EnfantsPage } from "@/pages/enfants"
 import { PersonnesAgeesPage } from "@/pages/personnes-agees"
+import { MessageSuiviPage } from "@/pages/invites/MessageSuiviPage"
 
 const ALL_GROUPS = "all"
 
@@ -177,7 +178,7 @@ export function InvitesList() {
 
 // ── Page composite ─────────────────────────────────────────────────────────────
 
-type InvitesTab = "liste" | "plan-table" | "enfants" | "accessibilite"
+type InvitesTab = "liste" | "plan-table" | "enfants" | "accessibilite" | "messages"
 
 export function InvitesPage() {
   const [tab, setTab] = useState<InvitesTab>("liste")
@@ -189,12 +190,14 @@ export function InvitesPage() {
           <TabsTrigger value="plan-table">Plan de table</TabsTrigger>
           <TabsTrigger value="enfants">Enfants</TabsTrigger>
           <TabsTrigger value="accessibilite">Accessibilité</TabsTrigger>
+          <TabsTrigger value="messages">Communications</TabsTrigger>
         </TabsList>
       </Tabs>
       {tab === "liste" && <InvitesList />}
       {tab === "plan-table" && <PlanTablePage />}
       {tab === "enfants" && <EnfantsPage />}
       {tab === "accessibilite" && <PersonnesAgeesPage />}
+      {tab === "messages" && <MessageSuiviPage />}
     </div>
   )
 }

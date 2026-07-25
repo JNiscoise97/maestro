@@ -1,8 +1,9 @@
 import type { MissionAcceptanceStatus, RosDelivererType, RosDeliveryMode, RosMessage, RosRecipientType } from "@/types/domain"
 import { createMockTable } from "@/services/mock/db"
+import { rosMessagesSeed } from "@/services/mock/data/ros-messages"
 import { supabase, USE_SUPABASE } from "@/supabase/client"
 
-const mock = createMockTable<RosMessage>("sj-ros-messages", [])
+const mock = createMockTable<RosMessage>("sj-ros-messages", rosMessagesSeed)
 
 function rowToMsg(r: {
   id: string; step_id: string; subject: string | null; content: string

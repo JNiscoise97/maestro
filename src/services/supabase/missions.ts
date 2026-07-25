@@ -17,6 +17,8 @@ function toMission(row: {
   scheduled_end_date: string | null
   scheduled_end_time: string | null
   sort_order: number
+  responsible_person_id?: string | null
+  responsible_guest_id?: string | null
 }): Mission {
   return {
     id: row.id,
@@ -31,6 +33,8 @@ function toMission(row: {
     scheduledEndDate: row.scheduled_end_date,
     scheduledEndTime: row.scheduled_end_time,
     sortOrder: row.sort_order,
+    responsiblePersonId: row.responsible_person_id,
+    responsibleGuestId: row.responsible_guest_id,
   }
 }
 
@@ -83,6 +87,8 @@ export const missionsSupabaseService: MissionsService = {
       scheduled_end_date: string | null
       scheduled_end_time: string | null
       sort_order: number
+      responsible_person_id: string | null
+      responsible_guest_id: string | null
     }> = {}
     if (patch.domaineId !== undefined) row.domaine_id = patch.domaineId
     if (patch.title !== undefined) row.title = patch.title
@@ -95,7 +101,10 @@ export const missionsSupabaseService: MissionsService = {
     if (patch.scheduledEndDate !== undefined) row.scheduled_end_date = patch.scheduledEndDate ?? null
     if (patch.scheduledEndTime !== undefined) row.scheduled_end_time = patch.scheduledEndTime ?? null
     if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
-    const { data, error } = await db.from("_20260725_missions").update(row).eq("id", id).select("*").single()
+    if (patch.responsiblePersonId !== undefined) row.responsible_person_id = patch.responsiblePersonId ?? null
+    if (patch.responsibleGuestId !== undefined) row.responsible_guest_id = patch.responsibleGuestId ?? null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await db.from("_20260725_missions").update(row as any).eq("id", id).select("*").single()
     if (error) throw error
     return toMission(data)
   },

@@ -152,11 +152,6 @@ const PHASE_DEFS: Array<{ name: PhaseName; key: PhaseKey }> = [
   { name: "Désinstallation", key: "cleanup" },
 ]
 
-const DOMAIN_PHASE: Record<PhaseKey, string> = {
-  setup:   "installation",
-  main:    "jour_j",
-  cleanup: "desinstallation",
-}
 
 function hasOverlap(bands: PhaseBand[]): boolean {
   for (let i = 0; i < bands.length; i++)

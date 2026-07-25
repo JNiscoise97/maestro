@@ -20,6 +20,7 @@ import { ParametresPage } from "@/pages/parametres"
 import { RevueContenuPage } from "@/pages/revue-contenu"
 import { MaMissionPage } from "@/pages/ma-mission"
 import { MesResponsabilitesPage } from "@/pages/mes-responsabilites"
+import { TourTablesIndexPage } from "@/pages/tour-tables"
 import { NotFoundPage } from "@/pages/not-found"
 
 export function AppRoutes() {
@@ -112,6 +113,14 @@ export function AppRoutes() {
             element={
               <RoleGuard capability="view:guests">
                 <GuestDetailPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="tour-tables"
+            element={
+              <RoleGuard capability="view:tour-tables">
+                <TourTablesIndexPage />
               </RoleGuard>
             }
           />

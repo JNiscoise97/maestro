@@ -9,12 +9,14 @@ import {
 import { usePeople } from "@/hooks/queries/use-people"
 import { useGuests } from "@/hooks/queries/use-guests"
 import { useIdentity } from "@/context/IdentityContext"
+import { useLogAssigneeChange } from "@/hooks/queries/use-assignee-history"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ItemScheduleTrigger } from "@/components/missions/ItemScheduleDialog"
+import { ItemMessageTrigger } from "@/components/missions/ItemMessageDialog"
 
 const NONE = "__none__"
 
@@ -25,6 +27,8 @@ interface ChecklistWidgetProps {
   allowAssignment?: boolean
   /** Affiche l'icône de planification sur chaque item (phases installation/jour_j/désinstallation). */
   schedulable?: boolean
+  /** Responsable hérité (mission → domaine → pôle) — affiché en placeholder quand l'item n'a pas d'assigné propre. */
+  inheritedResponsable?: string
 }
 
 function SingleChecklist({
@@ -36,6 +40,8 @@ function SingleChecklist({
   fiances,
   schedulable,
   guests,
+  inheritedResponsable,
+  logChange,
 }: {
   checklistId: string
   title: string | null
@@ -45,6 +51,8 @@ function SingleChecklist({
   fiances: Person[]
   schedulable?: boolean
   guests: Guest[]
+  inheritedResponsable?: string
+  logChange: ReturnType<typeof useLogAssigneeChange>
 }) {
   const { data: items, isLoading } = useChecklistItems(checklistId)
   const toggleItem = useToggleChecklistItem()
@@ -95,9 +103,14 @@ function SingleChecklist({
       <Progress value={progress} />
       <ul className="space-y-1.5">
         {items.map((item) => {
-          const assignee =
-            guests.find((g) => g.id === item.assigneeGuestId) ??
-            fiances.find((f) => f.id === item.assigneeGuestId)
+          const assigneeGuest  = guests.find((g) => g.id === item.assigneeGuestId)
+          const assigneePerson = fiances.find((f) => f.id === item.assigneePersonId)
+          const assignee       = assigneeGuest ?? assigneePerson
+          const currentValue   = item.assigneeGuestId
+            ? `guest:${item.assigneeGuestId}`
+            : item.assigneePersonId
+            ? `person:${item.assigneePersonId}`
+            : NONE
           return (
             <li key={item.id} className="flex items-center gap-2">
               <Checkbox
@@ -113,32 +126,62 @@ function SingleChecklist({
               </label>
               {(guests.length > 0 || fiances.length > 0) && (
                 <Select
-                  value={item.assigneeGuestId ?? NONE}
-                  onValueChange={(val) =>
-                    updateItem.mutate({ id: item.id, patch: { assigneeGuestId: val === NONE ? null : val } })
-                  }
+                  value={currentValue}
+                  onValueChange={(val) => {
+                    const prevName = assignee?.fullName ?? null
+                    const [kind, id] = val.split(":")
+                    const newName = val === NONE ? null
+                      : (kind === "person"
+                          ? fiances.find((f) => f.id === id)
+                          : guests.find((g) => g.id === id))?.fullName ?? null
+                    logChange({ entityType: "checklist_item", entityId: item.id, entityLabel: item.label, previousName: prevName, newName })
+                    updateItem.mutate({
+                      id: item.id,
+                      patch: val === NONE
+                        ? { assigneeGuestId: null, assigneePersonId: null }
+                        : kind === "person"
+                        ? { assigneePersonId: id, assigneeGuestId: null }
+                        : { assigneeGuestId: id, assigneePersonId: null },
+                    })
+                  }}
                 >
-                  <SelectTrigger size="sm" className="h-6 w-auto max-w-32 shrink-0 border-dashed text-xs">
+                  <SelectTrigger
+                    size="sm"
+                    className={`h-6 w-auto max-w-32 shrink-0 border-dashed text-xs${!assignee && inheritedResponsable ? " text-muted-foreground/60" : ""}`}
+                  >
                     <SelectValue placeholder="—">
-                      {assignee ? assignee.fullName.split(" ")[0] : "—"}
+                      {assignee
+                        ? assignee.fullName.split(" ")[0]
+                        : inheritedResponsable
+                        ? `↑ ${inheritedResponsable.split(" ")[0]}`
+                        : "—"}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NONE}>—</SelectItem>
-                    {fiances.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.fullName}
-                      </SelectItem>
-                    ))}
-                    {guests.map((g) => (
-                      <SelectItem key={g.id} value={g.id}>
-                        {g.fullName}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value={NONE}>
+                      {inheritedResponsable ? `— (hérite : ${inheritedResponsable})` : "—"}
+                    </SelectItem>
+                    {fiances.length > 0 && (
+                      <>
+                        <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Fiancés</p>
+                        {fiances.map((f) => (
+                          <SelectItem key={f.id} value={`person:${f.id}`}>{f.fullName}</SelectItem>
+                        ))}
+                      </>
+                    )}
+                    {guests.length > 0 && (
+                      <>
+                        <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Invités</p>
+                        {guests.map((g) => (
+                          <SelectItem key={g.id} value={`guest:${g.id}`}>{g.fullName}</SelectItem>
+                        ))}
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               )}
               {schedulable && <ItemScheduleTrigger item={item} />}
+              <ItemMessageTrigger item={item} />
             </li>
           )
         })}
@@ -147,11 +190,12 @@ function SingleChecklist({
   )
 }
 
-export function ChecklistWidget({ ownerType, ownerId, allowAssignment = true, schedulable }: ChecklistWidgetProps) {
+export function ChecklistWidget({ ownerType, ownerId, allowAssignment = true, schedulable, inheritedResponsable }: ChecklistWidgetProps) {
   const { data: checklists, isLoading } = useChecklistsForOwner(ownerType, ownerId)
   const { data: people } = usePeople()
   const { data: guestsData } = useGuests()
   const { person } = useIdentity()
+  const logChange = useLogAssigneeChange()
 
   if (isLoading) return <Skeleton className="h-24 rounded-xl" />
   if (!checklists || checklists.length === 0) {
@@ -180,6 +224,8 @@ export function ChecklistWidget({ ownerType, ownerId, allowAssignment = true, sc
           fiances={fiances}
           schedulable={schedulable}
           guests={assignableGuests}
+          inheritedResponsable={inheritedResponsable}
+          logChange={logChange}
         />
       ))}
     </div>

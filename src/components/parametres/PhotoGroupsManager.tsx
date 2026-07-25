@@ -666,7 +666,7 @@ function SessionPeoplePanel({
   guests: Guest[]
   fiances: Person[]
 }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
 
   const participants = useMemo(() => {
     if (groups.length === 0) return []

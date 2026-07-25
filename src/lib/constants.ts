@@ -13,6 +13,7 @@ import {
   Camera,
   DoorOpen,
   ClipboardList,
+  UtensilsCrossed,
   type LucideIcon,
 } from "lucide-react"
 
@@ -73,6 +74,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Réception", path: "/accueil", icon: DoorOpen, capability: "view:accueil" },
   { label: "Logistique", path: "/logistique", icon: Truck, capability: "view:logistique" },
   { label: "Invités", path: "/invites", icon: Armchair, capability: "view:guests" },
+  { label: "Tour des tables", path: "/tour-tables", icon: UtensilsCrossed, capability: "view:tour-tables" },
   { label: "Documents", path: "/documents", icon: FolderOpen, capability: "view:documents" },
   { label: "Paramètres", path: "/parametres", icon: Settings, capability: "manage:settings" },
 ]

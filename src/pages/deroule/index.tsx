@@ -20,8 +20,9 @@ import { LiveDashboard } from "@/components/timing/LiveDashboard"
 import { DelayJournal } from "@/components/timing/DelayJournal"
 import { buildPhaseSegments, formatProgramWindow, splitRunOfShowSteps } from "@/lib/run-of-show"
 import type { Person, RunOfShowStep } from "@/types/domain"
+import { RosMessagesTab } from "@/pages/deroule/RosMessagesTab"
 
-type TabId = "programme" | "preparation" | "en-direct" | "retards"
+type TabId = "programme" | "preparation" | "en-direct" | "retards" | "messages"
 
 function StepList({ steps, people }: { steps: RunOfShowStep[]; people: Person[] }) {
   return (
@@ -102,6 +103,7 @@ export function DeroulePage() {
               </span>
             )}
           </TabsTrigger>
+          {isFiance && <TabsTrigger value="messages">Messages</TabsTrigger>}
         </TabsList>
       </Tabs>
 
@@ -154,6 +156,10 @@ export function DeroulePage() {
 
       {tab === "retards" && (
         <DelayJournal delays={delays} steps={steps} />
+      )}
+
+      {tab === "messages" && isFiance && (
+        <RosMessagesTab />
       )}
     </div>
   )

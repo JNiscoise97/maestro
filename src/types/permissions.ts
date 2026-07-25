@@ -31,6 +31,7 @@ export type Capability =
   | "view:briefing"
   | "view:referent-home"
   | "view:guest-home"
+  | "view:tour-tables"
 
 const FIANCE_CAPABILITIES: Capability[] = [
   "view:dashboard",
@@ -59,6 +60,7 @@ const FIANCE_CAPABILITIES: Capability[] = [
   "view:timing",
   "manage:timing",
   "view:briefing",
+  "view:tour-tables",
 ]
 
 const REFERENT_CAPABILITIES: Capability[] = [
@@ -76,6 +78,7 @@ const REFERENT_CAPABILITIES: Capability[] = [
   "view:photos-groupe",
   "view:accueil",
   "view:briefing",
+  "view:tour-tables",
 ]
 
 const INVITE_CAPABILITIES: Capability[] = ["view:introduction", "view:referent-home", "view:guest-home"]

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
   AlertTriangle, ArrowLeft, Camera, Check, CheckCircle2,
-  ChevronDown, ChevronRight, Clock, LogOut, Pencil, SkipForward, Star,
+  ChevronDown, ChevronRight, Clock, Pencil, SkipForward, Star,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -13,6 +13,14 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { estimatePhotoDurationSeconds, formatDuration, recordPhotoDuration } from "@/lib/photo-duration"
 import { useGuests, useGuestGroups } from "@/hooks/queries/use-guests"
@@ -45,90 +53,248 @@ const PRESENCE_CLASS: Record<PresenceStatus, string> = {
   absent: "bg-bordeaux/15 text-bordeaux border-bordeaux/30",
 }
 
+const PRESENCE_LABELS: Record<PresenceStatus, string> = {
+  present: "Présent·e",
+  en_route: "En route",
+  absent: "Absent·e définitivement",
+}
+
+function chronoKey(sessionId: string) {
+  return `photos-elapsed-${sessionId}`
+}
+
+function loadElapsed(sessionId: string): Map<string, number> {
+  try {
+    const raw = sessionStorage.getItem(chronoKey(sessionId))
+    if (raw) return new Map(Object.entries(JSON.parse(raw) as Record<string, number>))
+  } catch {}
+  return new Map()
+}
+
+function saveElapsed(sessionId: string, map: Map<string, number>) {
+  try {
+    sessionStorage.setItem(chronoKey(sessionId), JSON.stringify(Object.fromEntries(map)))
+  } catch {}
+}
+
+// Effective member set of a group after removing absent people (prefixed ids to distinguish guests/fiancés)
+function getEffectiveMembers(
+  group: PhotoGroup,
+  membersByGroupId: Map<string, PhotoGroupMember[]>,
+  absentGuestIds: string[],
+  absentFianceIds: string[],
+  allFiances: Person[]
+): Set<string> {
+  const result = new Set<string>()
+  for (const m of membersByGroupId.get(group.id) ?? []) {
+    if (!absentGuestIds.includes(m.guestId)) result.add(`g:${m.guestId}`)
+  }
+  const reqIds = group.requiredFianceIds.length > 0 ? group.requiredFianceIds : allFiances.map(f => f.id)
+  for (const fid of reqIds) {
+    if (!absentFianceIds.includes(fid)) result.add(`f:${fid}`)
+  }
+  return result
+}
+
+function setsEqual(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) return false
+  for (const x of a) if (!b.has(x)) return false
+  return true
+}
+
 // ── SessionListScreen ────────────────────────────────────────────────────────
 
-function SessionListScreen({ sessions, groups, onEnter }: {
+function SessionListScreen({ sessions = [], groups = [], members = [], fiances = [], onEnter }: {
   sessions: PhotoSession[]
   groups: PhotoGroup[]
+  members: PhotoGroupMember[]
+  fiances: Person[]
   onEnter: (id: string) => void
 }) {
-  const sorted = [...sessions].sort((a, b) => a.sortOrder - b.sortOrder)
+  const sorted = useMemo(() => [...sessions].sort((a, b) => a.sortOrder - b.sortOrder), [sessions])
+
+  const membersByGroupId = useMemo(() => {
+    const map = new Map<string, PhotoGroupMember[]>()
+    for (const m of members) {
+      const list = map.get(m.photoGroupId) ?? []
+      list.push(m)
+      map.set(m.photoGroupId, list)
+    }
+    return map
+  }, [members])
+
+  const sessionData = useMemo(() => sorted.map((session, idx) => {
+    const sg = groups.filter(g => g.sessionId === session.id).sort((a, b) => a.sortOrder - b.sortOrder)
+    const done = sg.filter(g => g.status === "done")
+    const pending = sg.filter(g => g.status === "pending")
+    const skipped = sg.filter(g => g.status === "skipped")
+    const remaining = [...pending, ...skipped]
+    const isAllDone = sg.length > 0 && done.length === sg.length
+    const hasStarted = done.length > 0 || skipped.length > 0
+    const isInProgress = hasStarted && !isAllDone
+
+    const estimatedSeconds = sg.reduce((sum, g) => {
+      const rf = g.requiredFianceIds.length > 0 ? fiances.filter(f => g.requiredFianceIds.includes(f.id)) : fiances
+      return sum + estimatePhotoDurationSeconds((membersByGroupId.get(g.id) ?? []).length + rf.length, g.label)
+    }, 0)
+
+    const remainingSeconds = remaining.reduce((sum, g) => {
+      const rf = g.requiredFianceIds.length > 0 ? fiances.filter(f => g.requiredFianceIds.includes(f.id)) : fiances
+      return sum + estimatePhotoDurationSeconds((membersByGroupId.get(g.id) ?? []).length + rf.length, g.label)
+    }, 0)
+
+    return { session, sg, done, pending, skipped, remaining, isAllDone, hasStarted, isInProgress, estimatedSeconds, remainingSeconds, idx }
+  }), [sorted, groups, membersByGroupId, fiances])
+
+  const totalGroups = groups.length
+  const totalDone = useMemo(() => groups.filter(g => g.status === "done").length, [groups])
+  const totalRemainingSeconds = useMemo(() => sessionData.reduce((sum, sd) => sum + sd.remainingSeconds, 0), [sessionData])
+  const allSessionsDone = sessionData.length > 0 && sessionData.every(sd => sd.isAllDone)
 
   if (sorted.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
-        <Camera className="size-8 opacity-30" />
-        <p className="text-sm">Aucune séance photo configurée.</p>
+      <div className="flex flex-col items-center gap-3 py-16 text-center">
+        <Camera className="size-10 text-muted-foreground opacity-20" />
+        <div>
+          <p className="text-sm font-medium text-foreground">Aucune séance configurée</p>
+          <p className="text-xs text-muted-foreground mt-1">Configurez vos séances depuis les Paramètres.</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-3">
-      {sorted.map((session) => {
-        const sg = groups.filter(g => g.sessionId === session.id)
-        const done = sg.filter(g => g.status === "done").length
-        const skipped = sg.filter(g => g.status === "skipped").length
-        const remaining = sg.filter(g => g.status === "pending").length
-        const total = sg.length
-        const isComplete = total > 0 && remaining === 0
-        const isStarted = (done + skipped) > 0 && !isComplete
+    <div className="space-y-4">
+      {/* Compteur global */}
+      {totalGroups > 0 && (
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-4xl font-heading font-bold text-foreground tabular-nums">{totalDone}</span>
+                <span className="text-xl text-muted-foreground font-normal">/ {totalGroups}</span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {allSessionsDone ? "Toutes les photos sont prises !" : "photos prises"}
+              </p>
+            </div>
+            {allSessionsDone ? (
+              <CheckCircle2 className="size-9 text-vert-vegetal shrink-0 mt-0.5" />
+            ) : totalRemainingSeconds > 0 ? (
+              <div className="text-right shrink-0">
+                <p className="text-xl font-heading font-semibold text-foreground">~{formatDuration(totalRemainingSeconds)}</p>
+                <p className="text-xs text-muted-foreground">restantes</p>
+              </div>
+            ) : null}
+          </div>
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className={cn("h-full rounded-full transition-all duration-700", allSessionsDone ? "bg-vert-vegetal" : "bg-vert-vegetal/70")}
+              style={{ width: `${totalGroups > 0 ? Math.round((totalDone / totalGroups) * 100) : 0}%` }}
+            />
+          </div>
+        </div>
+      )}
 
-        return (
+      {/* Cartes de séance */}
+      <div className="space-y-2">
+        {sessionData.map(({ session, sg, done, remaining, isAllDone, isInProgress, estimatedSeconds, remainingSeconds, idx }) => (
           <button
             key={session.id}
             type="button"
             onClick={() => onEnter(session.id)}
             className={cn(
-              "w-full text-left rounded-xl border px-4 py-3 space-y-2 transition-colors hover:bg-muted/50",
-              isComplete ? "border-vert-vegetal/30 bg-vert-vegetal/5" : "border-border bg-card"
+              "w-full text-left rounded-xl border p-4 transition-all",
+              isAllDone
+                ? "border-vert-vegetal/30 bg-vert-vegetal/5 hover:bg-vert-vegetal/10"
+                : isInProgress
+                ? "border-dore/50 bg-dore/5 shadow-sm ring-1 ring-dore/20 hover:bg-dore/10"
+                : "border-border bg-card hover:bg-muted/40"
             )}
           >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="font-medium text-foreground">{session.label}</p>
-                <p className="text-sm text-muted-foreground">
-                  {isComplete ? "Séance terminée"
-                    : remaining > 0 ? `${remaining} restante${remaining > 1 ? "s" : ""}`
-                    : "—"}
-                  {done > 0 && ` · ${done} prise${done > 1 ? "s" : ""}`}
-                  {skipped > 0 && ` · ${skipped} passée${skipped > 1 ? "s" : ""}`}
+            <div className="flex items-start gap-3">
+              {/* Icône de statut */}
+              <div className={cn(
+                "flex size-8 shrink-0 items-center justify-center rounded-full font-semibold mt-0.5",
+                isAllDone ? "bg-vert-vegetal text-white"
+                : isInProgress ? "bg-dore text-white"
+                : "bg-muted text-muted-foreground text-sm"
+              )}>
+                {isAllDone ? (
+                  <Check className="size-4" />
+                ) : isInProgress ? (
+                  <Camera className="size-3.5" />
+                ) : (
+                  <span>{idx + 1}</span>
+                )}
+              </div>
+
+              {/* Contenu */}
+              <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <p className={cn("font-semibold truncate", isInProgress ? "text-brun" : "text-foreground")}>
+                    {session.label}
+                  </p>
+                  {isInProgress && (
+                    <Badge className="shrink-0 bg-dore/20 text-brun border-0">En cours</Badge>
+                  )}
+                  {isAllDone && (
+                    <span className="shrink-0 text-xs font-medium text-vert-vegetal">Terminée</span>
+                  )}
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  {isAllDone
+                    ? `${done.length} photo${done.length > 1 ? "s" : ""} prises`
+                    : isInProgress
+                    ? `${done.length} prise${done.length > 1 ? "s" : ""} · ${remaining.length} restante${remaining.length > 1 ? "s" : ""} · ~${formatDuration(remainingSeconds)}`
+                    : `${sg.length} groupe${sg.length > 1 ? "s" : ""} · ~${formatDuration(estimatedSeconds)}`}
                 </p>
+
+                {/* Barre de progression */}
+                {sg.length > 0 && (isInProgress || isAllDone) && (
+                  <div className="pt-0.5">
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full transition-all", isAllDone ? "bg-vert-vegetal" : "bg-vert-vegetal/60")}
+                        style={{ width: `${Math.round((done.length / sg.length) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {isComplete && <CheckCircle2 className="size-4 text-vert-vegetal" />}
-                {isStarted && <Badge className="bg-dore/20 text-brun">En cours</Badge>}
-                <ChevronRight className="size-4 text-muted-foreground" />
-              </div>
+
+              {/* Chevron */}
+              {!isAllDone && (
+                <ChevronRight className={cn("size-5 shrink-0 mt-0.5", isInProgress ? "text-brun" : "text-muted-foreground")} />
+              )}
             </div>
-            {total > 0 && (
-              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-vert-vegetal/60 transition-all"
-                  style={{ width: `${Math.round(((done + skipped) / total) * 100)}%` }}
-                />
-              </div>
-            )}
           </button>
-        )
-      })}
+        ))}
+      </div>
     </div>
   )
 }
 
 // ── GatheringScreen ──────────────────────────────────────────────────────────
 
-function GatheringScreen({ session, groups, members, guests, guestGroups, fiances, onStart, onBack }: {
+function GatheringScreen({
+  session, groups = [], members = [], guests = [], guestGroups = [], fiances = [],
+  presence, onTogglePresence, onStart, onBack,
+}: {
   session: PhotoSession
   groups: PhotoGroup[]
   members: PhotoGroupMember[]
   guests: Guest[]
   guestGroups: GuestGroup[]
   fiances: Person[]
+  presence: Map<string, PresenceStatus>
+  onTogglePresence: (id: string) => void
   onStart: () => void
   onBack: () => void
 }) {
-  const [presence, setPresence] = useState<Map<string, PresenceStatus>>(new Map())
+  const [confirmSkipAll, setConfirmSkipAll] = useState(false)
+  const [confirmSkipRedundant, setConfirmSkipRedundant] = useState(false)
   const updateGroup = useUpdatePhotoGroup()
 
   const sortedGroups = useMemo(() => [...groups].sort((a, b) => a.sortOrder - b.sortOrder), [groups])
@@ -144,14 +310,6 @@ function GatheringScreen({ session, groups, members, guests, guestGroups, fiance
   }, [members])
 
   const fianceIdSet = useMemo(() => new Set(fiances.map(f => f.id)), [fiances])
-
-  function toggle(id: string) {
-    setPresence(prev => {
-      const next = new Map(prev)
-      next.set(id, cyclePresence(next.get(id) ?? "present"))
-      return next
-    })
-  }
 
   const absentGuestIds = useMemo(() =>
     [...presence.entries()].filter(([id, s]) => s === "absent" && !fianceIdSet.has(id)).map(([id]) => id),
@@ -173,21 +331,50 @@ function GatheringScreen({ session, groups, members, guests, guestGroups, fiance
     [absentGuestIds, absentFianceIds, sortedGroups, membersByGroupId, fiances]
   )
 
+  // For each impacted group, find another pending group with an identical effective member set
+  const redundancyMap = useMemo(() => {
+    const result = new Map<string, PhotoGroup>()
+    for (const ig of impactedGroups) {
+      const effectiveIG = getEffectiveMembers(ig, membersByGroupId, absentGuestIds, absentFianceIds, fiances)
+      // Group is trivially redundant if it has no remaining members
+      if (effectiveIG.size === 0) {
+        result.set(ig.id, ig)
+        continue
+      }
+      for (const other of sortedGroups) {
+        if (other.id === ig.id) continue
+        if (other.status !== "pending") continue
+        const effectiveOther = getEffectiveMembers(other, membersByGroupId, absentGuestIds, absentFianceIds, fiances)
+        if (setsEqual(effectiveIG, effectiveOther)) {
+          result.set(ig.id, other)
+          break
+        }
+      }
+    }
+    return result
+  }, [impactedGroups, sortedGroups, membersByGroupId, absentGuestIds, absentFianceIds, fiances])
+
   const totalAbsent = absentGuestIds.length + absentFianceIds.length
 
-  async function skipImpacted() {
+  async function doSkipAll() {
     await Promise.all(impactedGroups.map(g => updateGroup.mutateAsync({ id: g.id, patch: { status: "skipped" } })))
-    toast.success(`${impactedGroups.length} groupe${impactedGroups.length > 1 ? "s" : ""} passé${impactedGroups.length > 1 ? "s" : ""}.`)
+    toast.success(`${impactedGroups.length} groupe${impactedGroups.length > 1 ? "s" : ""} différé${impactedGroups.length > 1 ? "s" : ""}.`)
+    setConfirmSkipAll(false)
   }
 
-  // Unique guest IDs across all photo groups in this session
+  async function doSkipRedundant() {
+    const redundantGroups = [...redundancyMap.keys()].map(id => sortedGroups.find(g => g.id === id)).filter(Boolean) as PhotoGroup[]
+    await Promise.all(redundantGroups.map(g => updateGroup.mutateAsync({ id: g.id, patch: { status: "skipped" } })))
+    toast.success(`${redundantGroups.length} groupe${redundantGroups.length > 1 ? "s" : ""} redondant${redundantGroups.length > 1 ? "s" : ""} ignoré${redundantGroups.length > 1 ? "s" : ""}.`)
+    setConfirmSkipRedundant(false)
+  }
+
   const sessionGuestIds = useMemo(() => {
     const ids = new Set<string>()
     for (const m of members) ids.add(m.guestId)
     return ids
   }, [members])
 
-  // Unique fiancé IDs across all photo groups in this session
   const sessionFianceIds = useMemo(() => {
     const ids = new Set<string>()
     for (const group of sortedGroups) {
@@ -197,26 +384,27 @@ function GatheringScreen({ session, groups, members, guests, guestGroups, fiance
     return ids
   }, [sortedGroups, fiances])
 
-  // Guests in session grouped by GuestGroup, then ungrouped at the end
   const guestsByGuestGroup = useMemo(() => {
     const sessionGuests = guests.filter(g => sessionGuestIds.has(g.id))
     const sortedGG = [...guestGroups].sort((a, b) => a.sortOrder - b.sortOrder)
     const rows: { label: string; guestIds: string[] }[] = []
-
     for (const gg of sortedGG) {
       const ids = sessionGuests.filter(g => g.groupId === gg.id).map(g => g.id)
       if (ids.length > 0) rows.push({ label: gg.familyName, guestIds: ids })
     }
-    // Guests with no group
     const ungrouped = sessionGuests.filter(g => !g.groupId).map(g => g.id)
     if (ungrouped.length > 0) rows.push({ label: "Sans groupe", guestIds: ungrouped })
-
     return rows
   }, [guests, guestGroups, sessionGuestIds])
 
   const pendingCount = sortedGroups.filter(g => g.status === "pending").length
   const isStarted = sortedGroups.some(g => g.status !== "pending")
   const sessionFianceList = fiances.filter(f => sessionFianceIds.has(f.id))
+  const anyMarked = presence.size > 0
+
+  const startLabel = anyMarked
+    ? isStarted ? "Reprendre la séance" : "Lancer la séance"
+    : isStarted ? "Reprendre la séance" : "Démarrer sans vérifier les présences"
 
   return (
     <div className="space-y-4">
@@ -230,28 +418,67 @@ function GatheringScreen({ session, groups, members, guests, guestGroups, fiance
         </div>
       </div>
 
+      {/* Légende des états */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground">Statut :</span>
+        {(["present", "en_route", "absent"] as PresenceStatus[]).map(s => (
+          <span key={s} className={cn("rounded-full border px-2 py-0.5 text-xs font-medium", PRESENCE_CLASS[s])}>
+            {PRESENCE_LABELS[s]}
+          </span>
+        ))}
+      </div>
+
+      {/* Absences & groupes impactés */}
       {impactedGroups.length > 0 && (
         <div className="flex items-start gap-3 rounded-xl border border-bordeaux/30 bg-bordeaux/5 p-3">
           <AlertTriangle className="size-4 shrink-0 text-bordeaux mt-0.5" />
-          <div className="flex-1 space-y-1.5">
+          <div className="flex-1 space-y-2">
             <p className="text-sm font-medium text-bordeaux">
-              {totalAbsent} absent{totalAbsent > 1 ? "s" : ""} · {impactedGroups.length} groupe{impactedGroups.length > 1 ? "s" : ""} impacté{impactedGroups.length > 1 ? "s" : ""}
+              {totalAbsent} absent{totalAbsent > 1 ? "s" : ""} définitif{totalAbsent > 1 ? "s" : ""} · {impactedGroups.length} groupe{impactedGroups.length > 1 ? "s" : ""} impacté{impactedGroups.length > 1 ? "s" : ""}
             </p>
-            <p className="text-xs text-bordeaux/70">{impactedGroups.map(g => g.label).join(", ")}</p>
-            <Button
-              size="sm" variant="outline"
-              className="border-bordeaux/30 text-bordeaux hover:bg-bordeaux/10 hover:text-bordeaux"
-              onClick={skipImpacted}
-              disabled={updateGroup.isPending}
-            >
-              Passer ces groupes
-            </Button>
+            <div className="space-y-1">
+              {impactedGroups.map(g => {
+                const redundantWith = redundancyMap.get(g.id)
+                const isVoid = redundantWith?.id === g.id
+                return (
+                  <div key={g.id} className="text-xs">
+                    <span className="font-medium text-bordeaux">{g.label}</span>
+                    {isVoid ? (
+                      <span className="text-bordeaux/60"> — plus personne à photographier</span>
+                    ) : redundantWith ? (
+                      <span className="text-bordeaux/60"> — devient identique à « {redundantWith.label} »</span>
+                    ) : (
+                      <span className="text-bordeaux/40"> — unique, à conserver</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {redundancyMap.size > 0 && (
+                <Button
+                  size="sm" variant="outline"
+                  className="border-bordeaux/30 text-bordeaux hover:bg-bordeaux/10 hover:text-bordeaux"
+                  onClick={() => setConfirmSkipRedundant(true)}
+                  disabled={updateGroup.isPending}
+                >
+                  Ignorer les redondants ({redundancyMap.size})
+                </Button>
+              )}
+              <Button
+                size="sm" variant="outline"
+                className="border-bordeaux/30 text-bordeaux hover:bg-bordeaux/10 hover:text-bordeaux"
+                onClick={() => setConfirmSkipAll(true)}
+                disabled={updateGroup.isPending}
+              >
+                Différer tous ({impactedGroups.length})
+              </Button>
+            </div>
           </div>
         </div>
       )}
 
       <div className="rounded-xl border border-border overflow-hidden">
-        {/* Fiancés — toujours en tête */}
         {sessionFianceList.length > 0 && (
           <div className="px-3 py-2.5 space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-bordeaux">Fiancés</p>
@@ -259,8 +486,8 @@ function GatheringScreen({ session, groups, members, guests, guestGroups, fiance
               {sessionFianceList.map(f => {
                 const status = presence.get(f.id) ?? "present"
                 return (
-                  <button key={f.id} type="button" onClick={() => toggle(f.id)}
-                    className={cn("rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors", PRESENCE_CLASS[status])}>
+                  <button key={f.id} type="button" onClick={() => onTogglePresence(f.id)}
+                    className={cn("cursor-pointer rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors hover:opacity-80", PRESENCE_CLASS[status])}>
                     {f.fullName}
                   </button>
                 )
@@ -268,7 +495,6 @@ function GatheringScreen({ session, groups, members, guests, guestGroups, fiance
             </div>
           </div>
         )}
-        {/* Invités groupés par GuestGroup — tree view parent-enfant */}
         {guestsByGuestGroup.map(({ label, guestIds }) => {
           const groupGuests = guestIds.map(id => guestById.get(id)).filter((g): g is Guest => !!g)
           return (
@@ -279,8 +505,8 @@ function GatheringScreen({ session, groups, members, guests, guestGroups, fiance
                 renderGuest={guest => {
                   const status = presence.get(guest.id) ?? "present"
                   return (
-                    <button type="button" onClick={() => toggle(guest.id)}
-                      className={cn("rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors", PRESENCE_CLASS[status])}>
+                    <button type="button" onClick={() => onTogglePresence(guest.id)}
+                      className={cn("cursor-pointer rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors hover:opacity-80", PRESENCE_CLASS[status])}>
                       {guest.fullName}
                     </button>
                   )
@@ -294,7 +520,7 @@ function GatheringScreen({ session, groups, members, guests, guestGroups, fiance
       {pendingCount > 0 ? (
         <Button className="w-full" size="lg" onClick={onStart}>
           <Camera className="size-4" />
-          {isStarted ? "Reprendre la séance" : "Lancer la séance"}
+          {startLabel}
         </Button>
       ) : (
         <div className="flex flex-col items-center gap-3 py-4 text-center">
@@ -303,27 +529,87 @@ function GatheringScreen({ session, groups, members, guests, guestGroups, fiance
           <Button variant="outline" onClick={onBack}>Retour aux séances</Button>
         </div>
       )}
+
+      {/* Confirmation : ignorer redondants */}
+      <Dialog open={confirmSkipRedundant} onOpenChange={setConfirmSkipRedundant}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-heading">
+              Ignorer {redundancyMap.size} groupe{redundancyMap.size > 1 ? "s" : ""} redondant{redundancyMap.size > 1 ? "s" : ""} ?
+            </DialogTitle>
+            <DialogDescription>
+              Ces groupes deviennent identiques à d'autres après les absences déclarées et seront différés :{" "}
+              <span className="font-medium text-foreground">
+                {[...redundancyMap.keys()].map(id => sortedGroups.find(g => g.id === id)?.label).filter(Boolean).join(", ")}
+              </span>.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmSkipRedundant(false)}>Annuler</Button>
+            <Button variant="destructive" onClick={doSkipRedundant} disabled={updateGroup.isPending}>
+              Ignorer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation : différer tous */}
+      <Dialog open={confirmSkipAll} onOpenChange={setConfirmSkipAll}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-heading">
+              Différer {impactedGroups.length} groupe{impactedGroups.length > 1 ? "s" : ""} ?
+            </DialogTitle>
+            <DialogDescription>
+              Ces groupes seront repoussés à la fin de la file :{" "}
+              <span className="font-medium text-foreground">{impactedGroups.map(g => g.label).join(", ")}</span>.
+              Vous pourrez les traiter à la fin de la séance.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmSkipAll(false)}>Annuler</Button>
+            <Button variant="destructive" onClick={doSkipAll} disabled={updateGroup.isPending}>
+              Différer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
 
 // ── ShootingScreen ───────────────────────────────────────────────────────────
 
-function ShootingScreen({ session, groups, members, guests, guestGroups, fiances, onQuit }: {
+function ShootingScreen({ session, groups = [], members = [], guests = [], guestGroups = [], fiances = [], presence, onBack, onQuit }: {
   session: PhotoSession
   groups: PhotoGroup[]
   members: PhotoGroupMember[]
   guests: Guest[]
   guestGroups: GuestGroup[]
   fiances: Person[]
+  presence: Map<string, PresenceStatus>
+  onBack: () => void
   onQuit: () => void
 }) {
   const sortedGroups = useMemo(() => [...groups].sort((a, b) => a.sortOrder - b.sortOrder), [groups])
   const pendingGroups = useMemo(() => sortedGroups.filter(g => g.status === "pending"), [sortedGroups])
+  const skippedGroups = useMemo(() => sortedGroups.filter(g => g.status === "skipped"), [sortedGroups])
+
+  // Groups dismissed in the deferred phase (skipped a 2nd time) — local only
+  const [dismissedGroupIds, setDismissedGroupIds] = useState<Set<string>>(new Set())
+
+  // Full active queue: pending first (original order), then deferred (skipped, not dismissed)
+  const activeQueue = useMemo(() => [
+    ...pendingGroups,
+    ...skippedGroups.filter(g => !dismissedGroupIds.has(g.id)),
+  ], [pendingGroups, skippedGroups, dismissedGroupIds])
+
+  // We're in the deferred phase when all original pending groups are done
+  const isInDeferredPhase = pendingGroups.length === 0 && activeQueue.length > 0
 
   const [activeGroupId, setActiveGroupId] = useState<string | null>(() => pendingGroups[0]?.id ?? null)
   const [groupStartTime, setGroupStartTime] = useState<number>(() => Date.now())
-  const [elapsedByGroupId, setElapsedByGroupId] = useState<Map<string, number>>(new Map())
+  const [elapsedByGroupId, setElapsedByGroupId] = useState<Map<string, number>>(() => loadElapsed(session.id))
   const [now, setNow] = useState(() => Date.now())
   const [noteValue, setNoteValue] = useState("")
   const [showUpcoming, setShowUpcoming] = useState(false)
@@ -346,27 +632,24 @@ function ShootingScreen({ session, groups, members, guests, guestGroups, fiances
 
   const activeGroup = sortedGroups.find(g => g.id === activeGroupId) ?? null
 
-  // Reset chrono + note when group changes
   useEffect(() => {
     setNoteValue(activeGroup?.notes ?? "")
     setGroupStartTime(Date.now())
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGroupId])
 
-  // Auto-select first pending if current is gone
+  // Auto-select first available group when activeGroupId becomes invalid
   useEffect(() => {
-    if (!activeGroupId && pendingGroups.length > 0) {
-      setActiveGroupId(pendingGroups[0].id)
+    if (!activeGroupId && activeQueue.length > 0) {
+      setActiveGroupId(activeQueue[0].id)
     }
-  }, [activeGroupId, pendingGroups])
+  }, [activeGroupId, activeQueue])
 
-  // 1-second tick
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
   }, [])
 
-  // Cleanup note debounce on unmount
   useEffect(() => () => { if (noteTimer.current) clearTimeout(noteTimer.current) }, [])
 
   function handleNoteChange(value: string) {
@@ -378,7 +661,6 @@ function ShootingScreen({ session, groups, members, guests, guestGroups, fiances
     }, 800)
   }
 
-  // Chrono
   const groupElapsedMs = now - groupStartTime
 
   const sessionEstimatedSeconds = useMemo(() =>
@@ -397,7 +679,21 @@ function ShootingScreen({ session, groups, members, guests, guestGroups, fiances
     : []
   const activeMembers = activeGroupId ? (membersByGroupId.get(activeGroupId) ?? []) : []
 
-  // Group active members by guest's GuestGroup
+  // Members of the current group who were marked "en route" during gathering
+  const enRouteInGroup = useMemo(() => {
+    const names: string[] = []
+    for (const m of activeMembers) {
+      if (presence.get(m.guestId) === "en_route") {
+        const g = guestById.get(m.guestId)
+        if (g) names.push(g.fullName)
+      }
+    }
+    for (const f of reqFiances) {
+      if (presence.get(f.id) === "en_route") names.push(f.fullName)
+    }
+    return names
+  }, [activeMembers, reqFiances, presence, guestById])
+
   const activeMembersByGuestGroup = useMemo(() => {
     const sortedGG = [...guestGroups].sort((a, b) => a.sortOrder - b.sortOrder)
     const byKey = new Map<string, PhotoGroupMember[]>()
@@ -427,18 +723,28 @@ function ShootingScreen({ session, groups, members, guests, guestGroups, fiances
 
   async function handlePhotoPrise() {
     if (!activeGroupId || !activeGroup) return
+
+    // Flush pending note debounce before completing the group
+    if (noteTimer.current) {
+      clearTimeout(noteTimer.current)
+      noteTimer.current = null
+    }
+    if (noteValue.trim() !== (activeGroup.notes ?? "").trim()) {
+      await updateGroup.mutateAsync({ id: activeGroupId, patch: { notes: noteValue.trim() || null } })
+    }
+
     const elapsed = Date.now() - groupStartTime
     recordPhotoDuration(elapsed / 1000)
-    setElapsedByGroupId(prev => new Map(prev).set(activeGroupId, elapsed))
+    const newElapsed = new Map(elapsedByGroupId).set(activeGroupId, elapsed)
+    setElapsedByGroupId(newElapsed)
+    saveElapsed(session.id, newElapsed)
 
-    // Compute freed people: in this group but not in any remaining pending group
-    const afterPending = pendingGroups.filter(g => g.id !== activeGroupId)
+    // Compute freed people: in this group but not in any remaining queue group
+    const afterQueue = activeQueue.filter(g => g.id !== activeGroupId)
     const freed: string[] = []
     const groupMembers = membersByGroupId.get(activeGroupId) ?? []
     for (const m of groupMembers) {
-      const stillNeeded = afterPending.some(g =>
-        (membersByGroupId.get(g.id) ?? []).some(gm => gm.guestId === m.guestId)
-      )
+      const stillNeeded = afterQueue.some(g => (membersByGroupId.get(g.id) ?? []).some(gm => gm.guestId === m.guestId))
       if (!stillNeeded) {
         const guest = guestById.get(m.guestId)
         if (guest) freed.push(guest.fullName)
@@ -448,7 +754,7 @@ function ShootingScreen({ session, groups, members, guests, guestGroups, fiances
       ? activeGroup.requiredFianceIds
       : fiances.map(f => f.id)
     for (const fid of completedFianceIds) {
-      const stillNeeded = afterPending.some(g => {
+      const stillNeeded = afterQueue.some(g => {
         const req = g.requiredFianceIds.length > 0 ? g.requiredFianceIds : fiances.map(f => f.id)
         return req.includes(fid)
       })
@@ -459,24 +765,34 @@ function ShootingScreen({ session, groups, members, guests, guestGroups, fiances
     }
 
     await updateGroup.mutateAsync({ id: activeGroupId, patch: { status: "done" } })
-    const next = pendingGroups.find(g => g.id !== activeGroupId)
+    const next = activeQueue.find(g => g.id !== activeGroupId)
     setActiveGroupId(next?.id ?? null)
     if (freed.length > 0) setFreedNames(freed)
   }
 
   async function handlePasser() {
     if (!activeGroupId) return
-    await updateGroup.mutateAsync({ id: activeGroupId, patch: { status: "skipped" } })
-    const next = pendingGroups.find(g => g.id !== activeGroupId)
-    setActiveGroupId(next?.id ?? null)
+
+    if (isInDeferredPhase) {
+      // In deferred phase: dismiss definitively (keep skipped in DB, remove from local queue)
+      const newDismissed = new Set([...dismissedGroupIds, activeGroupId])
+      setDismissedGroupIds(newDismissed)
+      const next = activeQueue.find(g => g.id !== activeGroupId && !newDismissed.has(g.id))
+      setActiveGroupId(next?.id ?? null)
+    } else {
+      // Normal phase: defer to end (set skipped in DB — will reappear at end of queue)
+      await updateGroup.mutateAsync({ id: activeGroupId, patch: { status: "skipped" } })
+      const next = activeQueue.find(g => g.id !== activeGroupId)
+      setActiveGroupId(next?.id ?? null)
+    }
   }
 
   const doneGroups = sortedGroups.filter(g => g.status === "done")
-  const skippedGroups = sortedGroups.filter(g => g.status === "skipped")
+  const dismissedGroups = skippedGroups.filter(g => dismissedGroupIds.has(g.id))
 
   // ── Recap ────────────────────────────────────────────────────────────────
 
-  if (sortedGroups.length > 0 && pendingGroups.length === 0) {
+  if (sortedGroups.length > 0 && activeQueue.length === 0) {
     const totalActual = [...elapsedByGroupId.values()].reduce((s, v) => s + v, 0) / 1000
     const delta = totalActual - sessionEstimatedSeconds
 
@@ -494,8 +810,8 @@ function ShootingScreen({ session, groups, members, guests, guestGroups, fiances
           <p className="font-heading text-base font-semibold text-foreground">Séance terminée !</p>
           <div className="flex justify-center gap-4 text-sm text-foreground">
             <span>{doneGroups.length} prise{doneGroups.length > 1 ? "s" : ""}</span>
-            {skippedGroups.length > 0 && (
-              <span className="text-muted-foreground">{skippedGroups.length} passée{skippedGroups.length > 1 ? "s" : ""}</span>
+            {dismissedGroups.length > 0 && (
+              <span className="text-muted-foreground">{dismissedGroups.length} ignoré{dismissedGroups.length > 1 ? "s" : ""}</span>
             )}
           </div>
           {totalActual > 0 && (
@@ -510,31 +826,12 @@ function ShootingScreen({ session, groups, members, guests, guestGroups, fiances
           )}
         </div>
 
-        {skippedGroups.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Groupes passés</p>
-            {skippedGroups.map(g => (
-              <div key={g.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
-                <span className="text-sm text-foreground">{g.label}</span>
-                <Button size="sm" variant="outline"
-                  onClick={() => updateGroup.mutate({ id: g.id, patch: { status: "pending" } })}>
-                  Relancer
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-
         <Button variant="outline" className="w-full" onClick={onQuit}>
           Retour aux séances
         </Button>
       </div>
     )
   }
-
-  if (!activeGroup) return null
-
-  const upcoming = pendingGroups.filter(g => g.id !== activeGroupId)
 
   // ── Freed announcement overlay ────────────────────────────────────────────
 
@@ -554,18 +851,39 @@ function ShootingScreen({ session, groups, members, guests, guestGroups, fiances
         <div className="rounded-2xl border border-vert-vegetal/30 bg-vert-vegetal/5 p-6 space-y-4 w-full max-w-sm">
           <CheckCircle2 className="size-10 text-vert-vegetal mx-auto" />
           <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-vert-vegetal">À dire</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-vert-vegetal">À dire à voix haute</p>
             <p className="text-lg font-heading font-semibold text-foreground leading-snug">
               « {announcement} »
             </p>
           </div>
         </div>
-        <Button size="lg" onClick={() => setFreedNames(null)}>
-          Continuer
-        </Button>
+        <div className="flex flex-col items-center gap-1.5">
+          <Button size="lg" onClick={() => setFreedNames(null)}>
+            Continuer
+          </Button>
+          <p className="text-xs text-muted-foreground">Appuyez pour passer au groupe suivant</p>
+        </div>
       </div>
     )
   }
+
+  // ── Blank guard ───────────────────────────────────────────────────────────
+
+  if (!activeGroup) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-start gap-3">
+          <button type="button" onClick={onBack} className="mt-0.5 text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="size-5" />
+          </button>
+          <p className="font-heading text-base font-semibold text-foreground">{session.label}</p>
+        </div>
+        <Skeleton className="h-48 rounded-xl" />
+      </div>
+    )
+  }
+
+  const upcoming = activeQueue.filter(g => g.id !== activeGroupId)
 
   // ── Active group ─────────────────────────────────────────────────────────
 
@@ -573,14 +891,14 @@ function ShootingScreen({ session, groups, members, guests, guestGroups, fiances
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-start gap-3">
-        <button type="button" onClick={onQuit} className="mt-0.5 text-muted-foreground hover:text-foreground transition-colors">
+        <button type="button" onClick={onBack} className="mt-0.5 text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="size-5" />
         </button>
         <div className="flex-1 min-w-0">
           <p className="font-heading text-base font-semibold text-foreground truncate">{session.label}</p>
           <div className="flex flex-wrap items-center gap-3 text-xs">
             <span className="text-muted-foreground">
-              {doneGroups.length} prise{doneGroups.length > 1 ? "s" : ""} · {pendingGroups.length} restante{pendingGroups.length > 1 ? "s" : ""}
+              {doneGroups.length} prise{doneGroups.length > 1 ? "s" : ""} · {activeQueue.length} restante{activeQueue.length > 1 ? "s" : ""}
             </span>
             <span className={cn(
               "flex items-center gap-1 font-mono font-medium",
@@ -593,12 +911,34 @@ function ShootingScreen({ session, groups, members, guests, guestGroups, fiances
         </div>
       </div>
 
+      {/* Deferred phase banner */}
+      {isInDeferredPhase && (
+        <div className="rounded-lg border border-dore/30 bg-dore/5 px-3 py-2 text-xs text-brun">
+          Phase de rattrapage — tous les groupes initiaux sont traités. {activeQueue.length} groupe{activeQueue.length > 1 ? "s" : ""} différé{activeQueue.length > 1 ? "s" : ""} restant{activeQueue.length > 1 ? "s" : ""}.
+        </div>
+      )}
+
       {/* Active group card */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-4">
         <div className="flex items-center gap-2">
           <p className="font-heading text-base font-semibold text-foreground flex-1">{activeGroup.label}</p>
           {activeGroup.isPriority && <Star className="size-3.5 fill-dore text-dore shrink-0" />}
+          {isInDeferredPhase && (
+            <span className="rounded-full bg-dore/20 px-2 py-0.5 text-[10px] font-medium text-brun">différé</span>
+          )}
         </div>
+
+        {/* En route reminder */}
+        {enRouteInGroup.length > 0 && (
+          <div className="rounded-lg border border-dore/40 bg-dore/10 px-3 py-2 flex items-start gap-2">
+            <AlertTriangle className="size-3.5 text-brun shrink-0 mt-0.5" />
+            <p className="text-xs text-brun">
+              {enRouteInGroup.length === 1
+                ? `${enRouteInGroup[0]} était en route — vérifiez qu'il·elle est bien arrivé·e.`
+                : `${enRouteInGroup.join(", ")} étaient en route — vérifiez qu'ils sont bien arrivés.`}
+            </p>
+          </div>
+        )}
 
         {/* Members list */}
         <div className="space-y-2">
@@ -608,12 +948,12 @@ function ShootingScreen({ session, groups, members, guests, guestGroups, fiances
               <span className="text-sm font-medium text-bordeaux">{f.fullName}</span>
             </div>
           ))}
-          {activeMembersByGuestGroup.map(({ label, key, members }) => (
+          {activeMembersByGuestGroup.map(({ label, key, members: ms }) => (
             <div key={key} className="space-y-0.5">
               {label && (
                 <p className="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
               )}
-              {members.map(m => {
+              {ms.map(m => {
                 const g = guestById.get(m.guestId)
                 if (!g) return null
                 return (
@@ -662,24 +1002,34 @@ function ShootingScreen({ session, groups, members, guests, guestGroups, fiances
         </div>
 
         {/* Actions */}
-        <div className="grid grid-cols-3 gap-2">
-          <Button variant="outline" size="sm" onClick={handlePasser} disabled={updateGroup.isPending}>
-            <SkipForward className="size-3.5" />
-            Passer
-          </Button>
-          <Button variant="outline" size="sm" onClick={onQuit}>
-            <LogOut className="size-3.5" />
-            Quitter
-          </Button>
-          <Button
-            size="sm"
-            className="bg-vert-vegetal hover:bg-vert-vegetal/90 text-white"
-            onClick={handlePhotoPrise}
-            disabled={updateGroup.isPending}
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline" size="sm"
+              onClick={handlePasser}
+              disabled={updateGroup.isPending}
+              className={isInDeferredPhase ? "text-muted-foreground" : ""}
+            >
+              <SkipForward className="size-3.5" />
+              {isInDeferredPhase ? "Ignorer" : "Passer"}
+            </Button>
+            <Button
+              size="sm"
+              className="bg-vert-vegetal hover:bg-vert-vegetal/90 text-white"
+              onClick={handlePhotoPrise}
+              disabled={updateGroup.isPending}
+            >
+              <Check className="size-3.5" />
+              Photo prise
+            </Button>
+          </div>
+          <button
+            type="button"
+            onClick={onQuit}
+            className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
           >
-            <Check className="size-3.5" />
-            Photo prise
-          </Button>
+            Quitter la séance
+          </button>
         </div>
       </div>
 
@@ -697,10 +1047,12 @@ function ShootingScreen({ session, groups, members, guests, guestGroups, fiances
               {upcoming.map(g => {
                 const gm = membersByGroupId.get(g.id) ?? []
                 const rf = g.requiredFianceIds.length > 0 ? fiances.filter(f => g.requiredFianceIds.includes(f.id)) : fiances
+                const isDeferred = g.status === "skipped"
                 return (
-                  <div key={g.id} className="flex items-center gap-3 px-4 py-2.5">
+                  <div key={g.id} className={cn("flex items-center gap-3 px-4 py-2.5", isDeferred && "opacity-60")}>
                     {g.isPriority && <Star className="size-3 fill-dore text-dore shrink-0" />}
                     <p className="flex-1 text-sm truncate text-foreground">{g.label}</p>
+                    {isDeferred && <span className="text-[10px] text-muted-foreground shrink-0">différé</span>}
                     <span className="text-xs text-muted-foreground shrink-0">{gm.length + rf.length} pers.</span>
                   </div>
                 )
@@ -718,6 +1070,7 @@ function ShootingScreen({ session, groups, members, guests, guestGroups, fiances
 export function PhotosGroupePage() {
   const [screen, setScreen] = useState<Screen>("sessions")
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [presence, setPresence] = useState<Map<string, PresenceStatus>>(new Map())
 
   const { data: sessions = [], isLoading: sl } = usePhotoSessions()
   const { data: groups = [], isLoading: gl } = usePhotoGroups()
@@ -727,6 +1080,8 @@ export function PhotosGroupePage() {
   const { data: people = [], isLoading: pl } = usePeople()
   const isLoading = sl || gl || ml || gul || ggl || pl
 
+  const updateMember = useUpdatePhotoGroupMember()
+
   const fiances = useMemo(() => people.filter(p => p.role === "fiance"), [people])
   const activeSession = useMemo(() => sessions.find(s => s.id === activeSessionId) ?? null, [sessions, activeSessionId])
   const sessionGroups = useMemo(() => groups.filter(g => g.sessionId === activeSessionId), [groups, activeSessionId])
@@ -734,6 +1089,35 @@ export function PhotosGroupePage() {
     () => members.filter(m => sessionGroups.some(g => g.id === m.photoGroupId)),
     [members, sessionGroups]
   )
+
+  function handleEnterSession(id: string) {
+    setActiveSessionId(id)
+    setPresence(new Map())
+    setScreen("gathering")
+  }
+
+  function togglePresence(id: string) {
+    setPresence(prev => {
+      const next = new Map(prev)
+      next.set(id, cyclePresence(next.get(id) ?? "present"))
+      return next
+    })
+  }
+
+  function handleStart() {
+    const absentGuestIds = [...presence.entries()]
+      .filter(([, s]) => s === "absent")
+      .map(([id]) => id)
+
+    if (absentGuestIds.length > 0) {
+      for (const m of sessionMembers) {
+        if (absentGuestIds.includes(m.guestId)) {
+          updateMember.mutate({ id: m.id, patch: { isPresent: false } })
+        }
+      }
+    }
+    setScreen("shooting")
+  }
 
   if (isLoading) {
     return (
@@ -753,7 +1137,9 @@ export function PhotosGroupePage() {
         <SessionListScreen
           sessions={sessions}
           groups={groups}
-          onEnter={id => { setActiveSessionId(id); setScreen("gathering") }}
+          members={members}
+          fiances={fiances}
+          onEnter={handleEnterSession}
         />
       </div>
     )
@@ -762,13 +1148,16 @@ export function PhotosGroupePage() {
   if (screen === "gathering") {
     return (
       <GatheringScreen
+        key={activeSessionId ?? "none"}
         session={activeSession}
         groups={sessionGroups}
         members={sessionMembers}
         guests={guests}
         guestGroups={guestGroups}
         fiances={fiances}
-        onStart={() => setScreen("shooting")}
+        presence={presence}
+        onTogglePresence={togglePresence}
+        onStart={handleStart}
         onBack={() => setScreen("sessions")}
       />
     )
@@ -783,6 +1172,8 @@ export function PhotosGroupePage() {
       guests={guests}
       guestGroups={guestGroups}
       fiances={fiances}
+      presence={presence}
+      onBack={() => setScreen("gathering")}
       onQuit={() => setScreen("sessions")}
     />
   )

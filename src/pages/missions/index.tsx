@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import {
   ListChecks, LayoutGrid, FolderTree, CheckCircle2, TriangleAlert,
-  Clock, Ban, ArrowRight, Calendar, RefreshCw, UserPlus,
+  Clock, Ban, ArrowRight, Calendar, RefreshCw, UserPlus, History,
 } from "lucide-react"
 
 import { toast } from "sonner"
@@ -25,13 +25,18 @@ import { useRosLaunches } from "@/hooks/queries/use-ros-launches"
 import { useDomaines } from "@/hooks/queries/use-domaines"
 import { usePoles } from "@/hooks/queries/use-poles"
 import { useAllChecklists, useAllChecklistItems, useUpdateChecklistItem } from "@/hooks/queries/use-checklists"
+import { useDomaineResponsables } from "@/hooks/queries/use-domaine-responsables"
 import { useAllMissionAcceptances, useRespondToMission } from "@/hooks/queries/use-mission-acceptances"
 import { useGuests } from "@/hooks/queries/use-guests"
 import { usePeople } from "@/hooks/queries/use-people"
 import { useIdentity } from "@/context/IdentityContext"
 import { useResponsableEntries } from "@/hooks/use-responsable-entries"
+import { useAssigneeHistory } from "@/hooks/queries/use-assignee-history"
 import { MissionEditDialog } from "@/components/missions/MissionEditDialog"
+import { MissionResponsableSelect } from "@/components/missions/MissionResponsableSelect"
+import { DomaineResponsableSelect } from "@/components/shared/DomaineResponsableSelect"
 import { DOMAINE_PHASE_LABELS, DOMAINE_PHASE_ORDER } from "@/lib/constants"
+import { resolveEffectiveMissionResponsable, type EffectiveResponsable } from "@/lib/responsible"
 import { cn } from "@/lib/utils"
 
 const NO_POLE = "__no_pole__"
@@ -62,45 +67,59 @@ const SCHEDULABLE_PHASES = new Set(["installation", "jour_j", "desinstallation"]
 function DomaineMissionsCard({
   domaine,
   missions,
-  responsableNames,
-  stats,
+  effectiveByMissionId,
 }: {
   domaine: Domaine
   missions: Mission[]
-  responsableNames?: string[]
-  stats?: { done: number; total: number; percent: number }
+  effectiveByMissionId?: Map<string, EffectiveResponsable | null>
 }) {
   const schedulable = SCHEDULABLE_PHASES.has(domaine.phase ?? "")
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-wrap items-center gap-2">
-          <CardTitle className="font-heading text-base">{domaine.name}</CardTitle>
-          {domaine.phase ? (
-            <Badge className="bg-muted text-muted-foreground">{DOMAINE_PHASE_LABELS[domaine.phase]}</Badge>
-          ) : null}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="font-heading text-base">{domaine.name}</CardTitle>
+            {domaine.phase ? (
+              <Badge className="bg-muted text-muted-foreground">{DOMAINE_PHASE_LABELS[domaine.phase]}</Badge>
+            ) : null}
+          </div>
+          <DomaineResponsableSelect domaine={domaine} />
         </div>
         {domaine.description ? <p className="text-xs text-muted-foreground">{domaine.description}</p> : null}
-        {responsableNames && responsableNames.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            Responsable{responsableNames.length > 1 ? "s" : ""} : {responsableNames.join(", ")}
-          </p>
-        )}
       </CardHeader>
       <CardContent className="space-y-4">
-        {missions.map((mission) => (
-          <div key={mission.id} className="space-y-2 rounded-xl bg-muted/50 p-3">
-            <div className="flex items-center gap-2">
-              <div className="flex flex-1 flex-wrap items-center gap-2">
-                <p className="text-sm font-medium text-foreground">{mission.title}</p>
-                <StatusBadge status={mission.status} />
+        {missions.map((mission) => {
+          const effective = effectiveByMissionId?.get(mission.id)
+          // Héritage visible dans le ChecklistWidget seulement si la source n'est pas l'item lui-même
+          const inheritedForItems = effective?.name
+          // Pour le select mission : on transmet le nom du parent uniquement si la mission n'a pas de responsable propre
+          const missionParentName = (!mission.responsiblePersonId && !mission.responsibleGuestId)
+            ? effective?.name
+            : undefined
+          return (
+            <div key={mission.id} className="space-y-2 rounded-xl bg-muted/50 p-3">
+              <div className="flex items-center gap-2">
+                <div className="flex flex-1 flex-wrap items-center gap-2">
+                  <p className="text-sm font-medium text-foreground">{mission.title}</p>
+                  <StatusBadge status={mission.status} />
+                </div>
+                {schedulable && (
+                  <MissionResponsableSelect mission={mission} inheritedName={missionParentName} />
+                )}
+                <MissionEditDialog mission={mission} />
               </div>
-              <MissionEditDialog mission={mission} />
+              {mission.description ? <p className="text-xs text-muted-foreground">{mission.description}</p> : null}
+              <ChecklistWidget
+                ownerType="mission"
+                ownerId={mission.id}
+                allowAssignment={false}
+                schedulable={schedulable}
+                inheritedResponsable={inheritedForItems}
+              />
             </div>
-            {mission.description ? <p className="text-xs text-muted-foreground">{mission.description}</p> : null}
-            <ChecklistWidget ownerType="mission" ownerId={mission.id} allowAssignment={false} schedulable={schedulable} />
-          </div>
-        ))}
+          )
+        })}
         <div className="space-y-1.5 rounded-xl border border-dashed border-border p-3">
           <p className="text-xs font-medium text-muted-foreground">Definition of Done du domaine</p>
           <ChecklistWidget ownerType="domaine" ownerId={domaine.id} allowAssignment={false} />
@@ -201,6 +220,7 @@ export function MissionsPage() {
   const { data: guests, isLoading: guestsLoading } = useGuests()
   const { data: people, isLoading: peopleLoading } = usePeople()
   const { data: acceptances, isLoading: acceptancesLoading } = useAllMissionAcceptances()
+  const { data: domaineResponsables = [] } = useDomaineResponsables()
   const { data: rosLaunches = [] } = useRosLaunches()
   const updateItem = useUpdateChecklistItem()
   const { person } = useIdentity()
@@ -214,6 +234,17 @@ export function MissionsPage() {
     if (!person || person.role === "fiance") return null
     return entries.find((e) => e.identity.id === person.id)?.domaineIds ?? []
   }, [person, entries])
+
+  const effectiveByMissionId = useMemo(() => {
+    const map = new Map<string, EffectiveResponsable | null>()
+    for (const mission of missions ?? []) {
+      const domaine = (domaines ?? []).find((d) => d.id === mission.domaineId)
+      map.set(mission.id, resolveEffectiveMissionResponsable(
+        mission, domaine, domaineResponsables, poles ?? [], people ?? [], guests ?? []
+      ))
+    }
+    return map
+  }, [missions, domaines, domaineResponsables, poles, people, guests])
 
   const visibleMissions = useMemo(() => {
     if (!missions) return undefined
@@ -267,8 +298,8 @@ export function MissionsPage() {
     if (!visibleMissions || !domaines || !poles) return []
 
     const sortedPoles = [...poles].sort((a, b) => a.sortOrder - b.sortOrder)
-    const poleList: { id: string; name: string }[] = [
-      ...sortedPoles.map((p) => ({ id: p.id, name: p.name })),
+    const poleList: { id: string; name: string; responsiblePersonId?: string | null }[] = [
+      ...sortedPoles.map((p) => ({ id: p.id, name: p.name, responsiblePersonId: p.responsiblePersonId })),
       { id: NO_POLE, name: "Sans pôle" },
     ]
 
@@ -411,6 +442,7 @@ export function MissionsPage() {
   }
 
   const isFiance = person?.role === "fiance"
+  const { data: assigneeHistory = [] } = useAssigneeHistory()
   const [activeTab, setActiveTab] = useState(DASHBOARD_TAB)
   const [fianceView, setFianceView] = useState<"pilotage" | "operationnelle">("pilotage")
   const [phaseFilter, setPhaseFilter] = useState<string | null>(null)
@@ -617,6 +649,49 @@ export function MissionsPage() {
           )}
         </CardContent>
       </Card>
+
+      {isFiance && assigneeHistory.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <History className="size-4 text-muted-foreground" />
+              <CardTitle className="font-heading text-base">Historique des responsables</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="overflow-x-auto p-0">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border text-muted-foreground">
+                  <th className="px-4 py-2 text-left font-medium">Date</th>
+                  <th className="px-4 py-2 text-left font-medium">Par</th>
+                  <th className="px-4 py-2 text-left font-medium">Niveau</th>
+                  <th className="px-4 py-2 text-left font-medium">Élément</th>
+                  <th className="px-4 py-2 text-left font-medium">Avant</th>
+                  <th className="px-4 py-2 text-left font-medium">Après</th>
+                </tr>
+              </thead>
+              <tbody>
+                {assigneeHistory.map((entry) => (
+                  <tr key={entry.id} className="border-b border-border/50 last:border-0">
+                    <td className="px-4 py-2 text-muted-foreground whitespace-nowrap">
+                      {new Date(entry.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                    </td>
+                    <td className="px-4 py-2 font-medium">{entry.actorName}</td>
+                    <td className="px-4 py-2">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground capitalize">
+                        {{ pole: "Pôle", domaine: "Domaine", mission: "Mission", checklist_item: "Tâche" }[entry.entityType]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 max-w-48 truncate">{entry.entityLabel}</td>
+                    <td className="px-4 py-2 text-muted-foreground">{entry.previousName ?? "—"}</td>
+                    <td className="px-4 py-2">{entry.newName ?? <span className="text-muted-foreground">Retiré</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
     </>
   )
 
@@ -663,7 +738,7 @@ export function MissionsPage() {
           const prev = byPhase.get(phase) ?? { done: 0, total: 0, unscheduled: 0 }
           byPhase.set(phase, { done: prev.done + ds.done, total: prev.total + ds.total, unscheduled: prev.unscheduled + unscheduled })
         }
-        const rows = DOMAINE_PHASE_ORDER
+        const rows: Array<{ phase: string; label: string; done: number; total: number; unscheduled: number }> = DOMAINE_PHASE_ORDER
           .filter((p) => byPhase.has(p))
           .map((p) => ({ phase: p, label: DOMAINE_PHASE_LABELS[p], ...byPhase.get(p)! }))
         if (byPhase.has("__none__")) rows.push({ phase: "__none__", label: "Sans phase", ...byPhase.get("__none__")!, unscheduled: 0 })
@@ -699,15 +774,12 @@ export function MissionsPage() {
       {domaineGroups
         .filter(({ domaine }) => phaseFilter === null || domaine.phase === phaseFilter)
         .map(({ domaine, missions: domaineMissions }) => {
-          const responsableNames = entries
-            .filter((e) => e.domaineIds.includes(domaine.id))
-            .map((e) => e.identity.fullName)
           return (
             <DomaineMissionsCard
               key={domaine.id}
               domaine={domaine}
               missions={domaineMissions}
-              responsableNames={responsableNames}
+              effectiveByMissionId={effectiveByMissionId}
             />
           )
         })}
@@ -812,19 +884,14 @@ export function MissionsPage() {
               <EmptyState icon={ListChecks} title="Aucune mission ne vous a été confiée pour le moment" />
             ) : (
               <div className="space-y-4">
-                {myDomaineGroups.map(({ domaine, missions: domaineMissions }) => {
-                  const responsableNames = entries
-                    .filter((e) => e.domaineIds.includes(domaine.id))
-                    .map((e) => e.identity.fullName)
-                  return (
-                    <DomaineMissionsCard
-                      key={domaine.id}
-                      domaine={domaine}
-                      missions={domaineMissions}
-                      responsableNames={responsableNames}
-                    />
-                  )
-                })}
+                {myDomaineGroups.map(({ domaine, missions: domaineMissions }) => (
+                  <DomaineMissionsCard
+                    key={domaine.id}
+                    domaine={domaine}
+                    missions={domaineMissions}
+                    effectiveByMissionId={effectiveByMissionId}
+                  />
+                ))}
               </div>
             )
           ) : (

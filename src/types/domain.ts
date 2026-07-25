@@ -93,6 +93,9 @@ export interface Mission {
   scheduledEndDate?: string | null
   scheduledEndTime?: string | null
   sortOrder: number
+  /** Responsable explicite : fiancé (personId) ou personne de confiance (guestId) — au plus un des deux. Sans affectation, hérite du domaine puis du pôle. */
+  responsiblePersonId?: string | null
+  responsibleGuestId?: string | null
 }
 
 export type MissionAcceptanceStatus = "pending" | "accepted" | "declined"
@@ -132,8 +135,10 @@ export interface ChecklistItem {
   estimatedEndDate?: string | null
   estimatedEndTime?: string | null
   assigneeGuestId?: string | null
+  assigneePersonId?: string | null
   taskSchedulingType?: TaskSchedulingType | null
   taskPhase?: string | null
+  rosMessageId?: string | null
 }
 
 export type PlanningMilestone = "j_moins_30" | "j_moins_15" | "j_moins_7" | "j_moins_1" | "jour_j" | "j_plus_1"
@@ -351,6 +356,7 @@ export interface SeatingTable {
   sortOrder: number
   posX?: number | null
   posY?: number | null
+  confirmedAt?: string | null
 }
 
 /** Le siège est attribué à un invité, un fiancé ou un prestataire — jamais plusieurs à la fois. */

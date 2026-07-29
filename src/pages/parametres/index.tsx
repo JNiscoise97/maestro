@@ -16,6 +16,7 @@ import { ResetIntroductionSeenButton } from "@/components/parametres/ResetIntrod
 import { ResetCheckInsButton } from "@/components/parametres/ResetCheckInsButton"
 import { ResetPhotoGroupsButton } from "@/components/parametres/ResetPhotoGroupsButton"
 import { SyncFromFiancaillesButton } from "@/components/parametres/SyncFromFiancaillesButton"
+import { GuestCsvImport } from "@/components/parametres/GuestCsvImport"
 import { EquipmentManager } from "@/components/parametres/EquipmentManager"
 import { AccessCodesManager } from "@/components/parametres/AccessCodesManager"
 import { MessagesConfig } from "@/components/timing/MessagesConfig"
@@ -37,6 +38,7 @@ type Section =
   | "timing-missions"
   | "timing-taches"
   | "invites-groupes"
+  | "invites-import"
   | "invites-photos"
   | "invites-tables"
   | "materiel"
@@ -69,6 +71,7 @@ const NAV: NavGroup[] = [
     label: "Invités",
     items: [
       { id: "invites-groupes", label: "Groupes & familles" },
+      { id: "invites-import", label: "Import CSV" },
       { id: "invites-photos", label: "Photos de groupe" },
       { id: "invites-tables", label: "Plan de table" },
     ],
@@ -154,6 +157,7 @@ function ContentPanel({ section }: { section: Section }) {
     case "timing-messages-crud":   return <MessagesManager />
     case "timing-messages":        return <TimingMessagesSection />
     case "invites-groupes": return <GuestGroupsManager />
+    case "invites-import":  return <GuestCsvImport />
     case "invites-photos":  return <PhotoGroupsManager />
     case "invites-tables":  return <SeatingTablesManager />
     case "materiel":        return <EquipmentManager />

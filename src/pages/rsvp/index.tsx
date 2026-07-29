@@ -4,6 +4,34 @@ import { rsvpService, type Attendance } from "@/services/rsvp.service"
 
 const SERIF = "'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif"
 
+function Stepper({ value, min, max, onChange }: { value: number; min: number; max: number; onChange: (v: number) => void }) {
+  return (
+    <div className="flex items-center gap-0">
+      <button
+        type="button"
+        onClick={() => onChange(Math.max(min, value - 1))}
+        disabled={value <= min}
+        aria-label="Diminuer"
+        className="w-11 h-11 flex items-center justify-center border border-[#C5C1B7] dark:border-[#363C38] text-[#1A1D1B] dark:text-[#E8E4DA] text-lg disabled:opacity-30 transition-colors hover:bg-[#EDE9DF] dark:hover:bg-[#1B211C] active:bg-[#E0DBD0] dark:active:bg-[#222820]"
+      >
+        −
+      </button>
+      <span className="w-12 h-11 flex items-center justify-center border-t border-b border-[#C5C1B7] dark:border-[#363C38] text-[17px] font-medium text-[#1A1D1B] dark:text-[#E8E4DA] tabular-nums select-none">
+        {value}
+      </span>
+      <button
+        type="button"
+        onClick={() => onChange(Math.min(max, value + 1))}
+        disabled={value >= max}
+        aria-label="Augmenter"
+        className="w-11 h-11 flex items-center justify-center border border-[#C5C1B7] dark:border-[#363C38] text-[#1A1D1B] dark:text-[#E8E4DA] text-lg disabled:opacity-30 transition-colors hover:bg-[#EDE9DF] dark:hover:bg-[#1B211C] active:bg-[#E0DBD0] dark:active:bg-[#222820]"
+      >
+        +
+      </button>
+    </div>
+  )
+}
+
 const OPTIONS: { value: Attendance; label: string }[] = [
   { value: "yes",          label: "Oui, je serai là" },
   { value: "probably",     label: "Probablement, à confirmer" },
@@ -130,21 +158,19 @@ export function RsvpPage() {
 
             {withCount && (
               <div className="mb-9">
-                <span className="block text-[10.5px] tracking-[0.16em] uppercase text-[#4A504B] dark:text-[#8A8E8B] font-medium mb-3.5">
+                <span className="block text-[10.5px] tracking-[0.16em] uppercase text-[#4A504B] dark:text-[#8A8E8B] font-medium mb-5">
                   Combien de personnes seriez-vous&nbsp;?
                 </span>
                 <div className="grid grid-cols-2 gap-8">
                   <div>
-                    <label htmlFor="adults" className="block text-[10.5px] tracking-[0.12em] uppercase text-[#4A504B] dark:text-[#8A8E8B] mb-2">Adultes</label>
-                    <input id="adults" type="number" min={1} max={20} value={adults} onChange={e => setAdults(Math.max(1, Number(e.target.value)))}
-                      className="w-full bg-transparent border-0 border-b border-[#C5C1B7] dark:border-[#363C38] rounded-none py-2.5 text-base text-[#1A1D1B] dark:text-[#E8E4DA] focus:border-[#2D5036] dark:focus:border-[#7BBF8C] focus:outline-none transition-colors" />
+                    <p className="text-[10.5px] tracking-[0.12em] uppercase text-[#4A504B] dark:text-[#8A8E8B] mb-3">Adultes</p>
+                    <Stepper value={adults} min={1} max={20} onChange={setAdults} />
                   </div>
                   <div>
-                    <label htmlFor="children" className="block text-[10.5px] tracking-[0.12em] uppercase text-[#4A504B] dark:text-[#8A8E8B] mb-2">
+                    <p className="text-[10.5px] tracking-[0.12em] uppercase text-[#4A504B] dark:text-[#8A8E8B] mb-3">
                       Enfants <span className="normal-case tracking-normal text-[10px] opacity-55">(optionnel)</span>
-                    </label>
-                    <input id="children" type="number" min={0} max={20} value={children} onChange={e => setChildren(Math.max(0, Number(e.target.value)))}
-                      className="w-full bg-transparent border-0 border-b border-[#C5C1B7] dark:border-[#363C38] rounded-none py-2.5 text-base text-[#1A1D1B] dark:text-[#E8E4DA] focus:border-[#2D5036] dark:focus:border-[#7BBF8C] focus:outline-none transition-colors" />
+                    </p>
+                    <Stepper value={children} min={0} max={20} onChange={setChildren} />
                   </div>
                 </div>
               </div>

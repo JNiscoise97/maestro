@@ -5,13 +5,13 @@ import type { Guest } from "@/types/domain"
 
 // ── Tree model ────────────────────────────────────────────────────────────────
 
-interface TreeNode {
+export interface GuestTreeNode {
   primary: Guest
   partner: Guest | null
-  children: TreeNode[]
+  children: GuestTreeNode[]
 }
 
-function buildTree(guests: Guest[]): TreeNode[] {
+export function buildGuestTree(guests: Guest[]): GuestTreeNode[] {
   const guestById = new Map(guests.map(g => [g.id, g]))
   const guestIds = new Set(guests.map(g => g.id))
 
@@ -29,7 +29,7 @@ function buildTree(guests: Guest[]): TreeNode[] {
 
   const consumed = new Set<string>()
 
-  function buildNode(guest: Guest): TreeNode {
+  function buildNode(guest: Guest): GuestTreeNode {
     // Partner: pairedWithId pointing to someone in this list, not yet consumed
     const partner =
       guest.pairedWithId &&
@@ -66,7 +66,7 @@ function buildTree(guests: Guest[]): TreeNode[] {
     .sort((a, b) => a.fullName.localeCompare(b.fullName, "fr"))
 
   consumed.clear()
-  const nodes: TreeNode[] = []
+  const nodes: GuestTreeNode[] = []
   for (const g of roots) {
     if (consumed.has(g.id)) continue
     nodes.push(buildNode(g))
@@ -81,7 +81,7 @@ function TreeNodeRow({
   depth,
   renderGuest,
 }: {
-  node: TreeNode
+  node: GuestTreeNode
   depth: number
   renderGuest: (guest: Guest) => React.ReactNode
 }) {
@@ -117,7 +117,7 @@ export function GuestTreeView({
   guests: Guest[]
   renderGuest: (guest: Guest) => React.ReactNode
 }) {
-  const tree = useMemo(() => buildTree(guests), [guests])
+  const tree = useMemo(() => buildGuestTree(guests), [guests])
   if (tree.length === 0) return null
 
   return (

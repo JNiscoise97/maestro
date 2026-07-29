@@ -32,6 +32,8 @@ export type Capability =
   | "view:referent-home"
   | "view:guest-home"
   | "view:tour-tables"
+  | "view:messages"
+  | "view:cadeaux"
 
 const FIANCE_CAPABILITIES: Capability[] = [
   "view:dashboard",
@@ -61,6 +63,8 @@ const FIANCE_CAPABILITIES: Capability[] = [
   "manage:timing",
   "view:briefing",
   "view:tour-tables",
+  "view:messages",
+  "view:cadeaux",
 ]
 
 const REFERENT_CAPABILITIES: Capability[] = [
@@ -79,9 +83,10 @@ const REFERENT_CAPABILITIES: Capability[] = [
   "view:accueil",
   "view:briefing",
   "view:tour-tables",
+  "view:messages",
 ]
 
-const INVITE_CAPABILITIES: Capability[] = ["view:introduction", "view:referent-home", "view:guest-home"]
+const INVITE_CAPABILITIES: Capability[] = ["view:introduction", "view:referent-home", "view:guest-home", "view:messages"]
 
 export const PERMISSIONS: Record<AppRole, ReadonlySet<Capability>> = {
   fiance: new Set(FIANCE_CAPABILITIES),

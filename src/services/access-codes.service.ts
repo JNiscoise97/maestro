@@ -1,6 +1,7 @@
-import { peopleService } from "@/services/people.service"
+﻿import { peopleService } from "@/services/people.service"
 import { guestsService } from "@/services/guests.service"
 import { supabase, USE_SUPABASE } from "@/supabase/client"
+import { tbl } from "@/lib/event"
 
 export interface AccessCodeEntry {
   id: string
@@ -13,9 +14,9 @@ export interface AccessCodeEntry {
 export const accessCodesService = {
   async list(): Promise<AccessCodeEntry[]> {
     if (USE_SUPABASE) {
-      const { data, error } = await supabase!.rpc("_20260725_list_access_codes")
+      const { data, error } = await (supabase! as any).rpc(tbl("list_access_codes") as any)
       if (error) throw error
-      return (data ?? []).map((row) => ({
+      return ((data ?? []) as any[]).map((row) => ({
         id: row.id,
         fullName: row.full_name,
         kind: row.kind as "fiance" | "guest",

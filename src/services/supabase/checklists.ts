@@ -1,8 +1,9 @@
-import type { Checklist, ChecklistItem } from "@/types/domain"
+﻿import type { Checklist, ChecklistItem } from "@/types/domain"
 import type { ChecklistsService } from "@/services/checklists.service"
 import { supabase } from "@/supabase/client"
+import { tbl } from "@/lib/event"
 
-const db = supabase!
+const db = supabase! as any
 
 function toChecklist(row: {
   id: string
@@ -114,13 +115,13 @@ function toChecklistRow(input: Partial<Checklist>): ChecklistRowPatch {
 
 export const checklistsSupabaseService: ChecklistsService = {
   async listAll() {
-    const { data, error } = await db.from("_20260725_checklists").select("*")
+    const { data, error } = await (db as any).from(tbl("checklists") as any).select("*")
     if (error) throw error
     return (data ?? []).map(toChecklist)
   },
   async listForOwner(ownerType, ownerId) {
     const { data, error } = await db
-      .from("_20260725_checklists")
+      .from(tbl("checklists") as any)
       .select("*")
       .eq("owner_type", ownerType)
       .eq("owner_id", ownerId)
@@ -129,13 +130,13 @@ export const checklistsSupabaseService: ChecklistsService = {
   },
   async create(input) {
     const row = toChecklistRow(input) as ChecklistRowPatch & { owner_type: Checklist["ownerType"] }
-    const { data, error } = await db.from("_20260725_checklists").insert(row).select("*").single()
+    const { data, error } = await (db as any).from(tbl("checklists") as any).insert(row).select("*").single()
     if (error) throw error
     return toChecklist(data)
   },
   async update(id, patch) {
     const { data, error } = await db
-      .from("_20260725_checklists")
+      .from(tbl("checklists") as any)
       .update(toChecklistRow(patch))
       .eq("id", id)
       .select("*")
@@ -144,12 +145,12 @@ export const checklistsSupabaseService: ChecklistsService = {
     return toChecklist(data)
   },
   async remove(id) {
-    const { error } = await db.from("_20260725_checklists").delete().eq("id", id)
+    const { error } = await (db as any).from(tbl("checklists") as any).delete().eq("id", id)
     if (error) throw error
   },
   async listItems(checklistId) {
     const { data, error } = await db
-      .from("_20260725_checklist_items")
+      .from(tbl("checklist_items") as any)
       .select("*")
       .eq("checklist_id", checklistId)
       .order("sort_order")
@@ -161,7 +162,7 @@ export const checklistsSupabaseService: ChecklistsService = {
     const PAGE = 1000
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await db
-        .from("_20260725_checklist_items")
+        .from(tbl("checklist_items") as any)
         .select("*")
         .range(from, from + PAGE - 1)
       if (error) throw error
@@ -173,13 +174,13 @@ export const checklistsSupabaseService: ChecklistsService = {
   async createItem(input) {
     const row = toItemRow(input) as ChecklistItemRowPatch & { checklist_id: string; label: string }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await db.from("_20260725_checklist_items").insert(row as any).select("*").single()
+    const { data, error } = await (db as any).from(tbl("checklist_items") as any).insert(row as any).select("*").single()
     if (error) throw error
     return toChecklistItem(data)
   },
   async updateItem(id, patch) {
     const { data, error } = await db
-      .from("_20260725_checklist_items")
+      .from(tbl("checklist_items") as any)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .update(toItemRow(patch) as any)
       .eq("id", id)
@@ -189,12 +190,12 @@ export const checklistsSupabaseService: ChecklistsService = {
     return toChecklistItem(data)
   },
   async removeItem(id) {
-    const { error } = await db.from("_20260725_checklist_items").delete().eq("id", id)
+    const { error } = await (db as any).from(tbl("checklist_items") as any).delete().eq("id", id)
     if (error) throw error
   },
   async toggleItem(itemId, isDone) {
     const { data, error } = await db
-      .from("_20260725_checklist_items")
+      .from(tbl("checklist_items") as any)
       .update({ is_done: isDone })
       .eq("id", itemId)
       .select("*")

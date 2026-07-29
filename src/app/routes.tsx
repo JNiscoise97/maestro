@@ -21,6 +21,8 @@ import { RevueContenuPage } from "@/pages/revue-contenu"
 import { MaMissionPage } from "@/pages/ma-mission"
 import { MesResponsabilitesPage } from "@/pages/mes-responsabilites"
 import { TourTablesIndexPage } from "@/pages/tour-tables"
+import { MessagesPage } from "@/pages/messages"
+import { CadeauxPage } from "@/pages/cadeaux"
 import { NotFoundPage } from "@/pages/not-found"
 
 export function AppRoutes() {
@@ -73,6 +75,14 @@ export function AppRoutes() {
             }
           />
           <Route path="timing" element={<Navigate to="/deroule" replace />} />
+          <Route
+            path="messages"
+            element={
+              <RoleGuard capability="view:messages">
+                <MessagesPage />
+              </RoleGuard>
+            }
+          />
           <Route
             path="photos-groupe"
             element={
@@ -128,6 +138,14 @@ export function AppRoutes() {
           <Route path="enfants" element={<Navigate to="/invites" replace />} />
           <Route path="personnes-agees" element={<Navigate to="/invites" replace />} />
           <Route path="prestataires" element={<Navigate to="/logistique" replace />} />
+          <Route
+            path="cadeaux"
+            element={
+              <RoleGuard capability="view:cadeaux">
+                <CadeauxPage />
+              </RoleGuard>
+            }
+          />
           <Route
             path="documents"
             element={

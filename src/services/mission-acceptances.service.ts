@@ -3,6 +3,7 @@ import { createMockTable } from "@/services/mock/db"
 import { missionAcceptancesSeed } from "@/services/mock/data/mission-acceptances"
 import { missionAcceptancesSupabaseService } from "@/services/supabase/mission-acceptances"
 import { USE_SUPABASE } from "@/supabase/client"
+import { mockKey } from "@/lib/event"
 
 export interface MissionAcceptancesService {
   list(): Promise<MissionAcceptance[]>
@@ -10,7 +11,7 @@ export interface MissionAcceptancesService {
   respond(missionId: string, guestId: string, status: MissionAcceptanceStatus): Promise<MissionAcceptance>
 }
 
-const missionAcceptancesTable = createMockTable<MissionAcceptance>("sj-mission-acceptances", missionAcceptancesSeed)
+const missionAcceptancesTable = createMockTable<MissionAcceptance>(mockKey("mission-acceptances"), missionAcceptancesSeed)
 
 const missionAcceptancesMockService: MissionAcceptancesService = {
   async list() {

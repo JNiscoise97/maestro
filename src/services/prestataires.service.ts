@@ -3,6 +3,7 @@ import { createMockTable } from "@/services/mock/db"
 import { prestatairesSeed } from "@/services/mock/data/prestataires"
 import { prestatairesSupabaseService } from "@/services/supabase/prestataires"
 import { USE_SUPABASE } from "@/supabase/client"
+import { mockKey } from "@/lib/event"
 
 export interface PrestatairesService {
   list(): Promise<Prestataire[]>
@@ -11,7 +12,7 @@ export interface PrestatairesService {
   remove(id: string): Promise<void>
 }
 
-const prestatairesTable = createMockTable<Prestataire>("sj-prestataires", prestatairesSeed)
+const prestatairesTable = createMockTable<Prestataire>(mockKey("prestataires"), prestatairesSeed)
 
 const prestatairesMockService: PrestatairesService = {
   async list() {

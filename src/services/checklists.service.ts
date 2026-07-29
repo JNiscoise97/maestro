@@ -3,6 +3,7 @@ import { createMockTable } from "@/services/mock/db"
 import { checklistsSeed, checklistItemsSeed } from "@/services/mock/data/checklists"
 import { checklistsSupabaseService } from "@/services/supabase/checklists"
 import { USE_SUPABASE } from "@/supabase/client"
+import { mockKey } from "@/lib/event"
 
 export interface ChecklistsService {
   listAll(): Promise<Checklist[]>
@@ -18,8 +19,8 @@ export interface ChecklistsService {
   toggleItem(itemId: string, isDone: boolean): Promise<ChecklistItem>
 }
 
-const checklistsTable = createMockTable<Checklist>("sj-checklists", checklistsSeed)
-const checklistItemsTable = createMockTable<ChecklistItem>("sj-checklist-items", checklistItemsSeed)
+const checklistsTable = createMockTable<Checklist>(mockKey("checklists"), checklistsSeed)
+const checklistItemsTable = createMockTable<ChecklistItem>(mockKey("checklist-items"), checklistItemsSeed)
 
 const checklistsMockService: ChecklistsService = {
   async listAll() {

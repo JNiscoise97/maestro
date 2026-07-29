@@ -1,9 +1,10 @@
-import type { MissionAcceptanceStatus, RosDelivererType, RosDeliveryMode, RosMessage, RosRecipientType } from "@/types/domain"
+﻿import type { MissionAcceptanceStatus, RosDelivererType, RosDeliveryMode, RosMessage, RosRecipientType } from "@/types/domain"
 import { createMockTable } from "@/services/mock/db"
 import { rosMessagesSeed } from "@/services/mock/data/ros-messages"
 import { supabase, USE_SUPABASE } from "@/supabase/client"
+import { tbl, mockKey } from "@/lib/event"
 
-const mock = createMockTable<RosMessage>("sj-ros-messages", rosMessagesSeed)
+const mock = createMockTable<RosMessage>(mockKey("ros-messages"), rosMessagesSeed)
 
 function rowToMsg(r: {
   id: string; step_id: string; subject: string | null; content: string
@@ -73,8 +74,8 @@ export interface RosMessagePatch {
 export const rosMessagesService = {
   async list(): Promise<RosMessage[]> {
     if (USE_SUPABASE) {
-      const { data, error } = await supabase!
-        .from("_20260725_ros_messages")
+      const { data, error } = await (supabase! as any)
+        .from(tbl("ros_messages") as any)
         .select("*")
         .order("sort_order")
       if (error) throw error
@@ -85,8 +86,8 @@ export const rosMessagesService = {
 
   async create(input: RosMessageInput): Promise<RosMessage> {
     if (USE_SUPABASE) {
-      const { data, error } = await supabase!
-        .from("_20260725_ros_messages")
+      const { data, error } = await (supabase! as any)
+        .from(tbl("ros_messages") as any)
         .insert({
           step_id: input.stepId,
           subject: input.subject ?? null,
@@ -156,7 +157,7 @@ export const rosMessagesService = {
       if ("scheduledTime" in patch) row.scheduled_time = patch.scheduledTime
       if ("delivererStatus" in patch) row.deliverer_status = patch.delivererStatus ?? null
       if ("notDelivered" in patch) row.not_delivered = patch.notDelivered ?? null
-      const { error } = await supabase!.from("_20260725_ros_messages").update(row).eq("id", id)
+      const { error } = await (supabase! as any).from(tbl("ros_messages") as any).update(row).eq("id", id)
       if (error) throw error
       return
     }
@@ -181,7 +182,7 @@ export const rosMessagesService = {
 
   async remove(id: string): Promise<void> {
     if (USE_SUPABASE) {
-      const { error } = await supabase!.from("_20260725_ros_messages").delete().eq("id", id)
+      const { error } = await (supabase! as any).from(tbl("ros_messages") as any).delete().eq("id", id)
       if (error) throw error
       return
     }

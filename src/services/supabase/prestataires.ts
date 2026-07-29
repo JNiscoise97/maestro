@@ -1,8 +1,9 @@
-import type { Prestataire } from "@/types/domain"
+﻿import type { Prestataire } from "@/types/domain"
 import type { PrestatairesService } from "@/services/prestataires.service"
 import { supabase } from "@/supabase/client"
+import { tbl } from "@/lib/event"
 
-const db = supabase!
+const db = supabase! as any
 
 function toPrestataire(row: {
   id: string
@@ -54,19 +55,19 @@ function toRow(input: Partial<Prestataire>): PrestataireRowPatch {
 
 export const prestatairesSupabaseService: PrestatairesService = {
   async list() {
-    const { data, error } = await db.from("_20260725_prestataires").select("*")
+    const { data, error } = await (db as any).from(tbl("prestataires") as any).select("*")
     if (error) throw error
     return (data ?? []).map(toPrestataire)
   },
   async create(prestataire) {
     const row = toRow(prestataire) as PrestataireRowPatch & { name: string }
-    const { data, error } = await db.from("_20260725_prestataires").insert(row).select("*").single()
+    const { data, error } = await (db as any).from(tbl("prestataires") as any).insert(row).select("*").single()
     if (error) throw error
     return toPrestataire(data)
   },
   async update(id, patch) {
     const { data, error } = await db
-      .from("_20260725_prestataires")
+      .from(tbl("prestataires") as any)
       .update(toRow(patch))
       .eq("id", id)
       .select("*")
@@ -75,7 +76,7 @@ export const prestatairesSupabaseService: PrestatairesService = {
     return toPrestataire(data)
   },
   async remove(id) {
-    const { error } = await db.from("_20260725_prestataires").delete().eq("id", id)
+    const { error } = await (db as any).from(tbl("prestataires") as any).delete().eq("id", id)
     if (error) throw error
   },
 }

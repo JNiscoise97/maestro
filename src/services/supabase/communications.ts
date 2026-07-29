@@ -1,4 +1,5 @@
 import { supabase, USE_SUPABASE } from "@/supabase/client"
+import { tbl } from "@/lib/event"
 
 export interface Communication {
   id: string
@@ -44,7 +45,7 @@ export const communicationsService = {
   async list(): Promise<Communication[]> {
     if (!USE_SUPABASE) return []
     const { data, error } = await supabase!
-      .from("_20260725_communications" as any)
+      .from(tbl("communications") as any)
       .select("*")
       .order("sort_order")
     if (error) throw error
@@ -53,7 +54,7 @@ export const communicationsService = {
 
   async create(name: string, description: string | null): Promise<Communication> {
     const { data, error } = await supabase!
-      .from("_20260725_communications" as any)
+      .from(tbl("communications") as any)
       .insert({ name, description, sort_order: Date.now() })
       .select()
       .single()
@@ -63,7 +64,7 @@ export const communicationsService = {
 
   async update(id: string, patch: { name?: string; description?: string | null }): Promise<void> {
     const { error } = await supabase!
-      .from("_20260725_communications" as any)
+      .from(tbl("communications") as any)
       .update(patch)
       .eq("id", id)
     if (error) throw error
@@ -71,7 +72,7 @@ export const communicationsService = {
 
   async remove(id: string): Promise<void> {
     const { error } = await supabase!
-      .from("_20260725_communications" as any)
+      .from(tbl("communications") as any)
       .delete()
       .eq("id", id)
     if (error) throw error
@@ -80,7 +81,7 @@ export const communicationsService = {
   async listSends(communicationId: string): Promise<CommunicationSend[]> {
     if (!USE_SUPABASE) return []
     const { data, error } = await supabase!
-      .from("_20260725_communication_sends" as any)
+      .from(tbl("communication_sends") as any)
       .select("*")
       .eq("communication_id", communicationId)
     if (error) throw error
@@ -89,7 +90,7 @@ export const communicationsService = {
 
   async markSent(communicationId: string, guestId: string): Promise<CommunicationSend> {
     const { data, error } = await supabase!
-      .from("_20260725_communication_sends" as any)
+      .from(tbl("communication_sends") as any)
       .insert({ communication_id: communicationId, guest_id: guestId })
       .select()
       .single()
@@ -99,7 +100,7 @@ export const communicationsService = {
 
   async unmarkSent(id: string): Promise<void> {
     const { error } = await supabase!
-      .from("_20260725_communication_sends" as any)
+      .from(tbl("communication_sends") as any)
       .delete()
       .eq("id", id)
     if (error) throw error

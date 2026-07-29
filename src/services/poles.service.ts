@@ -3,6 +3,7 @@ import { createMockTable } from "@/services/mock/db"
 import { polesSeed } from "@/services/mock/data/poles"
 import { polesSupabaseService } from "@/services/supabase/poles"
 import { USE_SUPABASE } from "@/supabase/client"
+import { mockKey } from "@/lib/event"
 
 export interface PolesService {
   list(): Promise<Pole[]>
@@ -11,7 +12,7 @@ export interface PolesService {
   remove(id: string): Promise<void>
 }
 
-const polesTable = createMockTable<Pole>("sj-poles", polesSeed)
+const polesTable = createMockTable<Pole>(mockKey("poles"), polesSeed)
 
 const polesMockService: PolesService = {
   async list() {

@@ -3,6 +3,7 @@ import { createMockTable } from "@/services/mock/db"
 import { peopleSeed } from "@/services/mock/data/people"
 import { peopleSupabaseService } from "@/services/supabase/people"
 import { USE_SUPABASE } from "@/supabase/client"
+import { mockKey } from "@/lib/event"
 
 export interface PeopleService {
   resolveByAccessCode(code: string): Promise<Person | null>
@@ -13,7 +14,7 @@ export interface PeopleService {
   remove(id: string): Promise<void>
 }
 
-const peopleTable = createMockTable<Person>("sj-people", peopleSeed)
+const peopleTable = createMockTable<Person>(mockKey("people"), peopleSeed)
 
 const peopleMockService: PeopleService = {
   async resolveByAccessCode(code) {

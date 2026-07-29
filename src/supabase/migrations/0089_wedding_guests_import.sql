@@ -1,0 +1,123 @@
+-- Import des groupes et invités des fiançailles vers le mariage.
+-- Les IDs sont conservés pour préserver les liens parent/partenaire.
+-- Les champs événementiels (RSVP, logistique, rôles) sont remis à zéro.
+
+-- ── Groupes ───────────────────────────────────────────────────────────────────
+
+insert into _20260629_guest_groups (id, family_name, notes, sort_order)
+select id, family_name, notes, sort_order
+from _20260725_guest_groups
+on conflict (id) do nothing;
+
+-- ── Invités ───────────────────────────────────────────────────────────────────
+
+insert into _20260629_guests (
+  id,
+  group_id,
+  first_name,
+  last_name,
+  nickname,
+  -- Champs stables (démographie, relations)
+  side,
+  age_range,
+  relation_category,
+  city,
+  is_child,
+  child_age,
+  is_reduced_mobility,
+  cultural_origin,
+  primary_language,
+  drinks_alcohol,
+  dietary_constraints,
+  allergies,
+  likely_traditional_attire,
+  has_vehicle,
+  notes,
+  access_code,
+  is_active,
+  assignable,
+  paired_with_id,
+  parent_id,
+  allowed_tabs,
+  -- Champs événementiels → remis à zéro
+  rsvp_status,
+  rsvp_responded_at,
+  rsvp_channel,
+  meal_choice,
+  arrival_info,
+  departure_info,
+  accommodation,
+  accommodation_type,
+  travel_mode,
+  needs_accommodation,
+  needs_late_transport,
+  in_cortege,
+  has_ceremonial_role,
+  attending_parents_anniversary,
+  attending_montpellier_visit,
+  communication_j30_sent,
+  communication_j15_sent,
+  communication_j3_sent,
+  meal_message_sent,
+  guide_sent,
+  address_change_sent,
+  reservation_done,
+  introduction_seen,
+  checked_in_at,
+  is_unexpected
+)
+select
+  id,
+  group_id,
+  first_name,
+  last_name,
+  nickname,
+  side,
+  age_range,
+  relation_category,
+  city,
+  is_child,
+  child_age,
+  is_reduced_mobility,
+  cultural_origin,
+  primary_language,
+  drinks_alcohol,
+  dietary_constraints,
+  allergies,
+  likely_traditional_attire,
+  has_vehicle,
+  notes,
+  access_code,
+  is_active,
+  assignable,
+  paired_with_id,
+  parent_id,
+  allowed_tabs,
+  -- Remises à zéro
+  'pending'   as rsvp_status,
+  null        as rsvp_responded_at,
+  null        as rsvp_channel,
+  null        as meal_choice,
+  null        as arrival_info,
+  null        as departure_info,
+  null        as accommodation,
+  null        as accommodation_type,
+  null        as travel_mode,
+  false       as needs_accommodation,
+  false       as needs_late_transport,
+  false       as in_cortege,
+  false       as has_ceremonial_role,
+  false       as attending_parents_anniversary,
+  false       as attending_montpellier_visit,
+  false       as communication_j30_sent,
+  false       as communication_j15_sent,
+  false       as communication_j3_sent,
+  false       as meal_message_sent,
+  false       as guide_sent,
+  false       as address_change_sent,
+  false       as reservation_done,
+  false       as introduction_seen,
+  null        as checked_in_at,
+  false       as is_unexpected
+from _20260725_guests
+on conflict (id) do nothing;

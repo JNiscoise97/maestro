@@ -1,4 +1,5 @@
 import { supabase, USE_SUPABASE } from "@/supabase/client"
+import { tbl } from "@/lib/event"
 
 export interface MessageSend {
   id: string
@@ -16,7 +17,7 @@ export const messageSendsService = {
   async listForMessage(messageId: string): Promise<MessageSend[]> {
     if (!USE_SUPABASE) return []
     const { data, error } = await supabase!
-      .from("_20260725_message_sends" as any)
+      .from(tbl("message_sends") as any)
       .select("*")
       .eq("message_id", messageId)
     if (error) throw error
@@ -25,7 +26,7 @@ export const messageSendsService = {
 
   async mark(messageId: string, guestId?: string, personId?: string): Promise<MessageSend> {
     const { data, error } = await supabase!
-      .from("_20260725_message_sends" as any)
+      .from(tbl("message_sends") as any)
       .insert({ message_id: messageId, guest_id: guestId ?? null, person_id: personId ?? null })
       .select()
       .single()
@@ -35,7 +36,7 @@ export const messageSendsService = {
 
   async unmark(id: string): Promise<void> {
     const { error } = await supabase!
-      .from("_20260725_message_sends" as any)
+      .from(tbl("message_sends") as any)
       .delete()
       .eq("id", id)
     if (error) throw error

@@ -2,8 +2,9 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 
 import type { Identity } from "@/types/domain"
 import { identityService } from "@/services/identity.service"
+import { mockKey } from "@/lib/event"
 
-const STORAGE_KEY = "sj-identity"
+const STORAGE_KEY = mockKey("identity")
 
 interface IdentityContextValue {
   /** Identité effective : celle de l'invité impersonné s'il y en a un, sinon la vraie. */

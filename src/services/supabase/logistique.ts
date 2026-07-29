@@ -1,8 +1,9 @@
-import type { LogistiqueItem } from "@/types/domain"
+﻿import type { LogistiqueItem } from "@/types/domain"
 import type { LogistiqueService } from "@/services/logistique.service"
 import { supabase } from "@/supabase/client"
+import { tbl } from "@/lib/event"
 
-const db = supabase!
+const db = supabase! as any
 
 function toLogistiqueItem(row: {
   id: string
@@ -26,7 +27,7 @@ function toLogistiqueItem(row: {
 
 export const logistiqueSupabaseService: LogistiqueService = {
   async list() {
-    const { data, error } = await db.from("_20260725_logistique_items").select("*")
+    const { data, error } = await db.from(tbl("logistique_items") as any).select("*")
     if (error) throw error
     return (data ?? []).map(toLogistiqueItem)
   },

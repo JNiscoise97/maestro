@@ -1,8 +1,9 @@
-import type { RosLaunch } from "@/types/domain"
+﻿import type { RosLaunch } from "@/types/domain"
 import { createMockTable } from "@/services/mock/db"
 import { supabase, USE_SUPABASE } from "@/supabase/client"
+import { tbl, mockKey } from "@/lib/event"
 
-const mock = createMockTable<RosLaunch>("sj-ros-launches", [])
+const mock = createMockTable<RosLaunch>(mockKey("ros-launches"), [])
 
 function rowToLaunch(r: {
   id: string; step_id: string; mission_id: string | null; label: string | null
@@ -38,8 +39,8 @@ export interface RosLaunchPatch {
 export const rosLaunchesService = {
   async list(): Promise<RosLaunch[]> {
     if (USE_SUPABASE) {
-      const { data, error } = await supabase!
-        .from("_20260725_ros_launches")
+      const { data, error } = await (supabase! as any)
+        .from(tbl("ros_launches") as any)
         .select("*")
         .order("sort_order")
       if (error) throw error
@@ -50,8 +51,8 @@ export const rosLaunchesService = {
 
   async create(input: RosLaunchInput): Promise<RosLaunch> {
     if (USE_SUPABASE) {
-      const { data, error } = await supabase!
-        .from("_20260725_ros_launches")
+      const { data, error } = await (supabase! as any)
+        .from(tbl("ros_launches") as any)
         .insert({
           step_id: input.stepId,
           mission_id: input.missionId ?? null,
@@ -87,7 +88,7 @@ export const rosLaunchesService = {
       if ("scheduledTime" in patch) row.scheduled_time = patch.scheduledTime
       if ("launchedAt" in patch) row.launched_at = patch.launchedAt
       if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
-      const { error } = await supabase!.from("_20260725_ros_launches").update(row).eq("id", id)
+      const { error } = await (supabase! as any).from(tbl("ros_launches") as any).update(row).eq("id", id)
       if (error) throw error
       return
     }
@@ -102,7 +103,7 @@ export const rosLaunchesService = {
 
   async remove(id: string): Promise<void> {
     if (USE_SUPABASE) {
-      const { error } = await supabase!.from("_20260725_ros_launches").delete().eq("id", id)
+      const { error } = await (supabase! as any).from(tbl("ros_launches") as any).delete().eq("id", id)
       if (error) throw error
       return
     }

@@ -4,6 +4,7 @@ import { photoSessionsSeed } from "@/services/mock/data/photo-sessions"
 import { photoSessionsSupabaseService } from "@/services/supabase/photo-sessions"
 import { photoGroupsService } from "@/services/photo-groups.service"
 import { USE_SUPABASE } from "@/supabase/client"
+import { mockKey } from "@/lib/event"
 
 export interface PhotoSessionsService {
   listSessions(): Promise<PhotoSession[]>
@@ -12,7 +13,7 @@ export interface PhotoSessionsService {
   removeSession(id: string): Promise<void>
 }
 
-const photoSessionsTable = createMockTable<PhotoSession>("sj-photo-sessions", photoSessionsSeed)
+const photoSessionsTable = createMockTable<PhotoSession>(mockKey("photo-sessions"), photoSessionsSeed)
 
 const photoSessionsMockService: PhotoSessionsService = {
   async listSessions() {

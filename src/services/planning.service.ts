@@ -3,12 +3,13 @@ import { createMockTable } from "@/services/mock/db"
 import { planningEventsSeed } from "@/services/mock/data/planning-events"
 import { planningSupabaseService } from "@/services/supabase/planning"
 import { USE_SUPABASE } from "@/supabase/client"
+import { mockKey } from "@/lib/event"
 
 export interface PlanningService {
   list(): Promise<PlanningEvent[]>
 }
 
-const planningEventsTable = createMockTable<PlanningEvent>("sj-planning-events", planningEventsSeed)
+const planningEventsTable = createMockTable<PlanningEvent>(mockKey("planning-events"), planningEventsSeed)
 
 const planningMockService: PlanningService = {
   async list() {

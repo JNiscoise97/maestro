@@ -3,6 +3,7 @@ import { createMockTable } from "@/services/mock/db"
 import { domainesSeed } from "@/services/mock/data/domaines"
 import { domainesSupabaseService } from "@/services/supabase/domaines"
 import { USE_SUPABASE } from "@/supabase/client"
+import { mockKey } from "@/lib/event"
 
 export interface DomainesService {
   list(): Promise<Domaine[]>
@@ -11,7 +12,7 @@ export interface DomainesService {
   remove(id: string): Promise<void>
 }
 
-const domainesTable = createMockTable<Domaine>("sj-domaines", domainesSeed)
+const domainesTable = createMockTable<Domaine>(mockKey("domaines"), domainesSeed)
 
 const domainesMockService: DomainesService = {
   async list() {

@@ -3,6 +3,7 @@ import { createMockTable } from "@/services/mock/db"
 import { tablesSeed, tableAssignmentsSeed } from "@/services/mock/data/seating"
 import { seatingSupabaseService } from "@/services/supabase/seating"
 import { USE_SUPABASE } from "@/supabase/client"
+import { mockKey } from "@/lib/event"
 
 export interface SeatTarget {
   guestId?: string | null
@@ -20,8 +21,8 @@ export interface SeatingService {
   unassign(assignmentId: string): Promise<void>
 }
 
-const tablesTable = createMockTable<SeatingTable>("sj-tables", tablesSeed)
-const tableAssignmentsTable = createMockTable<TableAssignment>("sj-table-assignments", tableAssignmentsSeed)
+const tablesTable = createMockTable<SeatingTable>(mockKey("tables"), tablesSeed)
+const tableAssignmentsTable = createMockTable<TableAssignment>(mockKey("table-assignments"), tableAssignmentsSeed)
 
 function findExisting(assignments: TableAssignment[], target: SeatTarget) {
   return assignments.find(

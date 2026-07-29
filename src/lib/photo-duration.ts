@@ -5,6 +5,7 @@
  *   pour affiner la moyenne au fil des photos prises — c'est une métrique de pacing opérationnelle, pas une
  *   donnée métier, donc pas besoin de la faire transiter par Supabase.
  */
+import { mockKey } from "@/lib/event"
 
 export const PHOTO_BASE_DURATION_SECONDS = 90
 export const PHOTO_PER_PERSON_SECONDS = 15
@@ -29,7 +30,7 @@ export function formatDuration(totalSeconds: number): string {
   return `${minutes} min ${remainingSeconds}s`
 }
 
-const DURATION_LOG_KEY = "sj-photo-duration-log"
+const DURATION_LOG_KEY = mockKey("photo-duration-log")
 const MAX_LOG_ENTRIES = 20
 
 function readDurationLog(): number[] {

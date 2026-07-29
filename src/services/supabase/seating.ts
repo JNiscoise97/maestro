@@ -1,8 +1,9 @@
-import type { SeatingTable, TableAssignment } from "@/types/domain"
+﻿import type { SeatingTable, TableAssignment } from "@/types/domain"
 import type { SeatingService } from "@/services/seating.service"
 import { supabase } from "@/supabase/client"
+import { tbl } from "@/lib/event"
 
-const db = supabase!
+const db = supabase! as any
 
 function toTable(row: { id: string; name: string; capacity: number; sort_order: number; pos_x?: number | null; pos_y?: number | null; confirmed_at?: string | null }): SeatingTable {
   return { id: row.id, name: row.name, capacity: row.capacity, sortOrder: row.sort_order, posX: row.pos_x, posY: row.pos_y, confirmedAt: row.confirmed_at ?? null }
@@ -28,13 +29,13 @@ function toAssignment(row: {
 
 export const seatingSupabaseService: SeatingService = {
   async listTables() {
-    const { data, error } = await db.from("_20260725_tables").select("*").order("sort_order")
+    const { data, error } = await db.from(tbl("tables") as any).select("*").order("sort_order")
     if (error) throw error
     return (data ?? []).map(toTable)
   },
   async createTable(input) {
     const { data, error } = await db
-      .from("_20260725_tables")
+      .from(tbl("tables") as any)
       .insert({ name: input.name, capacity: input.capacity, sort_order: input.sortOrder })
       .select("*")
       .single()
@@ -50,16 +51,16 @@ export const seatingSupabaseService: SeatingService = {
     if (patch.posY !== undefined) row.pos_y = patch.posY
     if (patch.confirmedAt !== undefined) row.confirmed_at = patch.confirmedAt ?? null
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await db.from("_20260725_tables").update(row as any).eq("id", id).select("*").single()
+    const { data, error } = await db.from(tbl("tables") as any).update(row as any).eq("id", id).select("*").single()
     if (error) throw error
     return toTable(data)
   },
   async deleteTable(id) {
-    const { error } = await db.from("_20260725_tables").delete().eq("id", id)
+    const { error } = await db.from(tbl("tables") as any).delete().eq("id", id)
     if (error) throw error
   },
   async listAssignments() {
-    const { data, error } = await db.from("_20260725_table_assignments").select("*")
+    const { data, error } = await db.from(tbl("table_assignments") as any).select("*")
     if (error) throw error
     return (data ?? []).map(toAssignment)
   },
@@ -70,7 +71,7 @@ export const seatingSupabaseService: SeatingService = {
     if (target.prestataireId) orFilters.push(`prestataire_id.eq.${target.prestataireId}`)
 
     const { data: existing, error: findError } = await db
-      .from("_20260725_table_assignments")
+      .from(tbl("table_assignments") as any)
       .select("*")
       .or(orFilters.join(","))
       .maybeSingle()
@@ -78,7 +79,7 @@ export const seatingSupabaseService: SeatingService = {
 
     if (existing) {
       const { data, error } = await db
-        .from("_20260725_table_assignments")
+        .from(tbl("table_assignments") as any)
         .update({ table_id: tableId })
         .eq("id", existing.id)
         .select("*")
@@ -88,7 +89,7 @@ export const seatingSupabaseService: SeatingService = {
     }
 
     const { data, error } = await db
-      .from("_20260725_table_assignments")
+      .from(tbl("table_assignments") as any)
       .insert({
         table_id: tableId,
         guest_id: target.guestId ?? null,
@@ -101,7 +102,7 @@ export const seatingSupabaseService: SeatingService = {
     return toAssignment(data)
   },
   async unassign(assignmentId) {
-    const { error } = await db.from("_20260725_table_assignments").delete().eq("id", assignmentId)
+    const { error } = await db.from(tbl("table_assignments") as any).delete().eq("id", assignmentId)
     if (error) throw error
   },
 }

@@ -3,6 +3,7 @@ import { createMockTable } from "@/services/mock/db"
 import { guestDefaults, guestGroupsSeed, guestsSeed } from "@/services/mock/data/guests"
 import { guestsSupabaseService } from "@/services/supabase/guests"
 import { USE_SUPABASE } from "@/supabase/client"
+import { mockKey } from "@/lib/event"
 
 export interface CreateGuestInput {
   firstName: string
@@ -35,8 +36,8 @@ export interface GuestsService {
   resetCheckInsForAll(): Promise<void>
 }
 
-const guestGroupsTable = createMockTable<GuestGroup>("sj-guest-groups", guestGroupsSeed)
-const guestsTable = createMockTable<Guest>("sj-guests", guestsSeed)
+const guestGroupsTable = createMockTable<GuestGroup>(mockKey("guest-groups"), guestGroupsSeed)
+const guestsTable = createMockTable<Guest>(mockKey("guests"), guestsSeed)
 
 const guestsMockService: GuestsService = {
   async listGroups() {

@@ -1,8 +1,9 @@
-import type { MissionAcceptance } from "@/types/domain"
+﻿import type { MissionAcceptance } from "@/types/domain"
 import type { MissionAcceptancesService } from "@/services/mission-acceptances.service"
 import { supabase } from "@/supabase/client"
+import { tbl } from "@/lib/event"
 
-const db = supabase!
+const db = supabase! as any
 
 function toMissionAcceptance(row: {
   id: string
@@ -22,18 +23,18 @@ function toMissionAcceptance(row: {
 
 export const missionAcceptancesSupabaseService: MissionAcceptancesService = {
   async list() {
-    const { data, error } = await db.from("_20260725_mission_acceptances").select("*")
+    const { data, error } = await db.from(tbl("mission_acceptances") as any).select("*")
     if (error) throw error
     return (data ?? []).map(toMissionAcceptance)
   },
   async listForGuest(guestId) {
-    const { data, error } = await db.from("_20260725_mission_acceptances").select("*").eq("guest_id", guestId)
+    const { data, error } = await db.from(tbl("mission_acceptances") as any).select("*").eq("guest_id", guestId)
     if (error) throw error
     return (data ?? []).map(toMissionAcceptance)
   },
   async respond(missionId, guestId, status) {
     const { data, error } = await db
-      .from("_20260725_mission_acceptances")
+      .from(tbl("mission_acceptances") as any)
       .upsert(
         { mission_id: missionId, guest_id: guestId, status, responded_at: new Date().toISOString() },
         { onConflict: "mission_id,guest_id" }

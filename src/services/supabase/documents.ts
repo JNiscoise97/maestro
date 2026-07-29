@@ -1,8 +1,9 @@
-import type { DocumentItem } from "@/types/domain"
+﻿import type { DocumentItem } from "@/types/domain"
 import type { DocumentsService } from "@/services/documents.service"
 import { supabase } from "@/supabase/client"
+import { tbl } from "@/lib/event"
 
-const db = supabase!
+const db = supabase! as any
 
 interface DocumentWithAttachment {
   id: string
@@ -26,28 +27,28 @@ function toDocument(row: DocumentWithAttachment): DocumentItem {
 export const documentsSupabaseService: DocumentsService = {
   async list() {
     const { data, error } = await db
-      .from("_20260725_documents")
-      .select("id, title, category, visible_to_roles, attachment:_20260725_attachments(file_name, file_path)")
+      .from(tbl("documents") as any)
+      .select(`id, title, category, visible_to_roles, attachment:${tbl("attachments")}(file_name, file_path)`)
     if (error) throw error
     return ((data ?? []) as unknown as DocumentWithAttachment[]).map(toDocument)
   },
   async create(input) {
     const { data: attachment, error: attachmentError } = await db
-      .from("_20260725_attachments")
+      .from(tbl("attachments") as any)
       .insert({ file_name: input.fileName, file_path: input.filePath })
       .select("id")
       .single()
     if (attachmentError) throw attachmentError
 
     const { data, error } = await db
-      .from("_20260725_documents")
+      .from(tbl("documents") as any)
       .insert({
         attachment_id: attachment.id,
         title: input.title,
         category: input.category ?? null,
         visible_to_roles: input.visibleToRoles,
       })
-      .select("id, title, category, visible_to_roles, attachment:_20260725_attachments(file_name, file_path)")
+      .select(`id, title, category, visible_to_roles, attachment:${tbl("attachments")}(file_name, file_path)`)
       .single()
     if (error) throw error
     return toDocument(data as unknown as DocumentWithAttachment)

@@ -1,9 +1,10 @@
-import type { Guest, GuestGroup } from "@/types/domain"
+﻿import type { Guest, GuestGroup } from "@/types/domain"
 import type { GuestsService } from "@/services/guests.service"
 import { supabase } from "@/supabase/client"
 import { formatDisplayName } from "@/lib/utils"
+import { tbl } from "@/lib/event"
 
-const db = supabase!
+const db = supabase! as any
 
 function toGuestGroup(row: { id: string; family_name: string; notes: string | null; sort_order: number }): GuestGroup {
   return { id: row.id, familyName: row.family_name, notes: row.notes, sortOrder: row.sort_order }
@@ -121,13 +122,13 @@ function toGuest(row: {
 
 export const guestsSupabaseService: GuestsService = {
   async listGroups() {
-    const { data, error } = await db.from("_20260725_guest_groups").select("*")
+    const { data, error } = await (db as any).from(tbl("guest_groups") as any).select("*")
     if (error) throw error
     return (data ?? []).map(toGuestGroup)
   },
   async createGroup({ familyName, notes, sortOrder }) {
     const { data, error } = await db
-      .from("_20260725_guest_groups")
+      .from(tbl("guest_groups") as any)
       .insert({ family_name: familyName, notes: notes ?? null, sort_order: sortOrder })
       .select("*")
       .single()
@@ -139,24 +140,24 @@ export const guestsSupabaseService: GuestsService = {
     if (patch.familyName !== undefined) row.family_name = patch.familyName
     if (patch.notes !== undefined) row.notes = patch.notes
     if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
-    const { data, error } = await db.from("_20260725_guest_groups").update(row).eq("id", id).select("*").single()
+    const { data, error } = await (db as any).from(tbl("guest_groups") as any).update(row).eq("id", id).select("*").single()
     if (error) throw error
     return toGuestGroup(data)
   },
   async deleteGroup(id) {
     // FK group_id -> guest_groups est "on delete set null" (voir 0006_guests_tables.sql) :
     // les invités du groupe sont simplement détachés, pas supprimés.
-    const { error } = await db.from("_20260725_guest_groups").delete().eq("id", id)
+    const { error } = await (db as any).from(tbl("guest_groups") as any).delete().eq("id", id)
     if (error) throw error
   },
   async listGuests() {
-    const { data, error } = await db.from("_20260725_guests").select("*")
+    const { data, error } = await (db as any).from(tbl("guests") as any).select("*")
     if (error) throw error
     return (data ?? []).map(toGuest)
   },
   async createGuest({ firstName, lastName, groupId }) {
     const { data, error } = await db
-      .from("_20260725_guests")
+      .from(tbl("guests") as any)
       .insert({ first_name: firstName, last_name: lastName, group_id: groupId ?? null })
       .select("*")
       .single()
@@ -267,44 +268,44 @@ export const guestsSupabaseService: GuestsService = {
     if (patch.isUnexpected !== undefined) row.is_unexpected = patch.isUnexpected
     if (patch.nickname !== undefined) row.nickname = patch.nickname ?? null
     if (Object.keys(row).length > 0) {
-      const { error } = await db.from("_20260725_guests").update(row).eq("id", id)
+      const { error } = await (db as any).from(tbl("guests") as any).update(row).eq("id", id)
       if (error) throw error
     }
     if (patch.accessCode) {
-      const { error } = await db.rpc("_20260725_set_guest_access_code", {
+      const { error } = await db.rpc(tbl("set_guest_access_code") as any, {
         p_guest_id: id,
         p_code: patch.accessCode,
       })
       if (error) throw error
     }
-    const { data, error } = await db.from("_20260725_guests").select("*").eq("id", id).single()
+    const { data, error } = await (db as any).from(tbl("guests") as any).select("*").eq("id", id).single()
     if (error) throw error
     return toGuest(data)
   },
   async deleteGuest(id) {
-    const { error } = await db.from("_20260725_guests").delete().eq("id", id)
+    const { error } = await (db as any).from(tbl("guests") as any).delete().eq("id", id)
     if (error) throw error
   },
   async resolveByAccessCode(code) {
-    const { data, error } = await db.rpc("_20260725_resolve_guest_access_code", { code })
+    const { data, error } = await db.rpc(tbl("resolve_guest_access_code") as any, { code })
     if (error) throw error
     const row = data?.[0]
     return row ? toGuest(row) : null
   },
   async getById(id) {
-    const { data, error } = await db.from("_20260725_guests").select("*").eq("id", id).maybeSingle()
+    const { data, error } = await (db as any).from(tbl("guests") as any).select("*").eq("id", id).maybeSingle()
     if (error) throw error
     return data ? toGuest(data) : null
   },
   async resetIntroductionSeenForAll() {
     const { error } = await db
-      .from("_20260725_guests")
+      .from(tbl("guests") as any)
       .update({ introduction_seen: false })
       .not("id", "is", null)
     if (error) throw error
   },
   async resetCheckInsForAll() {
-    const { error } = await db.from("_20260725_guests").update({ checked_in_at: null }).not("id", "is", null)
+    const { error } = await (db as any).from(tbl("guests") as any).update({ checked_in_at: null }).not("id", "is", null)
     if (error) throw error
   },
 }

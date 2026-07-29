@@ -4,6 +4,7 @@ import { photoGroupsSeed, photoGroupMembersSeed } from "@/services/mock/data/pho
 import { photoSessionsSeed } from "@/services/mock/data/photo-sessions"
 import { photoGroupsSupabaseService } from "@/services/supabase/photo-groups"
 import { USE_SUPABASE } from "@/supabase/client"
+import { mockKey } from "@/lib/event"
 
 export interface PhotoGroupsService {
   listGroups(): Promise<PhotoGroup[]>
@@ -17,9 +18,9 @@ export interface PhotoGroupsService {
   updateMember(id: string, patch: Partial<PhotoGroupMember>): Promise<PhotoGroupMember>
 }
 
-const photoGroupsTable = createMockTable<PhotoGroup>("sj-photo-groups", photoGroupsSeed)
-const photoGroupMembersTable = createMockTable<PhotoGroupMember>("sj-photo-group-members", photoGroupMembersSeed)
-const photoSessionsTable = createMockTable<PhotoSession>("sj-photo-sessions", photoSessionsSeed)
+const photoGroupsTable = createMockTable<PhotoGroup>(mockKey("photo-groups"), photoGroupsSeed)
+const photoGroupMembersTable = createMockTable<PhotoGroupMember>(mockKey("photo-group-members"), photoGroupMembersSeed)
+const photoSessionsTable = createMockTable<PhotoSession>(mockKey("photo-sessions"), photoSessionsSeed)
 
 /** Rattrapage local : les groupes créés en localStorage avant l'introduction des séances n'ont pas de sessionId — on les bascule dans une séance par défaut, créée à la volée si besoin. */
 async function ensureGroupsHaveSession(groups: PhotoGroup[]): Promise<PhotoGroup[]> {

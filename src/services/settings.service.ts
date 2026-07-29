@@ -1,5 +1,6 @@
 import { EVENT_DATE, EVENT_NAME } from "@/lib/constants"
 import { USE_SUPABASE } from "@/supabase/client"
+import { mockKey } from "@/lib/event"
 
 export type EventType = "fiancailles" | "mariage" | "pacs" | "anniversaire" | "autre"
 
@@ -41,7 +42,7 @@ export const SETTINGS_DEFAULTS: AppSettings = {
 
 // ── Mock (localStorage) ───────────────────────────────────────────────────────
 
-const STORAGE_KEY = "sj-app-settings"
+const STORAGE_KEY = mockKey("app-settings")
 
 function readFromStorage(): AppSettings {
   const raw = localStorage.getItem(STORAGE_KEY)

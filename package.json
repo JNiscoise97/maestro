@@ -1,11 +1,13 @@
 {
-  "name": "20260725-sj",
+  "name": "maestro",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:mariage": "vite --mode mariage",
     "build": "tsc -b && vite build",
+    "build:mariage": "tsc -b && vite build --mode mariage",
     "lint": "eslint .",
     "preview": "vite preview"
   },

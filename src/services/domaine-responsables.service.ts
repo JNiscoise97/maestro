@@ -3,6 +3,7 @@ import { createMockTable } from "@/services/mock/db"
 import { domaineResponsablesSeed } from "@/services/mock/data/domaine-responsables"
 import { domaineResponsablesSupabaseService } from "@/services/supabase/domaine-responsables"
 import { USE_SUPABASE } from "@/supabase/client"
+import { mockKey } from "@/lib/event"
 
 export interface DomaineResponsablesService {
   list(): Promise<DomaineResponsable[]>
@@ -11,7 +12,7 @@ export interface DomaineResponsablesService {
 }
 
 const domaineResponsablesTable = createMockTable<DomaineResponsable>(
-  "sj-domaine-responsables",
+  mockKey("domaine-responsables"),
   domaineResponsablesSeed
 )
 

@@ -1,8 +1,9 @@
-import type { EquipmentItem, FabricationStatut } from "@/types/domain"
+﻿import type { EquipmentItem, FabricationStatut } from "@/types/domain"
 import type { EquipmentService } from "@/services/equipment.service"
 import { supabase } from "@/supabase/client"
+import { tbl } from "@/lib/event"
 
-const db = supabase!
+const db = supabase! as any
 
 type EquipmentRow = {
   id: string
@@ -68,7 +69,7 @@ type RowPatch = Partial<{
 export const equipmentSupabaseService: EquipmentService = {
   async createItem(input) {
     const { data, error } = await db
-      .from("_20260725_equipment")
+      .from(tbl("equipment") as any)
       .insert({
         category: input.category,
         label: input.label,
@@ -93,14 +94,14 @@ export const equipmentSupabaseService: EquipmentService = {
   },
 
   async removeItem(id) {
-    const { error } = await db.from("_20260725_equipment").delete().eq("id", id)
+    const { error } = await db.from(tbl("equipment") as any).delete().eq("id", id)
     if (error) throw error
   },
 
   async listItems() {
-    const { data, error } = await db.from("_20260725_equipment").select("*").order("category").order("sort_order")
+    const { data, error } = await db.from(tbl("equipment") as any).select("*").order("category").order("sort_order")
     if (error) throw error
-    return (data ?? []).map((r) => toEquipmentItem(r as EquipmentRow))
+    return ((data ?? []) as any[]).map((r) => toEquipmentItem(r as EquipmentRow))
   },
 
   async updateItem(id, patch) {
@@ -121,7 +122,7 @@ export const equipmentSupabaseService: EquipmentService = {
     if (patch.fabricationStatut !== undefined) row.fabrication_statut = patch.fabricationStatut ?? null
 
     const { data, error } = await db
-      .from("_20260725_equipment")
+      .from(tbl("equipment") as any)
       .update(row)
       .eq("id", id)
       .select("*")

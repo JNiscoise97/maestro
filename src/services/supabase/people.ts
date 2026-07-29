@@ -1,10 +1,11 @@
-import type { Person } from "@/types/domain"
+﻿import type { Person } from "@/types/domain"
 import type { AppRoleRow } from "@/types/supabase"
 import type { PeopleService } from "@/services/people.service"
 import { supabase } from "@/supabase/client"
 import { formatDisplayName } from "@/lib/utils"
+import { tbl } from "@/lib/event"
 
-const db = supabase!
+const db = supabase! as any
 
 // `role` reste typé AppRoleRow côté ligne brute (l'enum Postgres n'est pas
 // resserré, voir types/supabase.ts) : seules des lignes 'fiance' doivent
@@ -40,23 +41,23 @@ function toPerson(row: {
 
 export const peopleSupabaseService: PeopleService = {
   async resolveByAccessCode(code) {
-    const { data, error } = await db.rpc("_20260725_resolve_access_code", { code })
+    const { data, error } = await db.rpc(tbl("resolve_access_code") as any, { code })
     if (error) throw error
     const row = data?.[0]
     return row ? toPerson(row) : null
   },
   async getById(id) {
-    const { data, error } = await db.from("_20260725_people").select("*").eq("id", id).maybeSingle()
+    const { data, error } = await db.from(tbl("people") as any).select("*").eq("id", id).maybeSingle()
     if (error) throw error
     return data ? toPerson(data) : null
   },
   async list() {
-    const { data, error } = await db.from("_20260725_people").select("*")
+    const { data, error } = await db.from(tbl("people") as any).select("*")
     if (error) throw error
     return (data ?? []).map(toPerson)
   },
   async create(person) {
-    const { data, error } = await db.rpc("_20260725_create_person", {
+    const { data, error } = await db.rpc(tbl("create_person") as any, {
       p_full_name: person.fullName,
       p_role: person.role,
       p_code: person.accessCode,
@@ -69,7 +70,7 @@ export const peopleSupabaseService: PeopleService = {
   },
   async update(id, patch) {
     if (patch.accessCode) {
-      const { error } = await db.rpc("_20260725_set_access_code", { p_person_id: id, p_code: patch.accessCode })
+      const { error } = await db.rpc(tbl("set_access_code") as any, { p_person_id: id, p_code: patch.accessCode })
       if (error) throw error
     }
     const fields: Partial<{
@@ -93,7 +94,7 @@ export const peopleSupabaseService: PeopleService = {
     if (patch.dietaryConstraints !== undefined) fields.dietary_constraints = patch.dietaryConstraints ?? null
     if (patch.allergies !== undefined) fields.allergies = patch.allergies ?? null
     if (Object.keys(fields).length > 0) {
-      const { error } = await db.from("_20260725_people").update(fields).eq("id", id)
+      const { error } = await db.from(tbl("people") as any).update(fields).eq("id", id)
       if (error) throw error
     }
     const updated = await peopleSupabaseService.getById(id)
@@ -101,7 +102,7 @@ export const peopleSupabaseService: PeopleService = {
     return updated
   },
   async remove(id) {
-    const { error } = await db.from("_20260725_people").delete().eq("id", id)
+    const { error } = await db.from(tbl("people") as any).delete().eq("id", id)
     if (error) throw error
   },
 }

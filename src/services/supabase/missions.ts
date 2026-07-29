@@ -1,8 +1,9 @@
-import type { Mission, MissionSchedulingType } from "@/types/domain"
+﻿import type { Mission, MissionSchedulingType } from "@/types/domain"
 import type { MissionsService } from "@/services/missions.service"
 import { supabase } from "@/supabase/client"
+import { tbl } from "@/lib/event"
 
-const db = supabase!
+const db = supabase! as any
 
 function toMission(row: {
   id: string
@@ -40,18 +41,18 @@ function toMission(row: {
 
 export const missionsSupabaseService: MissionsService = {
   async list() {
-    const { data, error } = await db.from("_20260725_missions").select("*")
+    const { data, error } = await db.from(tbl("missions") as any).select("*")
     if (error) throw error
     return (data ?? []).map(toMission)
   },
   async getById(id) {
-    const { data, error } = await db.from("_20260725_missions").select("*").eq("id", id).maybeSingle()
+    const { data, error } = await db.from(tbl("missions") as any).select("*").eq("id", id).maybeSingle()
     if (error) throw error
     return data ? toMission(data) : null
   },
   async create(mission) {
     const { data, error } = await db
-      .from("_20260725_missions")
+      .from(tbl("missions") as any)
       .insert({
         id: mission.id,
         domaine_id: mission.domaineId ?? null,
@@ -71,7 +72,7 @@ export const missionsSupabaseService: MissionsService = {
     return toMission(data)
   },
   async remove(id) {
-    const { error } = await db.from("_20260725_missions").delete().eq("id", id)
+    const { error } = await db.from(tbl("missions") as any).delete().eq("id", id)
     if (error) throw error
   },
   async update(id, patch) {
@@ -104,7 +105,7 @@ export const missionsSupabaseService: MissionsService = {
     if (patch.responsiblePersonId !== undefined) row.responsible_person_id = patch.responsiblePersonId ?? null
     if (patch.responsibleGuestId !== undefined) row.responsible_guest_id = patch.responsibleGuestId ?? null
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await db.from("_20260725_missions").update(row as any).eq("id", id).select("*").single()
+    const { data, error } = await db.from(tbl("missions") as any).update(row as any).eq("id", id).select("*").single()
     if (error) throw error
     return toMission(data)
   },

@@ -14,13 +14,15 @@ import {
   DoorOpen,
   ClipboardList,
   UtensilsCrossed,
+  MessageSquare,
+  Gift,
   type LucideIcon,
 } from "lucide-react"
 
 import type { Capability } from "@/types/permissions"
 import type { AppRole, DomainePhase, PlanningMilestone } from "@/types/domain"
 
-export const EVENT_NAME = "Fiançailles de Sarah & Jordan"
+export const EVENT_NAME = import.meta.env.VITE_EVENT_NAME ?? "Fiançailles de Sarah & Jordan"
 
 export const EVENT_DATE = import.meta.env.VITE_EVENT_DATE ?? "2026-07-25"
 
@@ -69,12 +71,14 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Équipe", path: "/referents", icon: Users, capability: "view:referents" },
   { label: "Planning", path: "/planning", icon: CalendarRange, capability: "view:planning" },
   { label: "Déroulé", path: "/deroule", icon: PartyPopper, capability: "view:deroule" },
+  { label: "Messages", path: "/messages", icon: MessageSquare, capability: "view:messages" },
   { label: "Mes missions", path: "/mes-responsabilites", icon: ClipboardList, capability: "view:briefing" },
   { label: "Photos de groupe", path: "/photos-groupe", icon: Camera, capability: "view:photos-groupe" },
   { label: "Réception", path: "/accueil", icon: DoorOpen, capability: "view:accueil" },
   { label: "Logistique", path: "/logistique", icon: Truck, capability: "view:logistique" },
   { label: "Invités", path: "/invites", icon: Armchair, capability: "view:guests" },
   { label: "Tour des tables", path: "/tour-tables", icon: UtensilsCrossed, capability: "view:tour-tables" },
+  { label: "Cadeaux", path: "/cadeaux", icon: Gift, capability: "view:cadeaux" },
   { label: "Documents", path: "/documents", icon: FolderOpen, capability: "view:documents" },
   { label: "Paramètres", path: "/parametres", icon: Settings, capability: "manage:settings" },
 ]

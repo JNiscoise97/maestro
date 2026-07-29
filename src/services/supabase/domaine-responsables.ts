@@ -1,8 +1,9 @@
-import type { DomaineResponsable } from "@/types/domain"
+﻿import type { DomaineResponsable } from "@/types/domain"
 import type { DomaineResponsablesService } from "@/services/domaine-responsables.service"
 import { supabase } from "@/supabase/client"
+import { tbl } from "@/lib/event"
 
-const db = supabase!
+const db = supabase! as any
 
 function toDomaineResponsable(row: {
   id: string
@@ -22,13 +23,13 @@ function toDomaineResponsable(row: {
 
 export const domaineResponsablesSupabaseService: DomaineResponsablesService = {
   async list() {
-    const { data, error } = await db.from("_20260725_domaine_responsables").select("*")
+    const { data, error } = await db.from(tbl("domaine_responsables") as any).select("*")
     if (error) throw error
     return (data ?? []).map(toDomaineResponsable)
   },
   async create(responsable) {
     const { data, error } = await db
-      .from("_20260725_domaine_responsables")
+      .from(tbl("domaine_responsables") as any)
       .insert({
         domaine_id: responsable.domaineId,
         person_id: responsable.personId ?? null,
@@ -41,7 +42,7 @@ export const domaineResponsablesSupabaseService: DomaineResponsablesService = {
     return toDomaineResponsable(data)
   },
   async remove(id) {
-    const { error } = await db.from("_20260725_domaine_responsables").delete().eq("id", id)
+    const { error } = await db.from(tbl("domaine_responsables") as any).delete().eq("id", id)
     if (error) throw error
   },
 }

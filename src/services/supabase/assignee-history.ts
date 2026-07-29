@@ -1,4 +1,5 @@
-import { supabase } from "@/supabase/client"
+﻿import { supabase } from "@/supabase/client"
+import { tbl } from "@/lib/event"
 
 export interface AssigneeHistoryEntry {
   id: string
@@ -22,7 +23,7 @@ export interface CreateAssigneeHistoryInput {
   newName: string | null
 }
 
-const db = supabase!
+const db = supabase! as any
 
 function toEntry(row: {
   id: string
@@ -52,7 +53,7 @@ export const assigneeHistorySupabaseService = {
   async list(): Promise<AssigneeHistoryEntry[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (db as any)
-      .from("_20260725_assignee_history")
+      .from(tbl("assignee_history"))
       .select("*")
       .order("created_at", { ascending: false })
       .limit(200)
@@ -62,7 +63,7 @@ export const assigneeHistorySupabaseService = {
 
   async create(input: CreateAssigneeHistoryInput): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (db as any).from("_20260725_assignee_history").insert({
+    const { error } = await (db as any).from(tbl("assignee_history")).insert({
       actor_id:     input.actorId,
       actor_name:   input.actorName,
       entity_type:  input.entityType,

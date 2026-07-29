@@ -3,6 +3,7 @@ import { createMockTable } from "@/services/mock/db"
 import { equipmentSeed } from "@/services/mock/data/equipment"
 import { equipmentSupabaseService } from "@/services/supabase/equipment"
 import { USE_SUPABASE } from "@/supabase/client"
+import { mockKey } from "@/lib/event"
 
 export interface EquipmentService {
   listItems(): Promise<EquipmentItem[]>
@@ -11,7 +12,7 @@ export interface EquipmentService {
   removeItem(id: string): Promise<void>
 }
 
-const equipmentTable = createMockTable<EquipmentItem>("sj-equipment", equipmentSeed)
+const equipmentTable = createMockTable<EquipmentItem>(mockKey("equipment"), equipmentSeed)
 
 const equipmentMockService: EquipmentService = {
   async listItems() {

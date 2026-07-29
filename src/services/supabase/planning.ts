@@ -1,8 +1,9 @@
-import type { PlanningEvent } from "@/types/domain"
+﻿import type { PlanningEvent } from "@/types/domain"
 import type { PlanningService } from "@/services/planning.service"
 import { supabase } from "@/supabase/client"
+import { tbl } from "@/lib/event"
 
-const db = supabase!
+const db = supabase! as any
 
 function toPlanningEvent(row: {
   id: string
@@ -26,9 +27,9 @@ function toPlanningEvent(row: {
 
 export const planningSupabaseService: PlanningService = {
   async list() {
-    const { data, error } = await db.from("_20260725_planning_events").select("*")
+    const { data, error } = await (db as any).from(tbl("planning_events") as any).select("*")
     if (error) throw error
-    const events = (data ?? []).map(toPlanningEvent)
+    const events = ((data ?? []) as any[]).map(toPlanningEvent)
     return events.sort((a, b) => (a.startsAt ?? "").localeCompare(b.startsAt ?? ""))
   },
 }

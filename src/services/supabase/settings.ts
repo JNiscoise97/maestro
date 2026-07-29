@@ -1,7 +1,8 @@
-import { supabase } from "@/supabase/client"
+﻿import { supabase } from "@/supabase/client"
 import type { AppSettings, SettingsService } from "@/services/settings.service"
+import { tbl } from "@/lib/event"
 
-const db = supabase!
+const db = supabase! as any
 
 function rowToSettings(row: {
   event_name: string
@@ -40,7 +41,7 @@ function rowToSettings(row: {
 export const settingsSupabaseService: SettingsService = {
   async get() {
     const { data, error } = await db
-      .from("_20260725_app_settings")
+      .from(tbl("app_settings") as any)
       .select("*")
       .eq("id", "singleton")
       .single()
@@ -82,7 +83,7 @@ export const settingsSupabaseService: SettingsService = {
     if ("cleanupEndTime" in patch)        fields.cleanup_end_time = patch.cleanupEndTime ?? null
 
     const { data, error } = await db
-      .from("_20260725_app_settings")
+      .from(tbl("app_settings") as any)
       .update(fields)
       .eq("id", "singleton")
       .select("*")

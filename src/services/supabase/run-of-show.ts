@@ -1,8 +1,9 @@
-import type { RunOfShowStep } from "@/types/domain"
+﻿import type { RunOfShowStep } from "@/types/domain"
 import type { RunOfShowService } from "@/services/run-of-show.service"
 import { supabase } from "@/supabase/client"
+import { tbl } from "@/lib/event"
 
-const db = supabase!
+const db = supabase! as any
 
 function toStep(
   row: {
@@ -37,8 +38,8 @@ function toStep(
 export const runOfShowSupabaseService: RunOfShowService = {
   async list() {
     const [stepsResult, responsiblesResult] = await Promise.all([
-      db.from("_20260725_run_of_show_steps").select("*"),
-      db.from("_20260725_run_of_show_responsibles").select("*"),
+      (db as any).from(tbl("run_of_show_steps") as any).select("*"),
+      (db as any).from(tbl("run_of_show_responsibles") as any).select("*"),
     ])
     if (stepsResult.error) throw stepsResult.error
     if (responsiblesResult.error) throw responsiblesResult.error
@@ -50,7 +51,7 @@ export const runOfShowSupabaseService: RunOfShowService = {
       responsiblesByStep.set(link.run_of_show_step_id, list)
     }
 
-    const steps = (stepsResult.data ?? []).map((row) => toStep(row, responsiblesByStep.get(row.id) ?? []))
+    const steps = ((stepsResult.data ?? []) as any[]).map((row: any) => toStep(row, responsiblesByStep.get(row.id) ?? []))
     return steps.sort((a, b) => (a.startsAt ?? "").localeCompare(b.startsAt ?? ""))
   },
 }

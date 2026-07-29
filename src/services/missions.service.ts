@@ -3,6 +3,7 @@ import { createMockTable } from "@/services/mock/db"
 import { missionsSeed } from "@/services/mock/data/missions"
 import { missionsSupabaseService } from "@/services/supabase/missions"
 import { USE_SUPABASE } from "@/supabase/client"
+import { mockKey } from "@/lib/event"
 
 export interface MissionsService {
   list(): Promise<Mission[]>
@@ -12,7 +13,7 @@ export interface MissionsService {
   remove(id: string): Promise<void>
 }
 
-const missionsTable = createMockTable<Mission>("sj-missions", missionsSeed)
+const missionsTable = createMockTable<Mission>(mockKey("missions"), missionsSeed)
 
 const missionsMockService: MissionsService = {
   async list() {

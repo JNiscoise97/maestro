@@ -16,3 +16,11 @@ export function useMarkRsvpProcessed() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["rsvp-responses"] }),
   })
 }
+
+export function useResetRsvp() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => rsvpService.reset(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["rsvp-responses"] }),
+  })
+}

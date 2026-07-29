@@ -15,6 +15,7 @@ import { PersonManager } from "@/components/parametres/PersonManager"
 import { ResetIntroductionSeenButton } from "@/components/parametres/ResetIntroductionSeenButton"
 import { ResetCheckInsButton } from "@/components/parametres/ResetCheckInsButton"
 import { ResetPhotoGroupsButton } from "@/components/parametres/ResetPhotoGroupsButton"
+import { ResetRsvpButton } from "@/components/parametres/ResetRsvpButton"
 import { SyncFromFiancaillesButton } from "@/components/parametres/SyncFromFiancaillesButton"
 import { GuestCsvImport } from "@/components/parametres/GuestCsvImport"
 import { EquipmentManager } from "@/components/parametres/EquipmentManager"
@@ -133,6 +134,7 @@ function OutilsSection() {
           <ResetIntroductionSeenButton />
           <ResetCheckInsButton />
           <ResetPhotoGroupsButton />
+          <ResetRsvpButton />
         </div>
       </div>
       <div>

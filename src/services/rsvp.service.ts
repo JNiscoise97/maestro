@@ -111,6 +111,19 @@ export const rsvpService = {
     return rowToRsvp(row)
   },
 
+  async reset(): Promise<void> {
+    if (USE_SUPABASE) {
+      const { error } = await (supabase! as any)
+        .from(tbl("rsvp_responses") as any)
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000")
+      if (error) throw error
+      return
+    }
+    const rows = await mockRsvp.getAll()
+    await Promise.all(rows.map((r) => mockRsvp.remove(r.id)))
+  },
+
   async markProcessed(id: string, processed: boolean): Promise<void> {
     if (USE_SUPABASE) {
       const { error } = await (supabase! as any)

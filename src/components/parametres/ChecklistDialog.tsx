@@ -1,4 +1,4 @@
-import { useState } from "react"
+﻿import { useState } from "react"
 import { Pencil, Plus } from "lucide-react"
 import { toast } from "sonner"
 
@@ -32,7 +32,7 @@ export function ChecklistDialog({ checklist, ownerType, ownerId }: ChecklistDial
   const [title, setTitle] = useState(checklist?.title ?? "")
   const [responsiblePersonId, setResponsiblePersonId] = useState(checklist?.responsiblePersonId ?? NONE)
   const { data: people } = usePeople()
-  const fiances = (people ?? []).filter((p) => p.role === "fiance")
+  const fiances = (people ?? []).filter((p) => p.role === "admin")
   const createChecklist = useCreateChecklist()
   const updateChecklist = useUpdateChecklist()
 

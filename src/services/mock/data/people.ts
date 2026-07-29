@@ -4,7 +4,7 @@ export const peopleSeed: Person[] = [
   {
     id: "p-sarah",
     fullName: "Sarah",
-    role: "fiance",
+    role: "admin",
     accessCode: "SARAH2026",
     isActive: true,
     phone: "+33600000001",
@@ -12,7 +12,7 @@ export const peopleSeed: Person[] = [
   {
     id: "p-jordan",
     fullName: "Jordan",
-    role: "fiance",
+    role: "admin",
     accessCode: "JORDAN2026",
     isActive: true,
     phone: "+33600000002",

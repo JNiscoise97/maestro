@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+﻿import { useEffect, useMemo, useState } from "react"
 import {
   CheckCheck, CheckCircle2, Circle, Clock, EarOff, MessageSquare,
   Mic, Swords, User, Users, XCircle,
@@ -351,7 +351,7 @@ export function MesResponsabilitesPage() {
       .filter(m =>
         m.delivererGuestId === person.id ||
         m.delivererPersonId === person.id ||
-        (person.role === "fiance" && m.delivererType === "both_fiances")
+        (person.role === "admin" && m.delivererType === "both_fiances")
       )
       .sort((a, b) => {
         if (a.scheduledTime && b.scheduledTime) return sortableTime(a.scheduledTime) - sortableTime(b.scheduledTime)

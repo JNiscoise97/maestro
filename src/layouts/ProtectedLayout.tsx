@@ -1,4 +1,4 @@
-import { Navigate, Outlet, useLocation } from "react-router-dom"
+﻿import { Navigate, Outlet, useLocation } from "react-router-dom"
 
 import { useIdentity } from "@/context/IdentityContext"
 
@@ -17,7 +17,7 @@ export function ProtectedLayout() {
 
   // Tout invité (référent ou simple) qui n'a pas encore vu l'introduction y
   // est forcé avant toute autre page — les fiancés n'ont pas ce champ.
-  const needsIntroduction = person.role !== "fiance" && !person.introductionSeen && !isImpersonating
+  const needsIntroduction = person.role !== "admin" && !person.introductionSeen && !isImpersonating
   if (needsIntroduction && location.pathname !== "/introduction") {
     return <Navigate to="/introduction" replace />
   }

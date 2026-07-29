@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+﻿import { useMemo, useState } from "react"
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core"
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
@@ -116,7 +116,7 @@ function ConfirmDeleteButton({
 function PoleResponsableSelect({ pole }: { pole: Pole }) {
   const { data: people } = usePeople()
   const updatePole = useUpdatePole()
-  const fiances = (people ?? []).filter((p) => p.role === "fiance")
+  const fiances = (people ?? []).filter((p) => p.role === "admin")
 
   return (
     <Select

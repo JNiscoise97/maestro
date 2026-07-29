@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+﻿import { useMemo } from "react"
 import { EarOff, MessageSquare, Mic } from "lucide-react"
 
 import type { RosDeliveryMode, RosMessage, RunOfShowStep } from "@/types/domain"
@@ -142,7 +142,7 @@ function GuestMessagesView({ guestId }: { guestId: string }) {
 
 export function MessagesPage() {
   const { person } = useIdentity()
-  const isFiance = person?.role === "fiance"
+  const isFiance = person?.role === "admin"
 
   return (
     <div className="space-y-6">

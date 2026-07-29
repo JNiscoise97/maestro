@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+﻿import { useMemo, useState } from "react"
 import {
   ListChecks, LayoutGrid, FolderTree, CheckCircle2, TriangleAlert,
   Clock, Ban, ArrowRight, Calendar, RefreshCw, UserPlus, History,
@@ -231,7 +231,7 @@ export function MissionsPage() {
     itemsLoading || entriesLoading || guestsLoading || acceptancesLoading || peopleLoading
 
   const myDomaineIds = useMemo(() => {
-    if (!person || person.role === "fiance") return null
+    if (!person || person.role === "admin") return null
     return entries.find((e) => e.identity.id === person.id)?.domaineIds ?? []
   }, [person, entries])
 
@@ -441,7 +441,7 @@ export function MissionsPage() {
     updateItem.mutate({ id: item.id, patch: { status, isDone: status === "done" } })
   }
 
-  const isFiance = person?.role === "fiance"
+  const isFiance = person?.role === "admin"
   const { data: assigneeHistory = [] } = useAssigneeHistory()
   const [activeTab, setActiveTab] = useState(DASHBOARD_TAB)
   const [fianceView, setFianceView] = useState<"pilotage" | "operationnelle">("pilotage")

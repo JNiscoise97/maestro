@@ -1,4 +1,4 @@
-import { useState } from "react"
+﻿import { useState } from "react"
 import { toast } from "sonner"
 
 import { useCreateDocument } from "@/hooks/queries/use-documents"
@@ -34,7 +34,7 @@ export function DocumentUploadDialog() {
       category: category || null,
       fileName: file.name,
       filePath: URL.createObjectURL(file),
-      visibleToRoles: ["fiance", "referent"],
+      visibleToRoles: ["admin", "referent"],
     })
     toast.success("Document ajouté.")
     setOpen(false)

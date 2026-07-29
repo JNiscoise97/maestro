@@ -1,4 +1,4 @@
-import {
+﻿import {
   Heart,
   UserCheck,
   Home,
@@ -59,14 +59,14 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { label: "Introduction", path: "/introduction", icon: Heart, capability: "view:introduction" },
   { label: "Mon rôle", path: "/ma-mission", icon: UserCheck, capability: "view:role" },
-  { label: "Tableau de bord", path: "/", icon: Home, capability: "view:dashboard", visibleToRoles: ["fiance"] },
+  { label: "Tableau de bord", path: "/", icon: Home, capability: "view:dashboard", visibleToRoles: ["admin"] },
   { label: "Accueil", path: "/", icon: Home, capability: "view:referent-home" },
   {
     label: "Les missions",
     path: "/missions",
     icon: ListChecks,
     capability: "view:missions",
-    visibleToRoles: ["fiance"],
+    visibleToRoles: ["admin"],
   },
   { label: "Équipe", path: "/referents", icon: Users, capability: "view:referents" },
   { label: "Planning", path: "/planning", icon: CalendarRange, capability: "view:planning" },

@@ -1,4 +1,4 @@
-import type { ChecklistOwnerType, Guest, Person } from "@/types/domain"
+﻿import type { ChecklistOwnerType, Guest, Person } from "@/types/domain"
 import {
   useChecklistsForOwner,
   useChecklistItems,
@@ -207,8 +207,8 @@ export function ChecklistWidget({ ownerType, ownerId, allowAssignment = true, sc
   // logistique...) — on ne le réaffiche que s'il y en a plusieurs (ex.
   // Coordinateur général, qui a 3 checklists distinctes pour la même mission).
   const showTitle = checklists.length > 1
-  const fiances = (people ?? []).filter((p) => p.role === "fiance")
-  const canAssign = allowAssignment && person?.role === "fiance"
+  const fiances = (people ?? []).filter((p) => p.role === "admin")
+  const canAssign = allowAssignment && person?.role === "admin"
   const assignableGuests = (guestsData ?? []).filter((g) => g.assignable)
 
   return (

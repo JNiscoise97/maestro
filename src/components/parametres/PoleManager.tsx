@@ -1,4 +1,4 @@
-import { useState } from "react"
+﻿import { useState } from "react"
 import { Pencil, Plus } from "lucide-react"
 import { toast } from "sonner"
 
@@ -26,7 +26,7 @@ export function PoleDialog({ pole }: { pole?: Pole }) {
   const [name, setName] = useState(pole?.name ?? "")
   const [responsiblePersonId, setResponsiblePersonId] = useState(pole?.responsiblePersonId ?? NONE)
   const { data: people } = usePeople()
-  const fiances = (people ?? []).filter((p) => p.role === "fiance")
+  const fiances = (people ?? []).filter((p) => p.role === "admin")
   const createPole = useCreatePole()
   const updatePole = useUpdatePole()
 

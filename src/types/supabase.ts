@@ -15,7 +15,7 @@ type TableDef<Row, OptionalOnInsert extends keyof Row> = {
   Relationships: []
 }
 
-export type AppRoleRow = "fiance" | "referent" | "invite"
+export type AppRoleRow = "admin" | "fiance" | "referent" | "invite"
 export type ProgressStatusRow = "todo" | "in_progress" | "done" | "blocked"
 export type PriorityRow = "low" | "normal" | "high" | "urgent"
 export type PlanningMilestoneRow = "j_moins_30" | "j_moins_15" | "j_moins_7" | "j_moins_1" | "jour_j" | "j_plus_1"

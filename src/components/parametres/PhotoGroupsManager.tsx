@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+﻿import { useMemo, useState } from "react"
 import {
   DndContext,
   DragOverlay,
@@ -1014,7 +1014,7 @@ export function PhotoGroupsManager() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
   const isLoading = sessionsLoading || groupsLoading || guestsLoading || membersLoading || peopleLoading
-  const fiances = useMemo(() => (people ?? []).filter((p) => p.role === "fiance"), [people])
+  const fiances = useMemo(() => (people ?? []).filter((p) => p.role === "admin"), [people])
 
   const sortedSessions = useMemo(() => [...(sessions ?? [])].sort((a, b) => a.sortOrder - b.sortOrder), [sessions])
 

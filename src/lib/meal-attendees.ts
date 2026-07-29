@@ -1,4 +1,4 @@
-import type { Guest, MealChoice, Person, Prestataire } from "@/types/domain"
+﻿import type { Guest, MealChoice, Person, Prestataire } from "@/types/domain"
 
 export type MealAttendeeSource = "guest" | "fiance" | "prestataire"
 
@@ -31,7 +31,7 @@ export function guestsToAttendees(guests: Guest[]): MealAttendee[] {
 
 export function fiancesToAttendees(people: Person[]): MealAttendee[] {
   return people
-    .filter((p) => p.role === "fiance")
+    .filter((p) => p.role === "admin")
     .map((p) => ({
       id: p.id,
       source: "fiance",

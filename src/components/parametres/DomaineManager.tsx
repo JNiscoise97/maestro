@@ -1,4 +1,4 @@
-import { useState } from "react"
+﻿import { useState } from "react"
 import { Pencil, Plus } from "lucide-react"
 import { toast } from "sonner"
 
@@ -44,7 +44,7 @@ export function DomaineDialog({ domaine, initialPoleId }: { domaine?: Domaine; i
   const { data: poles } = usePoles()
   const { data: people } = usePeople()
   const { data: domaines } = useDomaines()
-  const fiances = (people ?? []).filter((p) => p.role === "fiance")
+  const fiances = (people ?? []).filter((p) => p.role === "admin")
   const createDomaine = useCreateDomaine()
   const updateDomaine = useUpdateDomaine()
 

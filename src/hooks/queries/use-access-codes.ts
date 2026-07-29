@@ -39,7 +39,7 @@ export function useCreateAccount() {
         await peopleService.create({
           id: crypto.randomUUID(),
           fullName: (input.fullName ?? "").trim(),
-          role: "fiance",
+          role: "admin",
           accessCode: code,
           isActive: true,
         })

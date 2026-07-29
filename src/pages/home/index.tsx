@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+﻿import { useMemo, useState } from "react"
 import { AlertTriangle, CheckCircle2, Clock, HeartHandshake, XCircle } from "lucide-react"
 
 import { useIdentity } from "@/context/IdentityContext"
@@ -263,7 +263,7 @@ export function IndexPage() {
   const { entries, isLoading } = useResponsableEntries()
 
   if (!person) return null
-  if (person.role === "fiance") return <DashboardPage />
+  if (person.role === "admin") return <DashboardPage />
 
   if (isLoading) return (
     <div className="max-w-2xl space-y-6">

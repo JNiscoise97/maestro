@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom"
+﻿import { useNavigate } from "react-router-dom"
 import { HeartHandshake } from "lucide-react"
 
 import { useIdentity } from "@/context/IdentityContext"
@@ -20,7 +20,7 @@ export function IntroductionPage() {
   const navigate = useNavigate()
 
   function handleAcknowledge() {
-    if (!person || person.role === "fiance" || isImpersonating) {
+    if (!person || person.role === "admin" || isImpersonating) {
       navigate("/")
       return
     }

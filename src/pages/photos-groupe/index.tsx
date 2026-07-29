@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+﻿import { useEffect, useMemo, useRef, useState } from "react"
 import {
   AlertTriangle, ArrowLeft, Camera, Check, CheckCircle2,
   ChevronDown, ChevronRight, Clock, Pencil, SkipForward, Star,
@@ -1082,7 +1082,7 @@ export function PhotosGroupePage() {
 
   const updateMember = useUpdatePhotoGroupMember()
 
-  const fiances = useMemo(() => people.filter(p => p.role === "fiance"), [people])
+  const fiances = useMemo(() => people.filter(p => p.role === "admin"), [people])
   const activeSession = useMemo(() => sessions.find(s => s.id === activeSessionId) ?? null, [sessions, activeSessionId])
   const sessionGroups = useMemo(() => groups.filter(g => g.sessionId === activeSessionId), [groups, activeSessionId])
   const sessionMembers = useMemo(

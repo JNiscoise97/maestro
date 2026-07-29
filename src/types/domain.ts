@@ -1,4 +1,4 @@
-export type AppRole = "fiance" | "referent" | "invite"
+export type AppRole = "admin" | "referent" | "invite"
 
 /**
  * Réservée à Sarah & Jordan : ce n'est pas une table d'identité générique.
@@ -11,7 +11,7 @@ export interface Person {
   fullName: string
   nickname?: string | null
   phone?: string
-  role: "fiance"
+  role: AppRole
   accessCode: string
   avatarUrl?: string | null
   isActive: boolean

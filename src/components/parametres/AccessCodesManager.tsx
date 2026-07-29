@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils"
 const CONFIGURABLE_TABS: { capability: Capability; label: string }[] = NAV_ITEMS
   .filter(item => {
     if (!item.capability.startsWith("view:")) return false
-    if (item.visibleToRoles?.length === 1 && item.visibleToRoles[0] === "fiance") return false
+    if (item.visibleToRoles?.length === 1 && item.visibleToRoles[0] === "admin") return false
     return true
   })
   .filter((item, i, arr) => arr.findIndex(x => x.capability === item.capability) === i)

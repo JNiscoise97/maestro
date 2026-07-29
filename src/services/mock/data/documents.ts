@@ -1,4 +1,4 @@
-import type { DocumentItem } from "@/types/domain"
+﻿import type { DocumentItem } from "@/types/domain"
 
 export const documentsSeed: DocumentItem[] = [
   {
@@ -7,7 +7,7 @@ export const documentsSeed: DocumentItem[] = [
     category: "Planning",
     fileName: "Planning général.pdf",
     filePath: "documents/planning.pdf",
-    visibleToRoles: ["fiance", "referent"],
+    visibleToRoles: ["admin", "referent"],
   },
   {
     id: "doc-inventaire-boissons",
@@ -15,7 +15,7 @@ export const documentsSeed: DocumentItem[] = [
     category: "Boissons",
     fileName: "Inventaire boissons.pdf",
     filePath: "documents/inventaire-boissons.pdf",
-    visibleToRoles: ["fiance", "referent"],
+    visibleToRoles: ["admin", "referent"],
   },
   {
     id: "doc-playlist-dj",
@@ -23,6 +23,6 @@ export const documentsSeed: DocumentItem[] = [
     category: "DJ",
     fileName: "Playlist DJ.pdf",
     filePath: "documents/playlist-dj.pdf",
-    visibleToRoles: ["fiance", "referent"],
+    visibleToRoles: ["admin", "referent"],
   },
 ]

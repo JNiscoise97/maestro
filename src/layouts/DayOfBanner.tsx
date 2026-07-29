@@ -1,4 +1,4 @@
-import { Phone } from "lucide-react"
+﻿import { Phone } from "lucide-react"
 
 import { useEventConfig } from "@/context/EventConfigContext"
 import { usePeople } from "@/hooks/queries/use-people"
@@ -11,7 +11,7 @@ export function DayOfBanner() {
 
   if (!isDayOf) return null
 
-  const jordan = people?.find((p) => p.fullName === "Jordan" && p.role === "fiance")
+  const jordan = people?.find((p) => p.fullName === "Jordan" && p.role === "admin")
 
   const PHASE_LABELS: Record<string, string> = {
     "j-1": "J-1 — installation",

@@ -1,4 +1,4 @@
-import { Clock, Trash2 } from "lucide-react"
+﻿import { Clock, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import type { RosDelay, RunOfShowStep } from "@/types/domain"
@@ -18,7 +18,7 @@ function fmt(iso: string) {
 export function DelayJournal({ delays, steps }: Props) {
   const deleteDelay = useDeleteRosDelay()
   const { realPerson } = useIdentity()
-  const isFiance = realPerson?.role === "fiance"
+  const isFiance = realPerson?.role === "admin"
   const stepsById = new Map(steps.map((s) => [s.id, s]))
 
   const total = delays.reduce((acc, d) => acc + d.delayMinutes, 0)

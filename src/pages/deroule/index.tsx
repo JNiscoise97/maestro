@@ -1,4 +1,4 @@
-import { useState } from "react"
+﻿import { useState } from "react"
 import { motion } from "framer-motion"
 import { PartyPopper } from "lucide-react"
 
@@ -44,7 +44,7 @@ function StepList({ steps, people }: { steps: RunOfShowStep[]; people: Person[] 
 
 export function DeroulePage() {
   const { realPerson } = useIdentity()
-  const isFiance = realPerson?.role === "fiance"
+  const isFiance = realPerson?.role === "admin"
 
   const { data: steps, isLoading: stepsLoading } = useRunOfShow()
   const { data: people, isLoading: peopleLoading } = usePeople()

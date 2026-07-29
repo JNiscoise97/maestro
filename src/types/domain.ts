@@ -290,6 +290,8 @@ export interface Guest {
   notes?: string | null
   /** Présent uniquement à l'écriture (code en clair saisi dans l'UI) — jamais relu depuis Supabase, voir `services/supabase/guests.ts`. */
   accessCode?: string | null
+  /** Référence vers l'invité correspondant dans les fiançailles (_20260725_guests). null = nouvel invité. */
+  sourceGuestId?: string | null
   isActive?: boolean
   /** A déjà vu la page Introduction (mot de Sarah & Jordan) lors d'une connexion précédente. */
   introductionSeen?: boolean

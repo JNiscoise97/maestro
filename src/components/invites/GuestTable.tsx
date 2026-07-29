@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Link2, Unlink } from "lucide-react"
+import { History, Link2, Unlink } from "lucide-react"
 import { toast } from "sonner"
 
 import type { Guest, GuestGroup } from "@/types/domain"
@@ -128,6 +128,14 @@ export function GuestTable({ guests, groupsById }: GuestTableProps) {
               <TableCell className="truncate font-medium text-foreground">
                 <span className="inline-flex items-center gap-1.5">
                   {guest.fullName}
+                  {guest.sourceGuestId ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <History className="size-3.5 shrink-0 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent>Était invité aux fiançailles</TooltipContent>
+                    </Tooltip>
+                  ) : null}
                   {guest.pairedWithId ? (
                     <Tooltip>
                       <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>

@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
+import { useQuery } from "@tanstack/react-query"
 import { ArrowLeft, Pencil, Trash2, UserX } from "lucide-react"
 import { toast } from "sonner"
 
@@ -24,6 +25,7 @@ import {
 import { RsvpBadge } from "@/components/invites/RsvpBadge"
 import { GuestAccessSection } from "@/components/invites/GuestAccessSection"
 import { useDeleteGuest, useGuestGroups, useGuests, useUpdateGuest } from "@/hooks/queries/use-guests"
+import { supabase } from "@/supabase/client"
 import { MEAL_CHOICE_LABELS } from "@/lib/meal-choice"
 import type { Guest, GuestGroup, GuestSide, MealChoice, RsvpStatus } from "@/types/domain"
 
@@ -496,6 +498,44 @@ function GuestEditForm({ guest, groups, allGuests, onCancel, onSaved }: GuestEdi
   )
 }
 
+function useSourceGuest(sourceGuestId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["fiancailles-guest", sourceGuestId],
+    enabled: !!sourceGuestId && !!supabase,
+    queryFn: async () => {
+      const db = supabase as any
+      const { data, error } = await db
+        .from("_20260725_guests")
+        .select("rsvp_status, dietary_constraints, allergies, notes, rsvp_responded_at")
+        .eq("id", sourceGuestId)
+        .single()
+      if (error) throw error
+      return data as {
+        rsvp_status: string
+        dietary_constraints: string | null
+        allergies: string | null
+        notes: string | null
+        rsvp_responded_at: string | null
+      }
+    },
+  })
+}
+
+function FiancaillesSection({ sourceGuestId }: { sourceGuestId: string }) {
+  const { data, isLoading } = useSourceGuest(sourceGuestId)
+  if (isLoading) return <Section title="Fiançailles"><p className="py-2 text-sm text-muted-foreground">Chargement…</p></Section>
+  if (!data) return null
+  return (
+    <Section title="Fiançailles (données historiques)">
+      <Field label="Présence" value={<RsvpBadge status={data.rsvp_status as "pending" | "confirmed" | "declined"} />} />
+      <Field label="Date de réponse" value={data.rsvp_responded_at} />
+      <Field label="Régime alimentaire" value={data.dietary_constraints} />
+      <Field label="Allergies" value={data.allergies} />
+      <Field label="Notes fiançailles" value={data.notes} />
+    </Section>
+  )
+}
+
 export function GuestDetailPage() {
   const { guestId } = useParams<{ guestId: string }>()
   const navigate = useNavigate()
@@ -620,6 +660,10 @@ export function GuestDetailPage() {
               <Section title="Notes">
                 <p className="py-2 text-sm text-foreground">{guest.notes}</p>
               </Section>
+            ) : null}
+
+            {guest.sourceGuestId ? (
+              <FiancaillesSection sourceGuestId={guest.sourceGuestId} />
             ) : null}
 
             <GuestAccessSection guest={guest} />

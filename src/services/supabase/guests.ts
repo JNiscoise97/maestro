@@ -61,6 +61,7 @@ function toGuest(row: {
   checked_in_at: string | null
   is_unexpected: boolean
   nickname: string | null
+  source_guest_id: string | null
 }): Guest {
   return {
     id: row.id,
@@ -117,6 +118,7 @@ function toGuest(row: {
     allowedTabs: row.allowed_tabs,
     checkedInAt: row.checked_in_at,
     isUnexpected: row.is_unexpected,
+    sourceGuestId: row.source_guest_id,
   }
 }
 

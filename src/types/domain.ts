@@ -292,6 +292,8 @@ export interface Guest {
   accessCode?: string | null
   /** Référence vers l'invité correspondant dans les fiançailles (_20260725_guests). null = nouvel invité. */
   sourceGuestId?: string | null
+  /** Statut de présence aux fiançailles, dénormalisé depuis _20260725_guests. */
+  sourceAttendance?: "present" | "declined" | "no-show" | null
   isActive?: boolean
   /** A déjà vu la page Introduction (mot de Sarah & Jordan) lors d'une connexion précédente. */
   introductionSeen?: boolean

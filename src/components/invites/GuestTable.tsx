@@ -131,9 +131,19 @@ export function GuestTable({ guests, groupsById }: GuestTableProps) {
                   {guest.sourceGuestId ? (
                     <Tooltip>
                       <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <History className="size-3.5 shrink-0 text-muted-foreground" />
+                        <History className={`size-3.5 shrink-0 ${
+                          guest.sourceAttendance === "present"  ? "text-emerald-500" :
+                          guest.sourceAttendance === "no-show"  ? "text-amber-500"   :
+                          guest.sourceAttendance === "declined" ? "text-muted-foreground" :
+                          "text-muted-foreground"
+                        }`} />
                       </TooltipTrigger>
-                      <TooltipContent>Était invité aux fiançailles</TooltipContent>
+                      <TooltipContent>
+                        {guest.sourceAttendance === "present"  ? "Était présent aux fiançailles" :
+                         guest.sourceAttendance === "no-show"  ? "Ne s'est pas présenté·e" :
+                         guest.sourceAttendance === "declined" ? "A décliné l'invitation aux fiançailles" :
+                         "Était invité aux fiançailles"}
+                      </TooltipContent>
                     </Tooltip>
                   ) : null}
                   {guest.pairedWithId ? (

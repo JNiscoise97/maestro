@@ -24,10 +24,14 @@ import { TourTablesIndexPage } from "@/pages/tour-tables"
 import { MessagesPage } from "@/pages/messages"
 import { CadeauxPage } from "@/pages/cadeaux"
 import { NotFoundPage } from "@/pages/not-found"
+import { RsvpPage } from "@/pages/rsvp"
+import { RsvpInvitationPage } from "@/pages/rsvp/invitation"
 
 export function AppRoutes() {
   return (
     <Routes>
+      <Route path="/rsvp" element={<RsvpPage />} />
+      <Route path="/rsvp/invitation" element={<RsvpInvitationPage />} />
       <Route path="/connexion" element={<LoginPage />} />
 
       <Route element={<ProtectedLayout />}>

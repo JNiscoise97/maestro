@@ -15,6 +15,7 @@ import { PersonManager } from "@/components/parametres/PersonManager"
 import { ResetIntroductionSeenButton } from "@/components/parametres/ResetIntroductionSeenButton"
 import { ResetCheckInsButton } from "@/components/parametres/ResetCheckInsButton"
 import { ResetPhotoGroupsButton } from "@/components/parametres/ResetPhotoGroupsButton"
+import { SyncFromFiancaillesButton } from "@/components/parametres/SyncFromFiancaillesButton"
 import { EquipmentManager } from "@/components/parametres/EquipmentManager"
 import { AccessCodesManager } from "@/components/parametres/AccessCodesManager"
 import { MessagesConfig } from "@/components/timing/MessagesConfig"
@@ -119,6 +120,10 @@ function TimingMessagesSection() {
 function OutilsSection() {
   return (
     <div className="space-y-4">
+      <div>
+        <h2 className="mb-3 font-heading text-base font-medium text-foreground">Synchronisation</h2>
+        <SyncFromFiancaillesButton />
+      </div>
       <div>
         <h2 className="mb-3 font-heading text-base font-medium text-foreground">Réinitialisation</h2>
         <div className="flex flex-wrap gap-3">

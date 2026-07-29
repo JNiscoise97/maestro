@@ -498,6 +498,36 @@ function GuestEditForm({ guest, groups, allGuests, onCancel, onSaved }: GuestEdi
   )
 }
 
+type FiancaillesData = {
+  rsvp_status: string
+  checked_in_at: string | null
+  dietary_constraints: string | null
+  allergies: string | null
+  notes: string | null
+  rsvp_responded_at: string | null
+}
+
+function fiancaillesStatus(data: FiancaillesData): "present" | "declined" | "no-show" | null {
+  if (data.rsvp_status === "declined") return "declined"
+  if (data.rsvp_status === "confirmed") return data.checked_in_at ? "present" : "no-show"
+  return null
+}
+
+function FiancaillesBadge({ data }: { data: FiancaillesData }) {
+  const status = fiancaillesStatus(data)
+  if (!status) return null
+  const config = {
+    present:  { label: "Était présent aux fiançailles",          className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" },
+    declined: { label: "A décliné l'invitation aux fiançailles", className: "bg-muted text-muted-foreground" },
+    "no-show":{ label: "Ne s'est pas présenté·e",                className: "bg-amber-500/15 text-amber-700 dark:text-amber-400" },
+  }[status]
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${config.className}`}>
+      {config.label}
+    </span>
+  )
+}
+
 function useSourceGuest(sourceGuestId: string | null | undefined) {
   return useQuery({
     queryKey: ["fiancailles-guest", sourceGuestId],
@@ -506,17 +536,11 @@ function useSourceGuest(sourceGuestId: string | null | undefined) {
       const db = supabase as any
       const { data, error } = await db
         .from("_20260725_guests")
-        .select("rsvp_status, dietary_constraints, allergies, notes, rsvp_responded_at")
+        .select("rsvp_status, checked_in_at, dietary_constraints, allergies, notes, rsvp_responded_at")
         .eq("id", sourceGuestId)
         .single()
       if (error) throw error
-      return data as {
-        rsvp_status: string
-        dietary_constraints: string | null
-        allergies: string | null
-        notes: string | null
-        rsvp_responded_at: string | null
-      }
+      return data as FiancaillesData
     },
   })
 }
@@ -527,7 +551,9 @@ function FiancaillesSection({ sourceGuestId }: { sourceGuestId: string }) {
   if (!data) return null
   return (
     <Section title="Fiançailles (données historiques)">
-      <Field label="Présence" value={<RsvpBadge status={data.rsvp_status as "pending" | "confirmed" | "declined"} />} />
+      <div className="py-2">
+        <FiancaillesBadge data={data} />
+      </div>
       <Field label="Date de réponse" value={data.rsvp_responded_at} />
       <Field label="Régime alimentaire" value={data.dietary_constraints} />
       <Field label="Allergies" value={data.allergies} />

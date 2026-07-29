@@ -17,6 +17,7 @@ import { PlanTablePage } from "@/pages/plan-table"
 import { EnfantsPage } from "@/pages/enfants"
 import { PersonnesAgeesPage } from "@/pages/personnes-agees"
 import { MessageSuiviPage } from "@/pages/invites/MessageSuiviPage"
+import { RsvpSuiviTab } from "@/pages/invites/RsvpSuiviTab"
 
 const ALL_GROUPS = "all"
 
@@ -178,7 +179,7 @@ export function InvitesList() {
 
 // ── Page composite ─────────────────────────────────────────────────────────────
 
-type InvitesTab = "liste" | "plan-table" | "enfants" | "accessibilite" | "messages"
+type InvitesTab = "liste" | "rsvp" | "plan-table" | "enfants" | "accessibilite" | "messages"
 
 export function InvitesPage() {
   const [tab, setTab] = useState<InvitesTab>("liste")
@@ -187,6 +188,7 @@ export function InvitesPage() {
       <Tabs value={tab} onValueChange={(v) => setTab(v as InvitesTab)}>
         <TabsList>
           <TabsTrigger value="liste">Invités</TabsTrigger>
+          <TabsTrigger value="rsvp">RSVP</TabsTrigger>
           <TabsTrigger value="plan-table">Plan de table</TabsTrigger>
           <TabsTrigger value="enfants">Enfants</TabsTrigger>
           <TabsTrigger value="accessibilite">Accessibilité</TabsTrigger>
@@ -194,6 +196,7 @@ export function InvitesPage() {
         </TabsList>
       </Tabs>
       {tab === "liste" && <InvitesList />}
+      {tab === "rsvp" && <RsvpSuiviTab />}
       {tab === "plan-table" && <PlanTablePage />}
       {tab === "enfants" && <EnfantsPage />}
       {tab === "accessibilite" && <PersonnesAgeesPage />}

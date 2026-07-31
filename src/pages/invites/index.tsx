@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react"
-import { Armchair, ArrowUpDown } from "lucide-react"
+import { useNavigate } from "react-router-dom"
+import { Armchair, ArrowUpDown, LayoutList, Network } from "lucide-react"
 
-import type { Guest, RsvpStatus } from "@/types/domain"
+import type { Guest, GuestGroup, RsvpStatus } from "@/types/domain"
 import { PageHeader } from "@/components/shared/PageHeader"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -10,9 +11,11 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { RsvpBadge } from "@/components/invites/RsvpBadge"
 import { useGuestGroups, useGuests } from "@/hooks/queries/use-guests"
 import { GuestTable } from "@/components/invites/GuestTable"
 import { GuestCreateDialog } from "@/components/invites/GuestCreateDialog"
+import { GuestTreeView } from "@/components/invites/GuestTreeView"
 import { PlanTablePage } from "@/pages/plan-table"
 import { EnfantsPage } from "@/pages/enfants"
 import { PersonnesAgeesPage } from "@/pages/personnes-agees"
@@ -20,6 +23,69 @@ import { MessageSuiviPage } from "@/pages/invites/MessageSuiviPage"
 import { RsvpSuiviTab } from "@/pages/invites/RsvpSuiviTab"
 
 const ALL_GROUPS = "all"
+
+// ── Vue arbre par groupe ──────────────────────────────────────────────────────
+
+function GuestGroupTree({ guests, groups }: { guests: Guest[]; groups: GuestGroup[] }) {
+  const navigate = useNavigate()
+  const groupsById = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups])
+
+  const byGroup = useMemo(() => {
+    const map = new Map<string, Guest[]>()
+    for (const g of guests) {
+      const key = g.groupId ?? "__none__"
+      const list = map.get(key) ?? []
+      list.push(g)
+      map.set(key, list)
+    }
+    return map
+  }, [guests])
+
+  const sortedGroupIds = useMemo(() => {
+    const ids = [...byGroup.keys()]
+    return ids.sort((a, b) => {
+      if (a === "__none__") return 1
+      if (b === "__none__") return -1
+      const ga = groupsById.get(a)
+      const gb = groupsById.get(b)
+      return (ga?.sortOrder ?? 0) - (gb?.sortOrder ?? 0) || (ga?.familyName ?? "").localeCompare(gb?.familyName ?? "", "fr")
+    })
+  }, [byGroup, groupsById])
+
+  function renderGuest(guest: Guest) {
+    return (
+      <button
+        key={guest.id}
+        type="button"
+        onClick={() => navigate(`/invites/${guest.id}`)}
+        className="flex items-center gap-2 rounded-lg px-2 py-1 text-left text-sm hover:bg-muted/60 transition-colors"
+      >
+        <span className="font-medium text-foreground">{guest.fullName}</span>
+        <RsvpBadge status={guest.rsvpStatus} />
+      </button>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {sortedGroupIds.map((groupId) => {
+        const groupGuests = byGroup.get(groupId) ?? []
+        const group = groupId === "__none__" ? null : groupsById.get(groupId)
+        return (
+          <div key={groupId} className="rounded-2xl border border-border bg-card p-4">
+            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              {group?.familyName ?? "Sans groupe"}
+              <span className="ml-2 font-normal normal-case tracking-normal">
+                {groupGuests.length} invité{groupGuests.length > 1 ? "s" : ""}
+              </span>
+            </p>
+            <GuestTreeView guests={groupGuests} renderGuest={renderGuest} />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 type SortKey = "name" | "family" | "rsvp" | "age"
 
@@ -45,6 +111,7 @@ export function InvitesList() {
   const [groupFilter, setGroupFilter] = useState(ALL_GROUPS)
   const [sortBy, setSortBy] = useState<SortKey>("family")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
+  const [view, setView] = useState<"table" | "tree">("table")
 
   const isLoading = guestsLoading || groupsLoading
 
@@ -156,6 +223,19 @@ export function InvitesList() {
                 </TooltipTrigger>
                 <TooltipContent>{sortDir === "asc" ? "Ordre croissant" : "Ordre décroissant"}</TooltipContent>
               </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={view === "tree" ? "default" : "outline"}
+                    size="icon-sm"
+                    aria-label="Vue arbre par groupe"
+                    onClick={() => setView((v) => v === "table" ? "tree" : "table")}
+                  >
+                    {view === "tree" ? <LayoutList className="size-4" /> : <Network className="size-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{view === "tree" ? "Vue tableau" : "Vue arbre par groupe"}</TooltipContent>
+              </Tooltip>
               <p className="text-xs text-muted-foreground">
                 {filteredGuests.length} invité{filteredGuests.length === 1 ? "" : "s"} affiché{filteredGuests.length === 1 ? "" : "s"}
               </p>
@@ -168,6 +248,8 @@ export function InvitesList() {
           </div>
           {sortedGuests.length === 0 ? (
             <EmptyState icon={Armchair} title="Aucun invité ne correspond à ces filtres" />
+          ) : view === "tree" ? (
+            <GuestGroupTree guests={filteredGuests} groups={groups ?? []} />
           ) : (
             <GuestTable guests={sortedGuests} groupsById={groupsById} />
           )}

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react"
 import { CheckCircle2, Circle, Link2, MessageSquare, Pencil, Plus, Trash2 } from "lucide-react"
 
-import type { Guest } from "@/types/domain"
+import type { Guest, RsvpStatus } from "@/types/domain"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -52,6 +53,7 @@ function CommSheet({
 }) {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
+  const [targetRsvpStatuses, setTargetRsvpStatuses] = useState<RsvpStatus[]>([])
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const create = useCreateCommunication()
@@ -61,20 +63,28 @@ function CommSheet({
   useEffect(() => {
     setName(comm?.name ?? "")
     setDescription(comm?.description ?? "")
+    setTargetRsvpStatuses((comm?.targetRsvpStatuses ?? []) as RsvpStatus[])
     setConfirmDelete(false)
   }, [comm, open])
+
+  function toggleStatus(status: RsvpStatus) {
+    setTargetRsvpStatuses((prev) =>
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+    )
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
+    const statuses = targetRsvpStatuses.length > 0 ? targetRsvpStatuses : null
     if (comm) {
       update.mutate(
-        { id: comm.id, patch: { name: name.trim(), description: description.trim() || null } },
+        { id: comm.id, patch: { name: name.trim(), description: description.trim() || null, targetRsvpStatuses: statuses } },
         { onSuccess: () => onOpenChange(false) }
       )
     } else {
       create.mutate(
-        { name: name.trim(), description: description.trim() || null },
+        { name: name.trim(), description: description.trim() || null, targetRsvpStatuses: statuses },
         { onSuccess: () => onOpenChange(false) }
       )
     }
@@ -119,6 +129,22 @@ function CommSheet({
               placeholder="Contenu ou notes associées…"
               rows={4}
             />
+          </div>
+          <div className="space-y-2">
+            <Label>Destinataires <span className="text-muted-foreground font-normal">(tous si vide)</span></Label>
+            <div className="flex flex-col gap-2">
+              {(["pending", "confirmed", "declined"] as RsvpStatus[]).map((status) => (
+                <label key={status} className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={targetRsvpStatuses.includes(status)}
+                    onCheckedChange={() => toggleStatus(status)}
+                  />
+                  <span className="text-sm">
+                    {status === "pending" ? "En attente" : status === "confirmed" ? "Confirmés" : "Déclinés"}
+                  </span>
+                </label>
+              ))}
+            </div>
           </div>
           <Button type="submit" disabled={isPending || !name.trim()}>
             {comm ? "Enregistrer" : "Créer"}
@@ -170,10 +196,14 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
   const markSent = useMarkCommunicationSent(comm.id)
   const unmark = useUnmarkCommunicationSent(comm.id)
 
-  // Adultes confirmés uniquement — même logique que EnfantsPage
+  const targetStatuses: RsvpStatus[] = useMemo(
+    () => (comm.targetRsvpStatuses?.length ? (comm.targetRsvpStatuses as RsvpStatus[]) : ["confirmed"]),
+    [comm.targetRsvpStatuses]
+  )
+
   const eligible = useMemo(
-    () => guests.filter((g) => g.rsvpStatus === "confirmed" && !isUnder18(g)),
-    [guests]
+    () => guests.filter((g) => targetStatuses.includes(g.rsvpStatus) && !isUnder18(g)),
+    [guests, targetStatuses]
   )
 
   // Index nom par id pour résoudre les partenaires
@@ -236,6 +266,15 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
             <p className="font-medium text-sm leading-snug">{comm.name}</p>
             {comm.description && (
               <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{comm.description}</p>
+            )}
+            {comm.targetRsvpStatuses && comm.targetRsvpStatuses.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {targetStatuses.map((s) => (
+                  <span key={s} className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">
+                    {s === "pending" ? "En attente" : s === "confirmed" ? "Confirmés" : "Déclinés"}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
           <span className="text-2xl font-bold tabular-nums shrink-0">
@@ -400,6 +439,15 @@ export function MessageSuiviPage() {
                   <p className="text-sm font-medium">{comm.name}</p>
                   {comm.description && (
                     <p className="text-xs text-muted-foreground truncate">{comm.description}</p>
+                  )}
+                  {comm.targetRsvpStatuses && comm.targetRsvpStatuses.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {comm.targetRsvpStatuses.map((s) => (
+                        <span key={s} className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">
+                          {s === "pending" ? "En attente" : s === "confirmed" ? "Confirmés" : "Déclinés"}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
                 <Button

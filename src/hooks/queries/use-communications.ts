@@ -20,8 +20,8 @@ export function useCommunications() {
 export function useCreateCommunication() {
   const invalidate = useInvalidateComms()
   return useMutation({
-    mutationFn: ({ name, description }: { name: string; description: string | null }) =>
-      communicationsService.create(name, description),
+    mutationFn: ({ name, description, targetRsvpStatuses }: { name: string; description: string | null; targetRsvpStatuses?: string[] | null }) =>
+      communicationsService.create(name, description, targetRsvpStatuses),
     onSuccess: invalidate,
   })
 }
@@ -29,7 +29,7 @@ export function useCreateCommunication() {
 export function useUpdateCommunication() {
   const invalidate = useInvalidateComms()
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: { name?: string; description?: string | null } }) =>
+    mutationFn: ({ id, patch }: { id: string; patch: { name?: string; description?: string | null; targetRsvpStatuses?: string[] | null } }) =>
       communicationsService.update(id, patch),
     onSuccess: invalidate,
   })

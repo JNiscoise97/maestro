@@ -7,6 +7,7 @@ export interface Communication {
   description: string | null
   sortOrder: number
   createdAt: string
+  targetRsvpStatuses: string[] | null
 }
 
 export interface CommunicationSend {
@@ -22,6 +23,7 @@ function toComm(r: {
   description: string | null
   sort_order: number
   created_at: string
+  target_rsvp_statuses: string[] | null
 }): Communication {
   return {
     id: r.id,
@@ -29,6 +31,7 @@ function toComm(r: {
     description: r.description,
     sortOrder: r.sort_order,
     createdAt: r.created_at,
+    targetRsvpStatuses: r.target_rsvp_statuses,
   }
 }
 
@@ -52,20 +55,21 @@ export const communicationsService = {
     return ((data ?? []) as unknown as Parameters<typeof toComm>[0][]).map(toComm)
   },
 
-  async create(name: string, description: string | null): Promise<Communication> {
+  async create(name: string, description: string | null, targetRsvpStatuses?: string[] | null): Promise<Communication> {
     const { data, error } = await supabase!
       .from(tbl("communications") as any)
-      .insert({ name, description, sort_order: Date.now() })
+      .insert({ name, description, sort_order: Date.now(), target_rsvp_statuses: targetRsvpStatuses ?? null })
       .select()
       .single()
     if (error) throw error
     return toComm(data as unknown as Parameters<typeof toComm>[0])
   },
 
-  async update(id: string, patch: { name?: string; description?: string | null }): Promise<void> {
+  async update(id: string, patch: { name?: string; description?: string | null; targetRsvpStatuses?: string[] | null }): Promise<void> {
+    const { name, description, targetRsvpStatuses } = patch
     const { error } = await supabase!
       .from(tbl("communications") as any)
-      .update(patch)
+      .update({ name, description, target_rsvp_statuses: targetRsvpStatuses })
       .eq("id", id)
     if (error) throw error
   },

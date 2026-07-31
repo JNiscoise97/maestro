@@ -280,13 +280,26 @@ function GuestEditForm({ guest, groups, allGuests, onCancel, onSaved }: GuestEdi
               </SelectContent>
             </Select>
           </EditField>
-          <EditField label="Âge" htmlFor="edit-age-range">
-            <Input
-              id="edit-age-range"
-              value={ageRange}
-              onChange={(e) => setAgeRange(e.target.value)}
-              placeholder="Ex. 30-40"
-            />
+          <EditField label="Âge">
+            <Select value={ageRange || "__none__"} onValueChange={(v) => {
+              const val = v === "__none__" ? "" : v
+              setAgeRange(val)
+              setIsChild(val === "0-12 ans" || val === "13-17 ans")
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Non renseigné" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Non renseigné</SelectItem>
+                <SelectItem value="0-12 ans">0-12 ans</SelectItem>
+                <SelectItem value="13-17 ans">13-17 ans</SelectItem>
+                <SelectItem value="18-24 ans">18-24 ans</SelectItem>
+                <SelectItem value="25-35 ans">25-35 ans</SelectItem>
+                <SelectItem value="36-49 ans">36-49 ans</SelectItem>
+                <SelectItem value="50-69 ans">50-69 ans</SelectItem>
+                <SelectItem value="70-90 ans">70-90 ans</SelectItem>
+              </SelectContent>
+            </Select>
           </EditField>
           <EditField label="Relation" htmlFor="edit-relation">
             <Input

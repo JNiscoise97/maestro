@@ -21,6 +21,8 @@ import { EnfantsPage } from "@/pages/enfants"
 import { PersonnesAgeesPage } from "@/pages/personnes-agees"
 import { MessageSuiviPage } from "@/pages/invites/MessageSuiviPage"
 import { RsvpSuiviTab } from "@/pages/invites/RsvpSuiviTab"
+import { AtelierTab } from "@/pages/invites/AtelierTab"
+import { useProspects } from "@/hooks/queries/use-prospects"
 
 const ALL_GROUPS = "all"
 
@@ -261,16 +263,27 @@ export function InvitesList() {
 
 // ── Page composite ─────────────────────────────────────────────────────────────
 
-type InvitesTab = "liste" | "rsvp" | "plan-table" | "enfants" | "accessibilite" | "messages"
+type InvitesTab = "liste" | "rsvp" | "plan-table" | "enfants" | "accessibilite" | "messages" | "atelier"
 
 export function InvitesPage() {
   const [tab, setTab] = useState<InvitesTab>("liste")
+  const { data: prospects = [] } = useProspects()
+  const pendingCount = prospects.filter((p) => p.status === "pending").length
+
   return (
     <div className="space-y-6">
       <Tabs value={tab} onValueChange={(v) => setTab(v as InvitesTab)}>
         <TabsList>
           <TabsTrigger value="liste">Invités</TabsTrigger>
           <TabsTrigger value="rsvp">RSVP</TabsTrigger>
+          <TabsTrigger value="atelier" className="relative">
+            Atelier
+            {pendingCount > 0 && (
+              <span className="ml-1.5 rounded-full bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 leading-none">
+                {pendingCount}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="plan-table">Plan de table</TabsTrigger>
           <TabsTrigger value="enfants">Enfants</TabsTrigger>
           <TabsTrigger value="accessibilite">Accessibilité</TabsTrigger>
@@ -279,6 +292,7 @@ export function InvitesPage() {
       </Tabs>
       {tab === "liste" && <InvitesList />}
       {tab === "rsvp" && <RsvpSuiviTab />}
+      {tab === "atelier" && <AtelierTab />}
       {tab === "plan-table" && <PlanTablePage />}
       {tab === "enfants" && <EnfantsPage />}
       {tab === "accessibilite" && <PersonnesAgeesPage />}

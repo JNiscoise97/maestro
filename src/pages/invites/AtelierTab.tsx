@@ -1,7 +1,7 @@
 import { useState } from "react"
-import { Trash2, Plus, ChevronDown } from "lucide-react"
+import { Trash2, Plus, ChevronDown, Users } from "lucide-react"
 
-import type { ProspectStatus } from "@/services/supabase/prospects"
+import type { Prospect, ProspectStatus } from "@/services/supabase/prospects"
 import { useProspects, useCreateProspect, useUpdateProspect, useDeleteProspect } from "@/hooks/queries/use-prospects"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,44 +9,25 @@ import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/shared/EmptyState"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Users } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 // ── Constantes ─────────────────────────────────────────────────────────────────
 
-export const STATUS_CONFIG: Record<ProspectStatus, { label: string; color: string }> = {
-  pending:    { label: "Pas encore réfléchi",           color: "bg-muted text-muted-foreground" },
-  no:         { label: "On ne les invitera pas",         color: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400" },
-  next_event: { label: "Pour un prochain événement",    color: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400" },
-  invite:     { label: "On les invite !",               color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
+const STATUS_CONFIG: Record<ProspectStatus, { label: string; color: string }> = {
+  pending:    { label: "Pas encore réfléchi",        color: "bg-muted text-muted-foreground" },
+  no:         { label: "On ne les invitera pas",      color: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400" },
+  next_event: { label: "Pour un prochain événement", color: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400" },
+  invite:     { label: "On les invite !",            color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
 }
 
 const STATUS_ORDER: ProspectStatus[] = ["pending", "invite", "next_event", "no"]
 
 type Filter = "all" | ProspectStatus
-
-// ── Badge statut ───────────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: ProspectStatus }) {
-  const { label, color } = STATUS_CONFIG[status]
-  return (
-    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", color)}>
-      {label}
-    </span>
-  )
-}
 
 // ── Formulaire d'ajout rapide ──────────────────────────────────────────────────
 
@@ -93,7 +74,7 @@ function AddProspectForm() {
 
 // ── Carte prospect ─────────────────────────────────────────────────────────────
 
-function ProspectCard({ prospect }: { prospect: ReturnType<typeof useProspects>["data"] extends Array<infer T> ? T : never }) {
+function ProspectCard({ prospect }: { prospect: Prospect }) {
   const [editingNotes, setEditingNotes] = useState(false)
   const [notes, setNotes]               = useState(prospect.notes ?? "")
   const update = useUpdateProspect()
@@ -193,8 +174,6 @@ const FILTER_LABELS: Record<Filter, string> = {
 export function AtelierTab() {
   const { data: prospects = [], isLoading } = useProspects()
   const [filter, setFilter] = useState<Filter>("all")
-
-  const pendingCount = prospects.filter((p) => p.status === "pending").length
 
   const filtered = filter === "all" ? prospects : prospects.filter((p) => p.status === filter)
 

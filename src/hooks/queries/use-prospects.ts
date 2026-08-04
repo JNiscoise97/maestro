@@ -15,7 +15,7 @@ export function useProspects() {
 export function useCreateProspect() {
   const invalidate = useInvalidate()
   return useMutation({
-    mutationFn: (fields: { fullName: string; groupName?: string | null; notes?: string | null }) =>
+    mutationFn: (fields: { fullName: string; groupName?: string | null; notes?: string | null; addedByName?: string | null }) =>
       prospectsService.create(fields),
     onSuccess: invalidate,
   })

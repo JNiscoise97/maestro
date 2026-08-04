@@ -10,6 +10,7 @@ export interface Prospect {
   notes: string | null
   status: ProspectStatus
   createdAt: string
+  addedByName: string | null
 }
 
 function toProspect(r: {
@@ -19,6 +20,7 @@ function toProspect(r: {
   notes: string | null
   status: string
   created_at: string
+  added_by_name: string | null
 }): Prospect {
   return {
     id: r.id,
@@ -27,6 +29,7 @@ function toProspect(r: {
     notes: r.notes,
     status: r.status as ProspectStatus,
     createdAt: r.created_at,
+    addedByName: r.added_by_name,
   }
 }
 
@@ -41,10 +44,10 @@ export const prospectsService = {
     return ((data ?? []) as unknown as Parameters<typeof toProspect>[0][]).map(toProspect)
   },
 
-  async create(fields: { fullName: string; groupName?: string | null; notes?: string | null }): Promise<Prospect> {
+  async create(fields: { fullName: string; groupName?: string | null; notes?: string | null; addedByName?: string | null }): Promise<Prospect> {
     const { data, error } = await supabase!
       .from(tbl("prospect_guests") as any)
-      .insert({ full_name: fields.fullName, group_name: fields.groupName ?? null, notes: fields.notes ?? null })
+      .insert({ full_name: fields.fullName, group_name: fields.groupName ?? null, notes: fields.notes ?? null, added_by_name: fields.addedByName ?? null })
       .select()
       .single()
     if (error) throw error

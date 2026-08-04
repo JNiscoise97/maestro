@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query"
 
 import type { Prospect, ProspectStatus } from "@/services/supabase/prospects"
 import { useProspects, useCreateProspect, useUpdateProspect, useDeleteProspect } from "@/hooks/queries/use-prospects"
-import { useGuestGroups } from "@/hooks/queries/use-guests"
+import { useCreateGuestGroup, useGuestGroups } from "@/hooks/queries/use-guests"
 import { useIdentity } from "@/context/IdentityContext"
 import { supabase } from "@/supabase/client"
 import { tbl } from "@/lib/event"
@@ -44,31 +44,27 @@ const CREATE_KEY = "__create__"
 function GroupSelect({
   value,
   onChange,
-  extraGroups,
-  onNewGroup,
   className,
 }: {
   value: string
   onChange: (v: string) => void
-  extraGroups: string[]
-  onNewGroup: (name: string) => void
   className?: string
 }) {
   const { data: groups = [] } = useGuestGroups()
+  const createGroup = useCreateGuestGroup()
   const [creating, setCreating] = useState(false)
   const [draft, setDraft] = useState("")
 
-  const existingNames = groups.map((g) => g.familyName)
-  const allOptions = [...new Set([...existingNames, ...extraGroups])]
-
-  function confirmNew() {
+  async function confirmNew() {
     const name = draft.trim()
-    if (name) {
-      onNewGroup(name)
-      onChange(name)
-    }
     setDraft("")
     setCreating(false)
+    if (!name) return
+    await createGroup.mutateAsync({
+      familyName: name,
+      sortOrder: (Math.max(0, ...groups.map((g) => g.sortOrder)) + 1),
+    })
+    onChange(name)
   }
 
   if (creating) {
@@ -101,8 +97,8 @@ function GroupSelect({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={NONE}>— aucun groupe —</SelectItem>
-        {allOptions.map((name) => (
-          <SelectItem key={name} value={name}>{name}</SelectItem>
+        {groups.map((g) => (
+          <SelectItem key={g.id} value={g.familyName}>{g.familyName}</SelectItem>
         ))}
         <SelectItem value={CREATE_KEY} className="text-primary font-medium">
           + Créer un groupe…
@@ -300,13 +296,8 @@ function PreviewStep({
   onClose: () => void
 }) {
   const [isImporting, setIsImporting] = useState(false)
-  const [extraGroups, setExtraGroups] = useState<string[]>([])
   const queryClient = useQueryClient()
   const { realPerson } = useIdentity()
-
-  function handleNewGroup(name: string) {
-    setExtraGroups((prev) => prev.includes(name) ? prev : [...prev, name])
-  }
 
   function updateRow(id: string, field: keyof Omit<MappedRow, "_id">, value: string) {
     onRows(rows.map((r) => r._id === id ? { ...r, [field]: value } : r))
@@ -373,8 +364,6 @@ function PreviewStep({
                   <GroupSelect
                     value={row.groupe}
                     onChange={(v) => updateRow(row._id, "groupe", v)}
-                    extraGroups={extraGroups}
-                    onNewGroup={handleNewGroup}
                   />
                 </TableCell>
                 <TableCell className="p-1">
@@ -459,16 +448,11 @@ function ProspectCsvImport({ onClose }: { onClose: () => void }) {
 // ── Formulaire d'ajout rapide ──────────────────────────────────────────────────
 
 function AddProspectForm() {
-  const [nom, setNom]                   = useState("")
-  const [prenom, setPrenom]             = useState("")
-  const [groupe, setGroupe]             = useState("")
-  const [extraGroups, setExtraGroups]   = useState<string[]>([])
+  const [nom, setNom]       = useState("")
+  const [prenom, setPrenom] = useState("")
+  const [groupe, setGroupe] = useState("")
   const create = useCreateProspect()
   const { realPerson } = useIdentity()
-
-  function handleNewGroup(name: string) {
-    setExtraGroups((prev) => prev.includes(name) ? prev : [...prev, name])
-  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -495,8 +479,6 @@ function AddProspectForm() {
         <GroupSelect
           value={groupe}
           onChange={setGroupe}
-          extraGroups={extraGroups}
-          onNewGroup={handleNewGroup}
           className="w-full"
         />
       </div>

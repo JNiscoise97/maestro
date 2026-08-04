@@ -408,7 +408,7 @@ type CsvStep = "upload" | "mapping" | "preview"
 function ProspectCsvImport({ onClose }: { onClose: () => void }) {
   const [step, setStep]       = useState<CsvStep>("upload")
   const [raw, setRaw]         = useState<RawCsv | null>(null)
-  const [mapping, setMapping] = useState<Mapping>({ nom: NONE, famille: NONE, notes: NONE })
+  const [mapping, setMapping] = useState<Mapping>({ nom: NONE, prenom: NONE, groupe: NONE })
   const [rows, setRows]       = useState<MappedRow[]>([])
 
   function handleParsed(r: RawCsv) {

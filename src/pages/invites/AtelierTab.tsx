@@ -565,7 +565,13 @@ export function AtelierTab() {
   const [filter, setFilter]     = useState<Filter>("all")
   const [showCsv, setShowCsv]   = useState(false)
 
-  const filtered = filter === "all" ? prospects : prospects.filter((p) => p.status === filter)
+  const filtered = (filter === "all" ? prospects : prospects.filter((p) => p.status === filter))
+    .slice()
+    .sort((a, b) => {
+      const g = (a.groupName ?? "").localeCompare(b.groupName ?? "", "fr", { sensitivity: "base" })
+      if (g !== 0) return g
+      return a.fullName.localeCompare(b.fullName, "fr", { sensitivity: "base" })
+    })
 
   const counts: Record<Filter, number> = {
     all:        prospects.length,

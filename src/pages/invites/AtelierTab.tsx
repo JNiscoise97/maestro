@@ -562,14 +562,18 @@ const FILTER_LABELS: Record<Filter, string> = {
 
 export function AtelierTab() {
   const { data: prospects = [], isLoading } = useProspects()
+  const { data: groups = [] }               = useGuestGroups()
   const [filter, setFilter]     = useState<Filter>("all")
   const [showCsv, setShowCsv]   = useState(false)
+
+  const groupOrder = new Map(groups.map((g) => [g.familyName, g.sortOrder]))
 
   const filtered = (filter === "all" ? prospects : prospects.filter((p) => p.status === filter))
     .slice()
     .sort((a, b) => {
-      const g = (a.groupName ?? "").localeCompare(b.groupName ?? "", "fr", { sensitivity: "base" })
-      if (g !== 0) return g
+      const orderA = a.groupName != null ? (groupOrder.get(a.groupName) ?? Infinity) : Infinity
+      const orderB = b.groupName != null ? (groupOrder.get(b.groupName) ?? Infinity) : Infinity
+      if (orderA !== orderB) return orderA - orderB
       return a.fullName.localeCompare(b.fullName, "fr", { sensitivity: "base" })
     })
 

@@ -489,9 +489,9 @@ function AddProspectForm() {
   )
 }
 
-// ── Carte prospect ─────────────────────────────────────────────────────────────
+// ── Ligne prospect ─────────────────────────────────────────────────────────────
 
-function ProspectCard({ prospect }: { prospect: Prospect }) {
+function ProspectRow({ prospect }: { prospect: Prospect }) {
   const [editingNotes, setEditingNotes] = useState(false)
   const [notes, setNotes]               = useState(prospect.notes ?? "")
   const update = useUpdateProspect()
@@ -504,54 +504,49 @@ function ProspectCard({ prospect }: { prospect: Prospect }) {
   }
 
   return (
-    <div className="rounded-2xl border bg-card px-4 py-3 space-y-2">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-medium text-sm leading-snug">{prospect.fullName}</p>
-          <div className="flex flex-wrap gap-x-2 gap-y-0">
-            {prospect.groupName && <p className="text-xs text-muted-foreground">{prospect.groupName}</p>}
-            {prospect.addedByName && (
-              <p className="text-xs text-muted-foreground/60">ajouté par {prospect.addedByName}</p>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button type="button" className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-opacity hover:opacity-80",
-                STATUS_CONFIG[prospect.status].color
-              )}>
-                {STATUS_CONFIG[prospect.status].label}
-                <ChevronDown className="size-3" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {STATUS_ORDER.map((s) => (
-                <DropdownMenuItem key={s} onClick={() => update.mutate({ id: prospect.id, patch: { status: s } })}
-                  className={prospect.status === s ? "font-medium" : ""}>
-                  {STATUS_CONFIG[s].label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-destructive"
-            onClick={() => remove.mutate(prospect.id)}>
-            <Trash2 className="size-3.5" />
-          </Button>
-        </div>
-      </div>
-
-      {editingNotes ? (
-        <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={saveNotes}
-          autoFocus rows={2} className="text-xs" placeholder="Notes…" />
-      ) : (
-        <button type="button" onClick={() => setEditingNotes(true)}
-          className="w-full text-left text-xs text-muted-foreground hover:text-foreground transition-colors">
-          {prospect.notes ?? <span className="italic">Ajouter une note…</span>}
-        </button>
-      )}
-    </div>
+    <TableRow>
+      <TableCell className="font-medium text-sm">{prospect.fullName}</TableCell>
+      <TableCell className="text-sm text-muted-foreground">{prospect.groupName ?? <span className="italic text-muted-foreground/50">—</span>}</TableCell>
+      <TableCell>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button" className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-opacity hover:opacity-80",
+              STATUS_CONFIG[prospect.status].color
+            )}>
+              {STATUS_CONFIG[prospect.status].label}
+              <ChevronDown className="size-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {STATUS_ORDER.map((s) => (
+              <DropdownMenuItem key={s} onClick={() => update.mutate({ id: prospect.id, patch: { status: s } })}
+                className={prospect.status === s ? "font-medium" : ""}>
+                {STATUS_CONFIG[s].label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+      <TableCell className="text-xs text-muted-foreground max-w-48">
+        {editingNotes ? (
+          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={saveNotes}
+            autoFocus rows={2} className="text-xs min-w-40" placeholder="Notes…" />
+        ) : (
+          <button type="button" onClick={() => setEditingNotes(true)}
+            className="w-full text-left hover:text-foreground transition-colors truncate block">
+            {prospect.notes ?? <span className="italic text-muted-foreground/50">—</span>}
+          </button>
+        )}
+      </TableCell>
+      <TableCell className="text-xs text-muted-foreground/60">{prospect.addedByName ?? "—"}</TableCell>
+      <TableCell>
+        <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-destructive"
+          onClick={() => remove.mutate(prospect.id)}>
+          <Trash2 className="size-3.5" />
+        </Button>
+      </TableCell>
+    </TableRow>
   )
 }
 
@@ -621,8 +616,22 @@ export function AtelierTab() {
           description={filter === "all" ? "Ajoutez des personnes via le formulaire ou importez un CSV." : undefined}
         />
       ) : (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {filtered.map((p) => <ProspectCard key={p.id} prospect={p} />)}
+        <div className="rounded-lg border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nom</TableHead>
+                <TableHead>Groupe</TableHead>
+                <TableHead>Statut</TableHead>
+                <TableHead>Notes</TableHead>
+                <TableHead>Ajouté par</TableHead>
+                <TableHead className="w-10" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((p) => <ProspectRow key={p.id} prospect={p} />)}
+            </TableBody>
+          </Table>
         </div>
       )}
     </div>

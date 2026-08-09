@@ -16,7 +16,7 @@ export interface MealAttendee {
 
 export function guestsToAttendees(guests: Guest[]): MealAttendee[] {
   return guests
-    .filter((g) => g.rsvpStatus !== "declined")
+    .filter((g) => g.rsvpStatus !== "declined" && g.rsvpStatus !== "no_show")
     .map((g) => ({
       id: g.id,
       source: "guest",

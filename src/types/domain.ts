@@ -221,7 +221,7 @@ export interface LogistiqueItem {
   notes?: string | null
 }
 
-export type RsvpStatus = "pending" | "confirmed" | "declined"
+export type RsvpStatus = "pending" | "confirmed" | "declined" | "no_show"
 
 export type MealChoice = "poulet" | "poisson" | "enfant_poulet" | "enfant_poisson"
 

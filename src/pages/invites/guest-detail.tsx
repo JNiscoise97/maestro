@@ -31,7 +31,7 @@ import type { Guest, GuestGroup, GuestSide, MealChoice, RsvpStatus } from "@/typ
 
 const NONE = "__none__"
 const SIDE_LABEL: Record<string, string> = { sarah: "Sarah", jordan: "Jordan" }
-const RSVP_LABEL: Record<RsvpStatus, string> = { pending: "En attente", confirmed: "Confirmé", declined: "Décliné" }
+const RSVP_LABEL: Record<RsvpStatus, string> = { pending: "En attente", confirmed: "Confirmé", declined: "Décliné", no_show: "No show" }
 
 function DeleteGuestButton({ guest }: { guest: Guest }) {
   const [open, setOpen] = useState(false)

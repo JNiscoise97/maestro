@@ -98,7 +98,7 @@ const SORT_LABELS: Record<SortKey, string> = {
   age: "Âge",
 }
 
-const RSVP_ORDER: Record<RsvpStatus, number> = { pending: 0, confirmed: 1, declined: 2 }
+const RSVP_ORDER: Record<RsvpStatus, number> = { pending: 0, confirmed: 1, no_show: 2, declined: 3 }
 
 function guestAgeValue(guest: Guest): number {
   if (guest.isChild && guest.childAge != null) return guest.childAge
@@ -159,6 +159,7 @@ export function InvitesList() {
     return {
       total: guests.length,
       confirmed: guests.filter((g) => g.rsvpStatus === "confirmed").length,
+      no_show: guests.filter((g) => g.rsvpStatus === "no_show").length,
       pending: guests.filter((g) => g.rsvpStatus === "pending").length,
       declined: guests.filter((g) => g.rsvpStatus === "declined").length,
     }
@@ -244,7 +245,7 @@ export function InvitesList() {
             </div>
             {stats ? (
               <p className="text-xs text-muted-foreground">
-                {stats.confirmed} confirmés · {stats.pending} en attente · {stats.declined} déclinés · {stats.total} au total
+                {stats.confirmed} confirmés · {stats.no_show > 0 ? `${stats.no_show} no show · ` : ""}{stats.pending} en attente · {stats.declined} déclinés · {stats.total} au total
               </p>
             ) : null}
           </div>

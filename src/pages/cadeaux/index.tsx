@@ -299,7 +299,7 @@ function AddGiftDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="flex flex-col max-w-md max-h-[85vh] p-0 gap-0">
+      <DialogContent className="flex flex-col max-w-xl max-h-[85vh] p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <div className="flex items-center gap-3">
             {step === 2 && (
@@ -556,7 +556,7 @@ function EditGiftDialog({
 
   return (
     <Dialog open={gift !== null} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="flex flex-col max-w-md max-h-[85vh] p-0 gap-0">
+      <DialogContent className="flex flex-col max-w-xl max-h-[85vh] p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <DialogTitle>Modifier le cadeau</DialogTitle>
         </DialogHeader>
@@ -942,7 +942,7 @@ function GiftBreakdownDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="flex flex-col max-w-lg max-h-[85vh] p-0 gap-0">
+      <DialogContent className="flex flex-col max-w-2xl max-h-[85vh] p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <DialogTitle>Décomposition des montants</DialogTitle>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -1097,7 +1097,10 @@ export function CadeauxPage() {
 
   const sortedGroups = useMemo(() => [...groups].sort((a, b) => a.sortOrder - b.sortOrder), [groups])
 
-  const confirmedGuests = useMemo(() => guests.filter((g) => g.rsvpStatus === "confirmed"), [guests])
+  const confirmedGuests = useMemo(
+    () => guests.filter((g) => g.rsvpStatus === "confirmed" || g.rsvpStatus === "no_show"),
+    [guests]
+  )
   const confirmedAdults = useMemo(() => confirmedGuests.filter((g) => !isUnder18(g)), [confirmedGuests])
 
   const unattributedGifts = useMemo(

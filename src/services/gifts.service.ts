@@ -1,4 +1,4 @@
-﻿import { createMockTable } from "@/services/mock/db"
+import { createMockTable } from "@/services/mock/db"
 import { supabase, USE_SUPABASE } from "@/supabase/client"
 import { tbl, mockKey } from "@/lib/event"
 
@@ -10,6 +10,9 @@ export interface Gift {
   thankyouSent: boolean
   notes: string | null
   createdAt: string
+  externalGiverName: string | null
+  giftType: string | null
+  hasCard: boolean
 }
 
 export interface GiftInput {
@@ -18,6 +21,9 @@ export interface GiftInput {
   amount?: number | null
   thankyouSent?: boolean
   notes?: string | null
+  externalGiverName?: string | null
+  giftType?: string | null
+  hasCard?: boolean
 }
 
 export interface GiftPatch {
@@ -25,6 +31,10 @@ export interface GiftPatch {
   amount?: number | null
   thankyouSent?: boolean
   notes?: string | null
+  externalGiverName?: string | null
+  guestIds?: string[]
+  giftType?: string | null
+  hasCard?: boolean
 }
 
 // ── Mock tables ───────────────────────────────────────────────────────────────
@@ -36,6 +46,9 @@ interface GiftRow {
   thankyou_sent: boolean
   notes: string | null
   created_at: string
+  external_giver_name: string | null
+  gift_type: string | null
+  has_card: boolean
 }
 
 interface GiftGuestRow {
@@ -56,6 +69,9 @@ function giftRowToGift(row: GiftRow, guestIds: string[]): Gift {
     thankyouSent: row.thankyou_sent,
     notes: row.notes,
     createdAt: row.created_at,
+    externalGiverName: row.external_giver_name,
+    giftType: row.gift_type ?? null,
+    hasCard: row.has_card ?? false,
   }
 }
 
@@ -77,6 +93,9 @@ export const giftsService = {
         thankyouSent: row.thankyou_sent,
         notes: row.notes,
         createdAt: row.created_at,
+        externalGiverName: row.external_giver_name ?? null,
+        giftType: row.gift_type ?? null,
+        hasCard: row.has_card ?? false,
       }))
     }
     const giftRows = await mockGifts.getAll()
@@ -99,6 +118,9 @@ export const giftsService = {
           amount: input.amount ?? null,
           thankyou_sent: input.thankyouSent ?? false,
           notes: input.notes ?? null,
+          external_giver_name: input.externalGiverName ?? null,
+          gift_type: input.giftType ?? null,
+          has_card: input.hasCard ?? false,
         })
         .select()
         .single()
@@ -119,6 +141,9 @@ export const giftsService = {
       thankyou_sent: input.thankyouSent ?? false,
       notes: input.notes ?? null,
       created_at: new Date().toISOString(),
+      external_giver_name: input.externalGiverName ?? null,
+      gift_type: input.giftType ?? null,
+      has_card: input.hasCard ?? false,
     }
     await mockGifts.insert(row)
     for (const guestId of input.guestIds) {
@@ -134,19 +159,53 @@ export const giftsService = {
       if ("amount" in patch) row.amount = patch.amount
       if (patch.thankyouSent !== undefined) row.thankyou_sent = patch.thankyouSent
       if ("notes" in patch) row.notes = patch.notes
-      const { error } = await (supabase! as any)
-        .from(tbl("gifts") as any)
-        .update(row)
-        .eq("id", id)
-      if (error) throw error
+      if ("externalGiverName" in patch) row.external_giver_name = patch.externalGiverName
+      if ("giftType" in patch) row.gift_type = patch.giftType
+      if ("hasCard" in patch) row.has_card = patch.hasCard
+
+      if (Object.keys(row).length > 0) {
+        const { error } = await (supabase! as any)
+          .from(tbl("gifts") as any)
+          .update(row)
+          .eq("id", id)
+        if (error) throw error
+      }
+
+      if ("guestIds" in patch) {
+        const { error: delError } = await (supabase! as any)
+          .from(tbl("gift_guests") as any)
+          .delete()
+          .eq("gift_id", id)
+        if (delError) throw delError
+        if (patch.guestIds!.length > 0) {
+          const { error: insError } = await (supabase! as any)
+            .from(tbl("gift_guests") as any)
+            .insert(patch.guestIds!.map((guestId) => ({ gift_id: id, guest_id: guestId })))
+          if (insError) throw insError
+        }
+      }
       return
     }
+
     const p: Partial<GiftRow> = {}
     if (patch.description !== undefined) p.description = patch.description
     if ("amount" in patch) p.amount = patch.amount ?? null
     if (patch.thankyouSent !== undefined) p.thankyou_sent = patch.thankyouSent
     if ("notes" in patch) p.notes = patch.notes ?? null
+    if ("externalGiverName" in patch) p.external_giver_name = patch.externalGiverName ?? null
+    if ("giftType" in patch) p.gift_type = patch.giftType ?? null
+    if ("hasCard" in patch) p.has_card = patch.hasCard ?? false
     await mockGifts.update(id, p)
+
+    if ("guestIds" in patch) {
+      const links = await mockGiftGuests.getAll()
+      for (const l of links.filter((l) => l.gift_id === id)) {
+        await mockGiftGuests.remove(l.id)
+      }
+      for (const guestId of patch.guestIds ?? []) {
+        await mockGiftGuests.insert({ id: crypto.randomUUID(), gift_id: id, guest_id: guestId })
+      }
+    }
   },
 
   async remove(id: string): Promise<void> {
@@ -159,7 +218,6 @@ export const giftsService = {
       return
     }
     await mockGifts.remove(id)
-    // Supprimer tous les liens de ce cadeau
     const links = await mockGiftGuests.getAll()
     for (const l of links.filter((l) => l.gift_id === id)) {
       await mockGiftGuests.remove(l.id)

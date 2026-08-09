@@ -11,6 +11,7 @@ export default defineConfig({
     },
   },
   server: {
+    port: 5273,
     watch: {
       ignored: ["**/input.txt"],
     },

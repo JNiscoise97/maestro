@@ -823,15 +823,258 @@ function GiftTreeNodes({ nodes, giftsByGuestId, onEdit, onToggle, depth = 0 }: {
   )
 }
 
+// ── Dialog décomposition des montants ────────────────────────────────────────
+
+function GiftBreakdownDialog({
+  open,
+  onClose,
+  gifts,
+  guests,
+  groups,
+}: {
+  open: boolean
+  onClose: () => void
+  gifts: Gift[]
+  guests: Guest[]
+  groups: { id: string; familyName: string; sortOrder: number }[]
+}) {
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set())
+  const [groupId, setGroupId]             = useState("")
+  const [individualKey, setIndividualKey] = useState("")
+
+  useEffect(() => {
+    if (!open) {
+      setSelectedTypes(new Set())
+      setGroupId("")
+      setIndividualKey("")
+    }
+  }, [open])
+
+  const giftsWithAmount = useMemo(() => gifts.filter((g) => g.amount != null), [gifts])
+  const grandTotal = giftsWithAmount.reduce((s, g) => s + (g.amount ?? 0), 0)
+
+  const typeAmounts = useMemo(() => {
+    const map = new Map<string, number>()
+    giftsWithAmount.forEach((g) => {
+      if (g.giftType) map.set(g.giftType, (map.get(g.giftType) ?? 0) + (g.amount ?? 0))
+    })
+    return map
+  }, [giftsWithAmount])
+
+  const availableTypes = useMemo(() => [...typeAmounts.keys()], [typeAmounts])
+
+  const guestGroupMap = useMemo(() => new Map(guests.map((g) => [g.id, g.groupId])), [guests])
+
+  const availableGroups = useMemo(() => {
+    const ids = new Set<string>()
+    giftsWithAmount.forEach((gift) => {
+      gift.guestIds.forEach((gId) => {
+        const grpId = guestGroupMap.get(gId)
+        if (grpId) ids.add(grpId)
+      })
+    })
+    return groups.filter((g) => ids.has(g.id)).sort((a, b) => a.sortOrder - b.sortOrder)
+  }, [giftsWithAmount, groups, guestGroupMap])
+
+  const availableIndividuals = useMemo(() => {
+    const result: { key: string; label: string }[] = []
+    const guestsInScope = groupId ? guests.filter((g) => g.groupId === groupId) : guests
+    guestsInScope.forEach((guest) => {
+      if (giftsWithAmount.some((g) => g.guestIds.includes(guest.id))) {
+        result.push({ key: `guest:${guest.id}`, label: guest.fullName })
+      }
+    })
+    if (!groupId) {
+      const seen = new Set<string>()
+      giftsWithAmount.forEach((g) => {
+        if (g.externalGiverName && !seen.has(g.externalGiverName)) {
+          seen.add(g.externalGiverName)
+          result.push({ key: `external:${g.externalGiverName}`, label: g.externalGiverName })
+        }
+      })
+    }
+    return result.sort((a, b) => a.label.localeCompare(b.label, "fr"))
+  }, [giftsWithAmount, guests, groupId])
+
+  function toggleType(type: string) {
+    setSelectedTypes((prev) => {
+      const next = new Set(prev)
+      next.has(type) ? next.delete(type) : next.add(type)
+      return next
+    })
+  }
+
+  function handleGroupChange(v: string) {
+    setGroupId(v === "__none__" ? "" : v)
+    setIndividualKey("")
+  }
+
+  const filtered = useMemo(() => {
+    return giftsWithAmount
+      .filter((gift) => {
+        if (selectedTypes.size > 0 && !selectedTypes.has(gift.giftType ?? "")) return false
+        if (groupId) {
+          const inGroup = gift.guestIds.some((gId) => guestGroupMap.get(gId) === groupId)
+          if (!inGroup) return false
+        }
+        if (individualKey) {
+          if (individualKey.startsWith("guest:")) {
+            if (!gift.guestIds.includes(individualKey.slice(6))) return false
+          } else {
+            if (gift.externalGiverName !== individualKey.slice(9)) return false
+          }
+        }
+        return true
+      })
+      .sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0))
+  }, [giftsWithAmount, selectedTypes, groupId, individualKey, guestGroupMap])
+
+  const filteredTotal = filtered.reduce((s, g) => s + (g.amount ?? 0), 0)
+  const hasFilters = selectedTypes.size > 0 || groupId !== "" || individualKey !== ""
+
+  function donorLabel(gift: Gift): string {
+    if (gift.externalGiverName) return gift.externalGiverName
+    if (gift.guestIds.length === 0) return "Donateur inconnu"
+    return gift.guestIds
+      .map((id) => guests.find((g) => g.id === id)?.fullName ?? "?")
+      .join(", ")
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="flex flex-col max-w-lg max-h-[85vh] p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+          <DialogTitle>Décomposition des montants</DialogTitle>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {giftsWithAmount.length} cadeau{giftsWithAmount.length > 1 ? "x" : ""} avec valeur renseignée
+            {" · "}
+            <span className="font-semibold text-foreground tabular-nums">{grandTotal.toFixed(0)} € au total</span>
+          </p>
+        </DialogHeader>
+
+        {/* Filtres */}
+        <div className="px-6 py-4 border-b shrink-0 space-y-3">
+          {availableTypes.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {availableTypes.map((type) => {
+                const active = selectedTypes.has(type)
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => toggleType(type)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors border",
+                      active
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted text-muted-foreground border-transparent hover:border-border"
+                    )}
+                  >
+                    {GIFT_TYPE_LABEL[type] ?? type}
+                    <span className={cn("tabular-nums", active ? "text-primary-foreground/80" : "text-muted-foreground/60")}>
+                      {(typeAmounts.get(type) ?? 0).toFixed(0)} €
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Select value={groupId || "__none__"} onValueChange={handleGroupChange}>
+              <SelectTrigger className="flex-1 h-8 text-xs">
+                <SelectValue placeholder="Tous les groupes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Tous les groupes</SelectItem>
+                {availableGroups.map((g) => (
+                  <SelectItem key={g.id} value={g.id}>{g.familyName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={individualKey || "__none__"}
+              onValueChange={(v) => setIndividualKey(v === "__none__" ? "" : v)}
+              disabled={availableIndividuals.length === 0}
+            >
+              <SelectTrigger className="flex-1 h-8 text-xs">
+                <SelectValue placeholder="Toutes les personnes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Toutes les personnes</SelectItem>
+                {availableIndividuals.map(({ key, label }) => (
+                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={() => { setSelectedTypes(new Set()); setGroupId(""); setIndividualKey("") }}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Effacer les filtres
+            </button>
+          )}
+        </div>
+
+        {/* Liste */}
+        <div className="flex-1 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">Aucun cadeau pour cette sélection.</p>
+          ) : (
+            <div className="divide-y divide-border/40">
+              {filtered.map((gift) => (
+                <div key={gift.id} className="flex items-start justify-between gap-4 px-6 py-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{donorLabel(gift)}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                      <span className="text-xs text-muted-foreground">{gift.description}</span>
+                      {gift.giftType && (
+                        <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          {GIFT_TYPE_LABEL[gift.giftType] ?? gift.giftType}
+                        </span>
+                      )}
+                      {gift.hasCard && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground/60">
+                          <Mail className="size-2.5" />carte
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-sm font-bold tabular-nums shrink-0">{amountLabel(gift.amount!)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Total filtré */}
+        <div className="border-t px-6 py-4 shrink-0 flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            {filtered.length} cadeau{filtered.length > 1 ? "x" : ""}
+            {hasFilters && ` sur ${giftsWithAmount.length}`}
+          </p>
+          <p className="text-lg font-bold tabular-nums">{filteredTotal.toFixed(0)} €</p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 type Filter = "all" | "pending" | "done"
 
 export function CadeauxPage() {
-  const [filter, setFilter]       = useState<Filter>("all")
-  const [addOpen, setAddOpen]     = useState(false)
-  const [editGift, setEditGift]   = useState<Gift | null>(null)
-  const [searchQuery, setSearchQuery] = useState("")
+  const [filter, setFilter]         = useState<Filter>("all")
+  const [addOpen, setAddOpen]       = useState(false)
+  const [editGift, setEditGift]     = useState<Gift | null>(null)
+  const [breakdownOpen, setBreakdownOpen] = useState(false)
+  const [searchQuery, setSearchQuery]     = useState("")
 
   const { data: gifts = [], isLoading: giftsLoading }   = useGifts()
   const { data: guests = [], isLoading: guestsLoading } = useGuests()
@@ -990,11 +1233,18 @@ export function CadeauxPage() {
       {totalGifts > 0 && (
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: "Cadeaux notés", value: totalGifts },
-            { label: "À remercier",   value: aRemercier, accent: aRemercier > 0 },
-            { label: "Valeur totale", value: totalAmount > 0 ? `${totalAmount.toFixed(0)} €` : "—" },
-          ].map(({ label, value, accent }) => (
-            <div key={label} className="rounded-2xl border bg-card px-4 py-3 text-center">
+            { label: "Cadeaux notés", value: totalGifts,   accent: false,           onClick: undefined },
+            { label: "À remercier",   value: aRemercier,   accent: aRemercier > 0,  onClick: undefined },
+            { label: "Valeur totale", value: totalAmount > 0 ? `${totalAmount.toFixed(0)} €` : "—", accent: false, onClick: totalAmount > 0 ? () => setBreakdownOpen(true) : undefined },
+          ].map(({ label, value, accent, onClick }) => (
+            <div
+              key={label}
+              onClick={onClick}
+              className={cn(
+                "rounded-2xl border bg-card px-4 py-3 text-center",
+                onClick && "cursor-pointer hover:bg-muted/50 transition-colors"
+              )}
+            >
               <p className={cn("text-2xl font-bold tabular-nums", accent && "text-primary")}>{value}</p>
               <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
             </div>
@@ -1101,6 +1351,7 @@ export function CadeauxPage() {
 
       <AddGiftDialog open={addOpen} onClose={() => setAddOpen(false)} confirmedAdults={confirmedAdults} sortedGroups={sortedGroups} />
       <EditGiftDialog gift={editGift} onClose={() => setEditGift(null)} confirmedAdults={confirmedAdults} sortedGroups={sortedGroups} />
+      <GiftBreakdownDialog open={breakdownOpen} onClose={() => setBreakdownOpen(false)} gifts={gifts} guests={guests} groups={groups} />
     </div>
   )
 }

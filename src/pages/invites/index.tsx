@@ -22,6 +22,7 @@ import { PersonnesAgeesPage } from "@/pages/personnes-agees"
 import { MessageSuiviPage } from "@/pages/invites/MessageSuiviPage"
 import { RsvpSuiviTab } from "@/pages/invites/RsvpSuiviTab"
 import { AtelierTab } from "@/pages/invites/AtelierTab"
+import { GuestExportDialog } from "@/components/invites/GuestExportDialog"
 import { useProspects } from "@/hooks/queries/use-prospects"
 
 const ALL_GROUPS = "all"
@@ -243,11 +244,14 @@ export function InvitesList() {
                 {filteredGuests.length} invité{filteredGuests.length === 1 ? "" : "s"} affiché{filteredGuests.length === 1 ? "" : "s"}
               </p>
             </div>
-            {stats ? (
-              <p className="text-xs text-muted-foreground">
-                {stats.confirmed} confirmés · {stats.no_show > 0 ? `${stats.no_show} no show · ` : ""}{stats.pending} en attente · {stats.declined} déclinés · {stats.total} au total
-              </p>
-            ) : null}
+            <div className="flex items-center gap-3">
+              {stats ? (
+                <p className="text-xs text-muted-foreground">
+                  {stats.confirmed} confirmés · {stats.no_show > 0 ? `${stats.no_show} no show · ` : ""}{stats.pending} en attente · {stats.declined} déclinés · {stats.total} au total
+                </p>
+              ) : null}
+              <GuestExportDialog guests={guests} groups={groups ?? []} />
+            </div>
           </div>
           {sortedGuests.length === 0 ? (
             <EmptyState icon={Armchair} title="Aucun invité ne correspond à ces filtres" />

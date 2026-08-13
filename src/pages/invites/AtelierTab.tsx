@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { ProspectExportDialog } from "@/components/invites/ProspectExportDialog"
 
 // ── Constantes ─────────────────────────────────────────────────────────────────
 
@@ -595,9 +596,12 @@ export function AtelierTab() {
           <p className="text-sm text-muted-foreground">Liste de réflexion — les candidats qu'on n'a pas encore tranchés.</p>
         </div>
         {!showCsv && (
-          <Button variant="outline" size="sm" onClick={() => setShowCsv(true)}>
-            <Upload className="size-4" /> Import CSV
-          </Button>
+          <div className="flex items-center gap-2">
+            <ProspectExportDialog prospects={prospects} groups={groups} />
+            <Button variant="outline" size="sm" onClick={() => setShowCsv(true)}>
+              <Upload className="size-4" /> Import CSV
+            </Button>
+          </div>
         )}
       </div>
 

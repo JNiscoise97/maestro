@@ -171,7 +171,14 @@ export function InvitesList() {
       <PageHeader
         title="Invités"
         description="Liste des invités et présence."
-        actions={<GuestCreateDialog groups={groups ?? []} />}
+        actions={
+          <div className="flex items-center gap-2">
+            {guests && guests.length > 0 && (
+              <GuestExportDialog guests={guests} groups={groups ?? []} />
+            )}
+            <GuestCreateDialog groups={groups ?? []} />
+          </div>
+        }
       />
 
       {isLoading ? (
@@ -244,14 +251,11 @@ export function InvitesList() {
                 {filteredGuests.length} invité{filteredGuests.length === 1 ? "" : "s"} affiché{filteredGuests.length === 1 ? "" : "s"}
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              {stats ? (
-                <p className="text-xs text-muted-foreground">
-                  {stats.confirmed} confirmés · {stats.no_show > 0 ? `${stats.no_show} no show · ` : ""}{stats.pending} en attente · {stats.declined} déclinés · {stats.total} au total
-                </p>
-              ) : null}
-              <GuestExportDialog guests={guests} groups={groups ?? []} />
-            </div>
+            {stats ? (
+              <p className="text-xs text-muted-foreground">
+                {stats.confirmed} confirmés · {stats.no_show > 0 ? `${stats.no_show} no show · ` : ""}{stats.pending} en attente · {stats.declined} déclinés · {stats.total} au total
+              </p>
+            ) : null}
           </div>
           {sortedGuests.length === 0 ? (
             <EmptyState icon={Armchair} title="Aucun invité ne correspond à ces filtres" />

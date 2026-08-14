@@ -214,7 +214,7 @@ export function GuestExportDialog({ guests, groups }: { guests: Guest[]; groups:
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="flex flex-col w-[90vw] max-w-[90vw] max-h-[85vh] p-0 gap-0">
+      <DialogContent className="flex flex-col w-[90vw] max-w-[90vw] sm:max-w-[90vw] max-h-[85vh] p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <DialogTitle>Exporter les invités</DialogTitle>
           <p className="text-sm text-muted-foreground mt-0.5">

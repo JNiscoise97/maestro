@@ -24,6 +24,8 @@ export const guestDefaults = {
   reservationDone: false,
   hasCeremonialRole: false,
   likelyTraditionalAttire: false,
+  likelyAbsent: false,
+  paperSent: false,
   assignable: false,
   isUnexpected: false,
 }

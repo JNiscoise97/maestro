@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react"
 import { CheckCircle2, Mail, Send, Smartphone } from "lucide-react"
 
-import type { Guest, GuestGroup, PaperType, ProspectStatus } from "@/types/domain"
+import type { Guest, PaperType, ProspectStatus } from "@/types/domain"
 import { useGuestGroups, useGuests, useUpdateGuest } from "@/hooks/queries/use-guests"
 import { groupLabel } from "@/lib/groups"
 import { Skeleton } from "@/components/ui/skeleton"

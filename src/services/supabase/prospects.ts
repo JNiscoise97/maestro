@@ -1,7 +1,7 @@
 import { supabase, USE_SUPABASE } from "@/supabase/client"
 import { tbl } from "@/lib/event"
 
-export type ProspectStatus = "pending" | "no" | "next_event" | "invite"
+export type ProspectStatus = "pending" | "main_list" | "secondary_list" | "deferred" | "faire_part" | "not_invited"
 
 export interface Prospect {
   id: string
@@ -44,10 +44,10 @@ export const prospectsService = {
     return ((data ?? []) as unknown as Parameters<typeof toProspect>[0][]).map(toProspect)
   },
 
-  async create(fields: { fullName: string; groupName?: string | null; notes?: string | null; addedByName?: string | null }): Promise<Prospect> {
+  async create(fields: { fullName: string; groupName?: string | null; notes?: string | null; addedByName?: string | null; status?: ProspectStatus }): Promise<Prospect> {
     const { data, error } = await supabase!
       .from(tbl("prospect_guests") as any)
-      .insert({ full_name: fields.fullName, group_name: fields.groupName ?? null, notes: fields.notes ?? null, added_by_name: fields.addedByName ?? null })
+      .insert({ full_name: fields.fullName, group_name: fields.groupName ?? null, notes: fields.notes ?? null, added_by_name: fields.addedByName ?? null, status: fields.status ?? "pending" })
       .select()
       .single()
     if (error) throw error

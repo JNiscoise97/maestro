@@ -34,7 +34,7 @@ interface ColDef {
   key: string
   label: string
   defaultOn: boolean
-  getValue: (g: Guest, groupName: string) => string | number
+  getValue: (g: Guest, groupName: string, groupSide: string) => string | number
 }
 
 const ALL_COLUMNS: ColDef[] = [
@@ -43,7 +43,7 @@ const ALL_COLUMNS: ColDef[] = [
   { key: "lastName",           label: "Nom",                      defaultOn: false, getValue: (g) => g.lastName },
   { key: "groupName",          label: "Groupe",                   defaultOn: true,  getValue: (_, gn) => gn },
   { key: "rsvpStatus",         label: "Statut RSVP",              defaultOn: true,  getValue: (g) => RSVP_LABELS[g.rsvpStatus] },
-  { key: "side",               label: "Côté",                     defaultOn: true,  getValue: (g) => g.side === "sarah" ? "Sarah" : g.side === "jordan" ? "Jordan" : "" },
+  { key: "side",               label: "Côté",                     defaultOn: true,  getValue: (_g, _gn, gs) => gs },
   { key: "isChild",            label: "Enfant",                   defaultOn: true,  getValue: (g) => g.isChild ? "Oui" : "Non" },
   { key: "ageRange",           label: "Tranche d'âge",            defaultOn: true,  getValue: (g) => g.ageRange ?? "" },
   { key: "childAge",           label: "Âge (enfant)",             defaultOn: false, getValue: (g) => g.childAge ?? "" },
@@ -94,7 +94,8 @@ function ageValue(g: Guest): number {
 function sortGuests(
   guests: Guest[],
   levels: SortLevel[],
-  groupOrderMap: Map<string | null | undefined, number>
+  groupOrderMap: Map<string | null | undefined, number>,
+  groupSideMap: Map<string, string>
 ): Guest[] {
   return [...guests].sort((a, b) => {
     for (const { field, dir } of levels) {
@@ -105,7 +106,7 @@ function sortGuests(
         case "lastName":   cmp = a.lastName.localeCompare(b.lastName, "fr"); break
         case "groupOrder": cmp = (groupOrderMap.get(a.groupId) ?? Infinity) - (groupOrderMap.get(b.groupId) ?? Infinity); break
         case "rsvpStatus": cmp = RSVP_ORDER[a.rsvpStatus] - RSVP_ORDER[b.rsvpStatus]; break
-        case "side":       cmp = (a.side ?? "").localeCompare(b.side ?? ""); break
+        case "side":       cmp = (groupSideMap.get(a.groupId ?? "") ?? "").localeCompare(groupSideMap.get(b.groupId ?? "") ?? ""); break
         case "isChild":    cmp = (a.isChild ? 1 : 0) - (b.isChild ? 1 : 0); break
         case "ageRange":   cmp = ageValue(a) - ageValue(b); break
       }
@@ -180,18 +181,20 @@ export function GuestExportDialog({ guests, groups }: { guests: Guest[]; groups:
   // ── Données à exporter
   const groupNameMap  = useMemo(() => new Map(groups.map((g) => [g.id, g.familyName])), [groups])
   const groupOrderMap = useMemo(() => new Map<string | null | undefined, number>(groups.map((g) => [g.id, g.sortOrder])), [groups])
+  const groupSideMap  = useMemo(() => new Map(groups.map((g) => [g.id, g.side === "sarah" ? "Sarah" : g.side === "jordan" ? "Jordan" : g.side === "both" ? "Les deux" : ""])), [groups])
 
   const exportRows = useMemo(() => {
     const filtered = guests.filter((g) => selectedGroups.has(g.groupId ?? "__none__"))
-    return sortGuests(filtered, sortLevels, groupOrderMap)
-  }, [guests, selectedGroups, sortLevels, groupOrderMap])
+    return sortGuests(filtered, sortLevels, groupOrderMap, groupSideMap)
+  }, [guests, selectedGroups, sortLevels, groupOrderMap, groupSideMap])
 
   const activeCols = useMemo(() => ALL_COLUMNS.filter((c) => selectedCols.has(c.key)), [selectedCols])
 
   function handleExport() {
     const data = exportRows.map((guest) => {
       const gn = guest.groupId ? (groupNameMap.get(guest.groupId) ?? "") : ""
-      return Object.fromEntries(activeCols.map((col) => [col.label, col.getValue(guest, gn)]))
+      const gs = guest.groupId ? (groupSideMap.get(guest.groupId) ?? "") : ""
+      return Object.fromEntries(activeCols.map((col) => [col.label, col.getValue(guest, gn, gs)]))
     })
     const ws = XLSX.utils.json_to_sheet(data)
     ws["!cols"] = activeCols.map((col) => ({

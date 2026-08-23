@@ -27,10 +27,9 @@ import { GuestAccessSection } from "@/components/invites/GuestAccessSection"
 import { useDeleteGuest, useGuestGroups, useGuests, useUpdateGuest } from "@/hooks/queries/use-guests"
 import { supabase } from "@/supabase/client"
 import { MEAL_CHOICE_LABELS } from "@/lib/meal-choice"
-import type { Guest, GuestGroup, GuestSide, MealChoice, RsvpStatus } from "@/types/domain"
+import type { Guest, GuestGroup, MealChoice, RsvpStatus } from "@/types/domain"
 
 const NONE = "__none__"
-const SIDE_LABEL: Record<string, string> = { sarah: "Sarah", jordan: "Jordan" }
 const RSVP_LABEL: Record<RsvpStatus, string> = { pending: "En attente", confirmed: "Confirmé", declined: "Décliné", no_show: "No show" }
 
 function DeleteGuestButton({ guest }: { guest: Guest }) {
@@ -145,7 +144,6 @@ function GuestEditForm({ guest, groups, allGuests, onCancel, onSaved }: GuestEdi
   const [lastName, setLastName] = useState(guest.lastName)
   const [nickname, setNickname] = useState(guest.nickname ?? "")
   const [groupId, setGroupId] = useState(guest.groupId ?? NONE)
-  const [side, setSide] = useState<GuestSide | typeof NONE>(guest.side ?? NONE)
   const [ageRange, setAgeRange] = useState(guest.ageRange ?? "")
   const [relationCategory, setRelationCategory] = useState(guest.relationCategory ?? "")
   const [city, setCity] = useState(guest.city ?? "")
@@ -191,7 +189,6 @@ function GuestEditForm({ guest, groups, allGuests, onCancel, onSaved }: GuestEdi
         lastName: lastName.trim(),
         nickname: nickname.trim() || null,
         groupId: groupId === NONE ? null : groupId,
-        side: side === NONE ? null : side,
         ageRange: ageRange.trim() || null,
         relationCategory: relationCategory.trim() || null,
         city: city.trim() || null,
@@ -265,18 +262,6 @@ function GuestEditForm({ guest, groups, allGuests, onCancel, onSaved }: GuestEdi
                     {g.familyName}
                   </SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-          </EditField>
-          <EditField label="Côté">
-            <Select value={side} onValueChange={(v: GuestSide | typeof NONE) => setSide(v)}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Non renseigné" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>Non renseigné</SelectItem>
-                <SelectItem value="sarah">{SIDE_LABEL.sarah}</SelectItem>
-                <SelectItem value="jordan">{SIDE_LABEL.jordan}</SelectItem>
               </SelectContent>
             </Select>
           </EditField>
@@ -624,7 +609,7 @@ export function GuestDetailPage() {
         <>
           <PageHeader
             title={guest.fullName}
-            description={`${group ? group.familyName : "Sans groupe"}${guest.side ? ` · Côté ${SIDE_LABEL[guest.side]}` : ""}`}
+            description={group ? group.familyName : "Sans groupe"}
             actions={
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setIsEditing(true)}>

@@ -23,7 +23,6 @@ import { MessageSuiviPage } from "@/pages/invites/MessageSuiviPage"
 import { RsvpSuiviTab } from "@/pages/invites/RsvpSuiviTab"
 import { AtelierTab } from "@/pages/invites/AtelierTab"
 import { GuestExportDialog } from "@/components/invites/GuestExportDialog"
-import { useProspects } from "@/hooks/queries/use-prospects"
 
 const ALL_GROUPS = "all"
 
@@ -108,8 +107,10 @@ function guestAgeValue(guest: Guest): number {
 }
 
 export function InvitesList() {
-  const { data: guests, isLoading: guestsLoading } = useGuests()
+  const { data: allGuests, isLoading: guestsLoading } = useGuests()
   const { data: groups, isLoading: groupsLoading } = useGuestGroups()
+  // Liste = invités confirmés (main_list ou sans prospect_status = historiques)
+  const guests = allGuests?.filter((g) => !g.prospectStatus || g.prospectStatus === "main_list")
   const [search, setSearch] = useState("")
   const [groupFilter, setGroupFilter] = useState(ALL_GROUPS)
   const [sortBy, setSortBy] = useState<SortKey>("family")
@@ -276,17 +277,17 @@ type InvitesTab = "liste" | "rsvp" | "plan-table" | "enfants" | "accessibilite" 
 
 export function InvitesPage() {
   const [tab, setTab] = useState<InvitesTab>("liste")
-  const { data: prospects = [] } = useProspects()
-  const pendingCount = prospects.filter((p) => p.status === "pending").length
+  const { data: allGuests = [] } = useGuests()
+  const pendingCount = allGuests.filter((g) => g.prospectStatus === "pending").length
 
   return (
     <div className="space-y-6">
       <Tabs value={tab} onValueChange={(v) => setTab(v as InvitesTab)}>
         <TabsList>
-          <TabsTrigger value="liste">Invités</TabsTrigger>
-          <TabsTrigger value="rsvp">RSVP</TabsTrigger>
+          <TabsTrigger value="liste">Liste</TabsTrigger>
+          <TabsTrigger value="rsvp">Réponses</TabsTrigger>
           <TabsTrigger value="atelier" className="relative">
-            Atelier
+            À décider
             {pendingCount > 0 && (
               <span className="ml-1.5 rounded-full bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 leading-none">
                 {pendingCount}
@@ -295,7 +296,7 @@ export function InvitesPage() {
           </TabsTrigger>
           <TabsTrigger value="plan-table">Plan de table</TabsTrigger>
           <TabsTrigger value="enfants">Enfants</TabsTrigger>
-          <TabsTrigger value="accessibilite">Accessibilité</TabsTrigger>
+          <TabsTrigger value="accessibilite">Besoins spéciaux</TabsTrigger>
           <TabsTrigger value="messages">Communications</TabsTrigger>
         </TabsList>
       </Tabs>

@@ -223,9 +223,11 @@ export interface LogistiqueItem {
 
 export type RsvpStatus = "pending" | "confirmed" | "declined" | "no_show"
 
+export type ProspectStatus = "pending" | "main_list" | "secondary_list" | "deferred" | "faire_part" | "not_invited"
+
 export type MealChoice = "poulet" | "poisson" | "enfant_poulet" | "enfant_poisson"
 
-export type GuestSide = "sarah" | "jordan"
+export type GuestSide = "sarah" | "jordan" | "both"
 
 export type AccommodationType = "quartier" | "hotel" | "airbnb"
 
@@ -236,6 +238,7 @@ export interface GuestGroup {
   familyName: string
   notes?: string | null
   sortOrder: number
+  side?: GuestSide | null
 }
 
 export interface Guest {
@@ -270,7 +273,6 @@ export interface Guest {
   communicationJ30Sent: boolean
   communicationJ15Sent: boolean
   communicationJ3Sent: boolean
-  side?: GuestSide | null
   ageRange?: string | null
   relationCategory?: string | null
   city?: string | null
@@ -309,6 +311,8 @@ export interface Guest {
   isUnexpected?: boolean
   /** Onglets accessibles dans l'app — surcharge les permissions du rôle si défini. Null = défauts du rôle. Voir 0073_guests_allowed_tabs.sql. */
   allowedTabs?: string[] | null
+  /** Statut dans l'atelier de réflexion — main_list = invité confirmé, null/absent = invité historique traité comme main_list. */
+  prospectStatus?: ProspectStatus | null
 }
 
 export type PhotoGroupStatus = "pending" | "done" | "skipped"

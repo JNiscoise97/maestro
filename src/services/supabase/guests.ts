@@ -1,4 +1,4 @@
-﻿import type { Guest, GuestGroup } from "@/types/domain"
+﻿import type { Guest, GuestGroup, GuestSide, ProspectStatus } from "@/types/domain"
 import type { GuestsService } from "@/services/guests.service"
 import { supabase } from "@/supabase/client"
 import { formatDisplayName } from "@/lib/utils"
@@ -6,8 +6,8 @@ import { tbl } from "@/lib/event"
 
 const db = supabase! as any
 
-function toGuestGroup(row: { id: string; family_name: string; notes: string | null; sort_order: number }): GuestGroup {
-  return { id: row.id, familyName: row.family_name, notes: row.notes, sortOrder: row.sort_order }
+function toGuestGroup(row: { id: string; family_name: string; notes: string | null; sort_order: number; side: GuestSide | null }): GuestGroup {
+  return { id: row.id, familyName: row.family_name, notes: row.notes, sortOrder: row.sort_order, side: row.side }
 }
 
 function toGuest(row: {
@@ -34,7 +34,6 @@ function toGuest(row: {
   communication_j30_sent: boolean
   communication_j15_sent: boolean
   communication_j3_sent: boolean
-  side: Guest["side"] | null
   age_range: string | null
   relation_category: string | null
   city: string | null
@@ -63,6 +62,7 @@ function toGuest(row: {
   nickname: string | null
   source_guest_id: string | null
   source_attendance: "present" | "declined" | "no-show" | null
+  prospect_status: ProspectStatus | null
 }): Guest {
   return {
     id: row.id,
@@ -90,7 +90,6 @@ function toGuest(row: {
     communicationJ30Sent: row.communication_j30_sent,
     communicationJ15Sent: row.communication_j15_sent,
     communicationJ3Sent: row.communication_j3_sent,
-    side: row.side,
     ageRange: row.age_range,
     relationCategory: row.relation_category,
     city: row.city,
@@ -121,6 +120,7 @@ function toGuest(row: {
     isUnexpected: row.is_unexpected,
     sourceGuestId: row.source_guest_id,
     sourceAttendance: row.source_attendance,
+    prospectStatus: row.prospect_status,
   }
 }
 
@@ -130,20 +130,21 @@ export const guestsSupabaseService: GuestsService = {
     if (error) throw error
     return (data ?? []).map(toGuestGroup)
   },
-  async createGroup({ familyName, notes, sortOrder }) {
+  async createGroup({ familyName, notes, sortOrder, side }) {
     const { data, error } = await db
       .from(tbl("guest_groups") as any)
-      .insert({ family_name: familyName, notes: notes ?? null, sort_order: sortOrder })
+      .insert({ family_name: familyName, notes: notes ?? null, sort_order: sortOrder, side: side ?? null })
       .select("*")
       .single()
     if (error) throw error
     return toGuestGroup(data)
   },
   async updateGroup(id, patch) {
-    const row: Partial<{ family_name: string; notes: string | null; sort_order: number }> = {}
+    const row: Partial<{ family_name: string; notes: string | null; sort_order: number; side: GuestSide | null }> = {}
     if (patch.familyName !== undefined) row.family_name = patch.familyName
     if (patch.notes !== undefined) row.notes = patch.notes
     if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
+    if (patch.side !== undefined) row.side = patch.side ?? null
     const { data, error } = await (db as any).from(tbl("guest_groups") as any).update(row).eq("id", id).select("*").single()
     if (error) throw error
     return toGuestGroup(data)
@@ -159,10 +160,10 @@ export const guestsSupabaseService: GuestsService = {
     if (error) throw error
     return (data ?? []).map(toGuest)
   },
-  async createGuest({ firstName, lastName, groupId }) {
+  async createGuest({ firstName, lastName, groupId, prospectStatus }) {
     const { data, error } = await db
       .from(tbl("guests") as any)
-      .insert({ first_name: firstName, last_name: lastName, group_id: groupId ?? null })
+      .insert({ first_name: firstName, last_name: lastName, group_id: groupId ?? null, prospect_status: prospectStatus ?? "main_list" })
       .select("*")
       .single()
     if (error) throw error
@@ -192,7 +193,6 @@ export const guestsSupabaseService: GuestsService = {
       communication_j30_sent: boolean
       communication_j15_sent: boolean
       communication_j3_sent: boolean
-      side: Guest["side"] | null
       age_range: string | null
       relation_category: string | null
       city: string | null
@@ -219,6 +219,7 @@ export const guestsSupabaseService: GuestsService = {
       checked_in_at: string | null
       is_unexpected: boolean
       nickname: string | null
+      prospect_status: ProspectStatus | null
     }> = {}
     if (patch.groupId !== undefined) row.group_id = patch.groupId
     if (patch.firstName !== undefined) row.first_name = patch.firstName
@@ -244,7 +245,6 @@ export const guestsSupabaseService: GuestsService = {
     if (patch.communicationJ30Sent !== undefined) row.communication_j30_sent = patch.communicationJ30Sent
     if (patch.communicationJ15Sent !== undefined) row.communication_j15_sent = patch.communicationJ15Sent
     if (patch.communicationJ3Sent !== undefined) row.communication_j3_sent = patch.communicationJ3Sent
-    if (patch.side !== undefined) row.side = patch.side
     if (patch.ageRange !== undefined) row.age_range = patch.ageRange
     if (patch.relationCategory !== undefined) row.relation_category = patch.relationCategory
     if (patch.city !== undefined) row.city = patch.city
@@ -271,6 +271,7 @@ export const guestsSupabaseService: GuestsService = {
     if (patch.checkedInAt !== undefined) row.checked_in_at = patch.checkedInAt
     if (patch.isUnexpected !== undefined) row.is_unexpected = patch.isUnexpected
     if (patch.nickname !== undefined) row.nickname = patch.nickname ?? null
+    if (patch.prospectStatus !== undefined) row.prospect_status = patch.prospectStatus ?? null
     if (Object.keys(row).length > 0) {
       const { error } = await (db as any).from(tbl("guests") as any).update(row).eq("id", id)
       if (error) throw error

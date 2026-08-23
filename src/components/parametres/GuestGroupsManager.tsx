@@ -5,7 +5,7 @@ import { CSS } from "@dnd-kit/utilities"
 import { GripVertical, Plus, Pencil, Trash2, Users } from "lucide-react"
 import { toast } from "sonner"
 
-import type { GuestGroup } from "@/types/domain"
+import type { GuestGroup, GuestSide } from "@/types/domain"
 import {
   useCreateGuestGroup,
   useDeleteGuestGroup,
@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
@@ -32,9 +33,12 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field"
 
+const NONE_SIDE = "__none__"
+
 interface GroupFormState {
   familyName: string
   notes: string
+  side: GuestSide | typeof NONE_SIDE
 }
 
 function GroupDialog({
@@ -50,16 +54,18 @@ function GroupDialog({
   const [form, setForm] = useState<GroupFormState>({
     familyName: group?.familyName ?? "",
     notes: group?.notes ?? "",
+    side: group?.side ?? NONE_SIDE,
   })
   const createGroup = useCreateGuestGroup()
   const updateGroup = useUpdateGuestGroup()
 
   async function handleSubmit() {
     if (!form.familyName.trim()) return
+    const side = form.side === NONE_SIDE ? null : form.side
     if (group) {
       await updateGroup.mutateAsync({
         id: group.id,
-        patch: { familyName: form.familyName.trim(), notes: form.notes.trim() || null },
+        patch: { familyName: form.familyName.trim(), notes: form.notes.trim() || null, side },
       })
       toast.success("Groupe mis à jour.")
     } else {
@@ -67,9 +73,10 @@ function GroupDialog({
         familyName: form.familyName.trim(),
         notes: form.notes.trim() || null,
         sortOrder: nextSortOrder ?? 0,
+        side,
       })
       toast.success("Groupe créé.")
-      setForm({ familyName: "", notes: "" })
+      setForm({ familyName: "", notes: "", side: NONE_SIDE })
     }
     setOpen(false)
   }
@@ -89,6 +96,18 @@ function GroupDialog({
               value={form.familyName}
               onChange={(e) => setForm((f) => ({ ...f, familyName: e.target.value }))}
             />
+          </Field>
+          <Field>
+            <FieldLabel>Côté</FieldLabel>
+            <Select value={form.side} onValueChange={(v) => setForm((f) => ({ ...f, side: v as GuestSide | typeof NONE_SIDE }))}>
+              <SelectTrigger><SelectValue placeholder="Non précisé" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE_SIDE}>Non précisé</SelectItem>
+                <SelectItem value="jordan">Côté Jordan</SelectItem>
+                <SelectItem value="sarah">Côté Sarah</SelectItem>
+                <SelectItem value="both">Les deux</SelectItem>
+              </SelectContent>
+            </Select>
           </Field>
           <Field>
             <FieldLabel htmlFor="group-notes">Notes</FieldLabel>
@@ -182,7 +201,11 @@ function GroupRow({ group, guestCount }: { group: GuestGroup; guestCount: number
           <Users className="size-3" />
           {guestCount}
         </Badge>
-        {group.notes ? <span className="truncate text-xs text-muted-foreground">{group.notes}</span> : null}
+        {group.side && (
+          <span className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">
+            {group.side === "jordan" ? "Côté Jordan" : group.side === "sarah" ? "Côté Sarah" : "Les deux"}
+          </span>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <GroupDialog

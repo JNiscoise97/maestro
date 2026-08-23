@@ -1,4 +1,4 @@
-import type { Guest, GuestGroup } from "@/types/domain"
+import type { Guest, GuestGroup, GuestSide } from "@/types/domain"
 import { createMockTable } from "@/services/mock/db"
 import { guestDefaults, guestGroupsSeed, guestsSeed } from "@/services/mock/data/guests"
 import { guestsSupabaseService } from "@/services/supabase/guests"
@@ -9,12 +9,14 @@ export interface CreateGuestInput {
   firstName: string
   lastName: string
   groupId?: string | null
+  prospectStatus?: import("@/types/domain").ProspectStatus | null
 }
 
 export interface CreateGuestGroupInput {
   familyName: string
   notes?: string | null
   sortOrder: number
+  side?: GuestSide | null
 }
 
 export interface GuestsService {

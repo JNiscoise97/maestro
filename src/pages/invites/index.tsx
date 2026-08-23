@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { Armchair, ArrowUpDown, LayoutList, Network } from "lucide-react"
 
 import type { Guest, GuestGroup, RsvpStatus } from "@/types/domain"
+import { groupLabel } from "@/lib/groups"
 import { PageHeader } from "@/components/shared/PageHeader"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -76,7 +77,7 @@ function GuestGroupTree({ guests, groups }: { guests: Guest[]; groups: GuestGrou
         return (
           <div key={groupId} className="rounded-2xl border border-border bg-card p-4">
             <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              {group?.familyName ?? "Sans groupe"}
+              {group ? groupLabel(group, groups) : "Sans groupe"}
               <span className="ml-2 font-normal normal-case tracking-normal">
                 {groupGuests.length} invité{groupGuests.length > 1 ? "s" : ""}
               </span>
@@ -204,7 +205,7 @@ export function InvitesList() {
                   <SelectItem value={ALL_GROUPS}>Tous les groupes</SelectItem>
                   {(groups ?? []).map((group) => (
                     <SelectItem key={group.id} value={group.id}>
-                      {group.familyName}
+                      {groupLabel(group, groups ?? [])}
                       {group.notes ? ` (${group.notes})` : ""}
                     </SelectItem>
                   ))}

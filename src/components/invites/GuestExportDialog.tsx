@@ -3,6 +3,7 @@ import { Download, Plus, X } from "lucide-react"
 import * as XLSX from "xlsx"
 
 import type { Guest, GuestGroup, RsvpStatus } from "@/types/domain"
+import { groupLabel } from "@/lib/groups"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -179,7 +180,7 @@ export function GuestExportDialog({ guests, groups }: { guests: Guest[]; groups:
   }
 
   // ── Données à exporter
-  const groupNameMap  = useMemo(() => new Map(groups.map((g) => [g.id, g.familyName])), [groups])
+  const groupNameMap  = useMemo(() => new Map(groups.map((g) => [g.id, groupLabel(g, groups)])), [groups])
   const groupOrderMap = useMemo(() => new Map<string | null | undefined, number>(groups.map((g) => [g.id, g.sortOrder])), [groups])
   const groupSideMap  = useMemo(() => new Map(groups.map((g) => [g.id, g.side === "sarah" ? "Sarah" : g.side === "jordan" ? "Jordan" : g.side === "both" ? "Les deux" : ""])), [groups])
 
@@ -245,7 +246,7 @@ export function GuestExportDialog({ guests, groups }: { guests: Guest[]; groups:
               {groups.map((grp) => (
                 <label key={grp.id} className="flex items-center gap-2 cursor-pointer min-w-0">
                   <Checkbox checked={selectedGroups.has(grp.id)} onCheckedChange={() => toggleGroup(grp.id)} />
-                  <span className="text-sm truncate">{grp.familyName}</span>
+                  <span className="text-sm truncate">{groupLabel(grp, groups)}</span>
                 </label>
               ))}
               {guests.some((g) => !g.groupId) && (

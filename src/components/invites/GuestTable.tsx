@@ -4,6 +4,7 @@ import { History, Link2, Unlink } from "lucide-react"
 import { toast } from "sonner"
 
 import type { Guest, GuestGroup } from "@/types/domain"
+import { groupLabel } from "@/lib/groups"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
@@ -29,6 +30,7 @@ export function GuestTable({ guests, groupsById }: GuestTableProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const guestsById = useMemo(() => new Map(guests.map((g) => [g.id, g])), [guests])
+  const allGroupsList = useMemo(() => [...groupsById.values()], [groupsById])
   const allSelected = guests.length > 0 && guests.every((g) => selectedIds.has(g.id))
   const selectedGuests = guests.filter((g) => selectedIds.has(g.id))
   const canTogglePair = selectedGuests.length === 2
@@ -159,7 +161,7 @@ export function GuestTable({ guests, groupsById }: GuestTableProps) {
                 </span>
               </TableCell>
               <TableCell className="truncate text-sm text-muted-foreground">
-                {guest.groupId ? groupsById.get(guest.groupId)?.familyName : "—"}
+                {guest.groupId ? (groupsById.get(guest.groupId) ? groupLabel(groupsById.get(guest.groupId)!, allGroupsList) : "—") : "—"}
               </TableCell>
               <TableCell className="truncate text-sm text-muted-foreground">{ageLabel(guest)}</TableCell>
               <TableCell>

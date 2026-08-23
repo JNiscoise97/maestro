@@ -2,10 +2,11 @@ import { useMemo, useState } from "react"
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core"
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { GripVertical, Plus, Pencil, Trash2, Users } from "lucide-react"
+import { ChevronDown, ChevronRight, GripVertical, Plus, Pencil, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
-import type { GuestGroup, GuestSide } from "@/types/domain"
+import type { Guest, GuestGroup, GuestSide } from "@/types/domain"
+import { groupLabel } from "@/lib/groups"
 import {
   useCreateGuestGroup,
   useDeleteGuestGroup,
@@ -20,7 +21,6 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
@@ -173,7 +173,8 @@ function ConfirmDeleteGroupButton({ group, guestCount }: { group: GuestGroup; gu
   )
 }
 
-function GroupRow({ group, guestCount }: { group: GuestGroup; guestCount: number }) {
+function GroupRow({ group, guests, allGroups }: { group: GuestGroup; guests: Guest[]; allGroups: GuestGroup[] }) {
+  const [expanded, setExpanded] = useState(false)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.id })
   const style = { transform: CSS.Transform.toString(transform), transition }
 
@@ -181,43 +182,58 @@ function GroupRow({ group, guestCount }: { group: GuestGroup; guestCount: number
     <div
       ref={setNodeRef}
       style={style}
-      className={cn(
-        "flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2",
-        isDragging && "opacity-50"
-      )}
+      className={cn("rounded-lg border border-border", isDragging && "opacity-50")}
     >
-      <div className="flex min-w-0 items-center gap-2">
-        <button
-          type="button"
-          aria-label="Réordonner"
-          className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing"
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical className="size-3.5" />
-        </button>
-        <span className="truncate text-sm text-foreground">{group.familyName}</span>
-        <Badge variant="outline" className="shrink-0 gap-1 text-xs text-muted-foreground">
-          <Users className="size-3" />
-          {guestCount}
-        </Badge>
-        {group.side && (
-          <span className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">
-            {group.side === "jordan" ? "Côté Jordan" : group.side === "sarah" ? "Côté Sarah" : "Les deux"}
-          </span>
-        )}
+      <div className="flex items-center justify-between gap-2 px-3 py-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            aria-label="Réordonner"
+            className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="size-3.5" />
+          </button>
+          <span className="truncate text-sm text-foreground">{groupLabel(group, allGroups)}</span>
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            className="flex shrink-0 items-center gap-1 rounded text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+            {guests.length} invité{guests.length !== 1 ? "s" : ""}
+          </button>
+          {group.side && (
+            <span className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">
+              {group.side === "jordan" ? "Côté Jordan" : group.side === "sarah" ? "Côté Sarah" : "Les deux"}
+            </span>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <GroupDialog
+            group={group}
+            trigger={
+              <Button variant="ghost" size="icon-xs" aria-label="Modifier">
+                <Pencil className="size-3.5" />
+              </Button>
+            }
+          />
+          <ConfirmDeleteGroupButton group={group} guestCount={guests.length} />
+        </div>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <GroupDialog
-          group={group}
-          trigger={
-            <Button variant="ghost" size="icon-xs" aria-label="Modifier">
-              <Pencil className="size-3.5" />
-            </Button>
-          }
-        />
-        <ConfirmDeleteGroupButton group={group} guestCount={guestCount} />
-      </div>
+      {expanded && guests.length > 0 && (
+        <div className="border-t border-border px-8 py-2 space-y-0.5">
+          {guests.map((g) => (
+            <p key={g.id} className="text-sm text-muted-foreground py-0.5">
+              {g.fullName}
+            </p>
+          ))}
+        </div>
+      )}
+      {expanded && guests.length === 0 && (
+        <p className="border-t border-border px-8 py-2 text-sm italic text-muted-foreground">Aucun invité dans ce groupe.</p>
+      )}
     </div>
   )
 }
@@ -230,11 +246,13 @@ export function GuestGroupsManager() {
 
   const isLoading = groupsLoading || guestsLoading
 
-  const guestCountByGroupId = useMemo(() => {
-    const map = new Map<string, number>()
+  const guestsByGroupId = useMemo(() => {
+    const map = new Map<string, Guest[]>()
     for (const guest of guests ?? []) {
       if (!guest.groupId) continue
-      map.set(guest.groupId, (map.get(guest.groupId) ?? 0) + 1)
+      const list = map.get(guest.groupId) ?? []
+      list.push(guest)
+      map.set(guest.groupId, list)
     }
     return map
   }, [guests])
@@ -275,7 +293,7 @@ export function GuestGroupsManager() {
             <SortableContext items={sortedGroups.map((g) => g.id)} strategy={verticalListSortingStrategy}>
               <div className="space-y-2">
                 {sortedGroups.map((group) => (
-                  <GroupRow key={group.id} group={group} guestCount={guestCountByGroupId.get(group.id) ?? 0} />
+                  <GroupRow key={group.id} group={group} guests={guestsByGroupId.get(group.id) ?? []} allGroups={sortedGroups} />
                 ))}
               </div>
             </SortableContext>

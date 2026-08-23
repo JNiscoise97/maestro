@@ -27,6 +27,7 @@ import { GuestAccessSection } from "@/components/invites/GuestAccessSection"
 import { useDeleteGuest, useGuestGroups, useGuests, useUpdateGuest } from "@/hooks/queries/use-guests"
 import { supabase } from "@/supabase/client"
 import { MEAL_CHOICE_LABELS } from "@/lib/meal-choice"
+import { groupLabel } from "@/lib/groups"
 import type { Guest, GuestGroup, MealChoice, RsvpStatus } from "@/types/domain"
 
 const NONE = "__none__"
@@ -259,7 +260,7 @@ function GuestEditForm({ guest, groups, allGuests, onCancel, onSaved }: GuestEdi
                 <SelectItem value={NONE}>Sans groupe</SelectItem>
                 {groups.map((g) => (
                   <SelectItem key={g.id} value={g.id}>
-                    {g.familyName}
+                    {groupLabel(g, groups)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -609,7 +610,7 @@ export function GuestDetailPage() {
         <>
           <PageHeader
             title={guest.fullName}
-            description={group ? group.familyName : "Sans groupe"}
+            description={group ? groupLabel(group, groups ?? []) : "Sans groupe"}
             actions={
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setIsEditing(true)}>

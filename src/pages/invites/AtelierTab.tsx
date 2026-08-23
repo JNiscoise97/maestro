@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { groupLabel } from "@/lib/groups"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ProspectExportDialog } from "@/components/invites/ProspectExportDialog"
 
@@ -107,7 +108,7 @@ function GroupSelect({
       <SelectContent>
         <SelectItem value={NONE}>— aucun groupe —</SelectItem>
         {groups.map((g) => (
-          <SelectItem key={g.id} value={g.id}>{g.familyName}</SelectItem>
+          <SelectItem key={g.id} value={g.id}>{groupLabel(g, groups)}</SelectItem>
         ))}
         <SelectItem value={CREATE_KEY} className="text-primary font-medium">
           + Créer un groupe…
@@ -789,7 +790,7 @@ export function AtelierTab() {
   const pending    = candidates.filter((g) => g.prospectStatus === "pending")
 
   const groupOrderMap = new Map(groups.map((g) => [g.id, g.sortOrder]))
-  const groupNameMap  = new Map(groups.map((g) => [g.id, g.familyName]))
+  const groupNameMap  = new Map(groups.map((g) => [g.id, groupLabel(g, groups)]))
 
   function sortByGroup(list: Guest[]) {
     return [...list].sort((a, b) => {

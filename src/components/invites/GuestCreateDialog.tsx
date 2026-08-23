@@ -5,6 +5,7 @@ import { toast } from "sonner"
 
 import { useCreateGuest } from "@/hooks/queries/use-guests"
 import type { GuestGroup } from "@/types/domain"
+import { groupLabel } from "@/lib/groups"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -78,7 +79,7 @@ export function GuestCreateDialog({ groups }: GuestCreateDialogProps) {
                 <SelectItem value={NONE}>Sans groupe</SelectItem>
                 {groups.map((group) => (
                   <SelectItem key={group.id} value={group.id}>
-                    {group.familyName}
+                    {groupLabel(group, groups)}
                   </SelectItem>
                 ))}
               </SelectContent>

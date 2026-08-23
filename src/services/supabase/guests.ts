@@ -63,6 +63,10 @@ function toGuest(row: {
   source_guest_id: string | null
   source_attendance: "present" | "declined" | "no-show" | null
   prospect_status: ProspectStatus | null
+  likely_absent: boolean
+  paper_type: "invitation" | "faire_part" | null
+  paper_sent: boolean
+  postal_address: string | null
 }): Guest {
   return {
     id: row.id,
@@ -121,6 +125,10 @@ function toGuest(row: {
     sourceGuestId: row.source_guest_id,
     sourceAttendance: row.source_attendance,
     prospectStatus: row.prospect_status,
+    likelyAbsent: row.likely_absent,
+    paperType: row.paper_type,
+    paperSent: row.paper_sent,
+    postalAddress: row.postal_address,
   }
 }
 
@@ -220,6 +228,10 @@ export const guestsSupabaseService: GuestsService = {
       is_unexpected: boolean
       nickname: string | null
       prospect_status: ProspectStatus | null
+      likely_absent: boolean
+      paper_type: "invitation" | "faire_part" | null
+      paper_sent: boolean
+      postal_address: string | null
     }> = {}
     if (patch.groupId !== undefined) row.group_id = patch.groupId
     if (patch.firstName !== undefined) row.first_name = patch.firstName
@@ -272,6 +284,10 @@ export const guestsSupabaseService: GuestsService = {
     if (patch.isUnexpected !== undefined) row.is_unexpected = patch.isUnexpected
     if (patch.nickname !== undefined) row.nickname = patch.nickname ?? null
     if (patch.prospectStatus !== undefined) row.prospect_status = patch.prospectStatus ?? null
+    if (patch.likelyAbsent !== undefined) row.likely_absent = patch.likelyAbsent
+    if (patch.paperType !== undefined) row.paper_type = patch.paperType ?? null
+    if (patch.paperSent !== undefined) row.paper_sent = patch.paperSent
+    if (patch.postalAddress !== undefined) row.postal_address = patch.postalAddress ?? null
     if (Object.keys(row).length > 0) {
       const { error } = await (db as any).from(tbl("guests") as any).update(row).eq("id", id)
       if (error) throw error

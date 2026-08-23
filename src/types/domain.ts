@@ -229,6 +229,8 @@ export type MealChoice = "poulet" | "poisson" | "enfant_poulet" | "enfant_poisso
 
 export type GuestSide = "sarah" | "jordan" | "both"
 
+export type PaperType = "invitation" | "faire_part"
+
 export type AccommodationType = "quartier" | "hotel" | "airbnb"
 
 export type TravelMode = "train" | "avion" | "voiture" | "bus"
@@ -289,6 +291,8 @@ export interface Guest {
   primaryLanguage?: string | null
   hasCeremonialRole: boolean
   likelyTraditionalAttire: boolean
+  /** Personne que Jordan/Sarah pense ne pas voir venir (doute sur la présence). */
+  likelyAbsent: boolean
   notes?: string | null
   /** Présent uniquement à l'écriture (code en clair saisi dans l'UI) — jamais relu depuis Supabase, voir `services/supabase/guests.ts`. */
   accessCode?: string | null
@@ -313,6 +317,12 @@ export interface Guest {
   allowedTabs?: string[] | null
   /** Statut dans l'atelier de réflexion — main_list = invité confirmé, null/absent = invité historique traité comme main_list. */
   prospectStatus?: ProspectStatus | null
+  /** Type de courrier papier à envoyer — invitation formelle ou faire-part. null = non assigné. */
+  paperType?: PaperType | null
+  /** Le courrier papier a été envoyé. */
+  paperSent: boolean
+  /** Adresse postale complète pour l'envoi papeterie. */
+  postalAddress?: string | null
 }
 
 export type PhotoGroupStatus = "pending" | "done" | "skipped"

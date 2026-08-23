@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,7 +36,7 @@ const STATUS_CONFIG: Record<ProspectStatus, { label: string; color: string }> = 
 
 const STATUS_ORDER: ProspectStatus[] = ["pending", "main_list", "secondary_list", "deferred", "faire_part", "not_invited"]
 
-const DECIDED_STATUSES: ProspectStatus[] = ["secondary_list", "deferred", "faire_part", "not_invited"]
+const DECIDED_STATUSES: ProspectStatus[] = ["main_list", "secondary_list", "deferred", "faire_part", "not_invited"]
 
 // Boutons d'action rapide sur une carte "En réflexion"
 const QUICK_ACTIONS: { status: ProspectStatus; label: string; className: string }[] = [
@@ -539,8 +540,12 @@ function DecidedRow({ guest, groupNameMap }: { guest: Guest; groupNameMap: Map<s
   }
 
   return (
-    <TableRow>
-      <TableCell className="font-medium text-sm py-2">{guest.fullName}</TableCell>
+    <TableRow className={guest.likelyAbsent ? "opacity-50" : undefined}>
+      <TableCell className="font-medium text-sm py-2">
+        <span className={guest.likelyAbsent ? "line-through text-muted-foreground" : undefined}>
+          {guest.fullName}
+        </span>
+      </TableCell>
       <TableCell className="text-sm text-muted-foreground py-2">
         {guest.groupId ? (groupNameMap.get(guest.groupId) ?? "—") : "—"}
       </TableCell>
@@ -576,6 +581,15 @@ function DecidedRow({ guest, groupNameMap }: { guest: Guest; groupNameMap: Map<s
             {guest.notes ?? <span className="italic text-muted-foreground/40">—</span>}
           </button>
         )}
+      </TableCell>
+      <TableCell className="py-2">
+        <div className="flex items-center gap-1.5">
+          <Checkbox
+            checked={guest.likelyAbsent}
+            onCheckedChange={(v) => update.mutate({ id: guest.id, patch: { likelyAbsent: !!v } })}
+          />
+          <span className="text-xs text-muted-foreground">Absent probable</span>
+        </div>
       </TableCell>
       <TableCell className="py-2">
         <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-destructive"
@@ -618,6 +632,7 @@ function DecidedSection({ status, guests, groupNameMap }: {
                 <TableHead>Groupe</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Notes</TableHead>
+                <TableHead className="w-36">Absent probable</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
@@ -635,14 +650,24 @@ function DecidedSection({ status, guests, groupNameMap }: {
 
 const SIDE_LABELS: Record<GuestSide, string> = { jordan: "Jordan", sarah: "Sarah", both: "Les deux" }
 
-interface SideBreakdown { jordan: number; sarah: number; both: number; unknown: number }
+interface SideBreakdown {
+  jordan: number; sarah: number; both: number; unknown: number
+  likelyAbsent: number
+  afterAbsent: { jordan: number; sarah: number; both: number; unknown: number }
+}
 
 function computeSideBreakdown(guests: Guest[], groupSideMap: Map<string, GuestSide | null>): SideBreakdown {
+  const present = guests.filter((g) => !g.likelyAbsent)
+  const bySide = (list: Guest[]) => ({
+    jordan:  list.filter((g) => g.groupId && groupSideMap.get(g.groupId) === "jordan").length,
+    sarah:   list.filter((g) => g.groupId && groupSideMap.get(g.groupId) === "sarah").length,
+    both:    list.filter((g) => g.groupId && groupSideMap.get(g.groupId) === "both").length,
+    unknown: list.filter((g) => !g.groupId || !groupSideMap.get(g.groupId)).length,
+  })
   return {
-    jordan:  guests.filter((g) => g.groupId && groupSideMap.get(g.groupId) === "jordan").length,
-    sarah:   guests.filter((g) => g.groupId && groupSideMap.get(g.groupId) === "sarah").length,
-    both:    guests.filter((g) => g.groupId && groupSideMap.get(g.groupId) === "both").length,
-    unknown: guests.filter((g) => !g.groupId || !groupSideMap.get(g.groupId)).length,
+    ...bySide(guests),
+    likelyAbsent: guests.length - present.length,
+    afterAbsent: bySide(present),
   }
 }
 
@@ -688,12 +713,42 @@ function StatChip({
             {(["jordan", "sarah", "both"] as GuestSide[]).map((side) => (
               <div key={side} className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Côté {SIDE_LABELS[side]}</span>
-                <span className="font-semibold tabular-nums text-base">{breakdown[side]}</span>
+                <div className="flex items-center gap-1.5 tabular-nums">
+                  <span className="font-semibold text-base">{breakdown[side]}</span>
+                  {breakdown.likelyAbsent > 0 && (
+                    <>
+                      <span className="text-muted-foreground/50 text-xs">→</span>
+                      <span className="font-semibold text-base">{breakdown.afterAbsent[side]}</span>
+                    </>
+                  )}
+                </div>
               </div>
             ))}
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">Non précisé</span>
-              <span className="font-semibold tabular-nums text-base">{breakdown.unknown}</span>
+              <div className="flex items-center gap-1.5 tabular-nums">
+                <span className="font-semibold text-base">{breakdown.unknown}</span>
+                {breakdown.likelyAbsent > 0 && (
+                  <>
+                    <span className="text-muted-foreground/50 text-xs">→</span>
+                    <span className="font-semibold text-base">{breakdown.afterAbsent.unknown}</span>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="border-t pt-2 space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Total</span>
+                <span className="font-semibold tabular-nums text-base">{value}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Absents probables</span>
+                <span className="font-semibold tabular-nums text-base text-amber-500">−{breakdown.likelyAbsent}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 font-medium">
+                <span>Estimé présents</span>
+                <span className="tabular-nums text-base">{value - breakdown.likelyAbsent}</span>
+              </div>
             </div>
           </div>
         </DialogContent>
@@ -813,11 +868,19 @@ export function AtelierTab() {
     pendingByGroupId.get(key)!.push(g)
   }
 
-  const decidedByStatus = Object.fromEntries(
-    DECIDED_STATUSES.map((s) => [s, sortByGroup(candidates.filter((g) => g.prospectStatus === s))])
-  ) as Record<ProspectStatus, Guest[]>
+  const mainListDecided = sortByGroup(allGuests.filter((g) => g.prospectStatus === "main_list"))
 
-  const decidedTotal = candidates.length - pending.length
+  const decidedByStatus = {
+    main_list: mainListDecided,
+    ...Object.fromEntries(
+      (["secondary_list", "deferred", "faire_part", "not_invited"] as ProspectStatus[]).map((s) => [
+        s,
+        sortByGroup(candidates.filter((g) => g.prospectStatus === s)),
+      ])
+    ),
+  } as Record<ProspectStatus, Guest[]>
+
+  const decidedTotal = candidates.length - pending.length + mainListDecided.length
 
   if (isLoading) return <Skeleton className="h-64 rounded-2xl" />
 

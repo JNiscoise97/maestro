@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react"
-import { CheckCircle2, Circle, Link2, MessageSquare, Pencil, Plus, Trash2 } from "lucide-react"
+import { CheckCircle2, Circle, GripVertical, Link2, MessageSquare, Pencil, Plus, Trash2 } from "lucide-react"
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core"
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 
-import type { Guest, RsvpStatus } from "@/types/domain"
+import type { Guest, ProspectStatus, RsvpStatus } from "@/types/domain"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { EmptyState } from "@/components/shared/EmptyState"
@@ -23,6 +26,7 @@ import {
   useCreateCommunication,
   useDeleteCommunication,
   useMarkCommunicationSent,
+  useReorderCommunications,
   useUnmarkCommunicationSent,
   useUpdateCommunication,
 } from "@/hooks/queries/use-communications"
@@ -54,6 +58,7 @@ function CommSheet({
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [targetRsvpStatuses, setTargetRsvpStatuses] = useState<RsvpStatus[]>([])
+  const [targetProspectStatuses, setTargetProspectStatuses] = useState<ProspectStatus[]>([])
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const create = useCreateCommunication()
@@ -64,11 +69,18 @@ function CommSheet({
     setName(comm?.name ?? "")
     setDescription(comm?.description ?? "")
     setTargetRsvpStatuses((comm?.targetRsvpStatuses ?? []) as RsvpStatus[])
+    setTargetProspectStatuses((comm?.targetProspectStatuses ?? []) as ProspectStatus[])
     setConfirmDelete(false)
   }, [comm, open])
 
-  function toggleStatus(status: RsvpStatus) {
+  function toggleRsvpStatus(status: RsvpStatus) {
     setTargetRsvpStatuses((prev) =>
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+    )
+  }
+
+  function toggleProspectStatus(status: ProspectStatus) {
+    setTargetProspectStatuses((prev) =>
       prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
     )
   }
@@ -76,15 +88,16 @@ function CommSheet({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
-    const statuses = targetRsvpStatuses.length > 0 ? targetRsvpStatuses : null
+    const rsvpStatuses = targetRsvpStatuses.length > 0 ? targetRsvpStatuses : null
+    const prospectStatuses = targetProspectStatuses.length > 0 ? targetProspectStatuses : null
     if (comm) {
       update.mutate(
-        { id: comm.id, patch: { name: name.trim(), description: description.trim() || null, targetRsvpStatuses: statuses } },
+        { id: comm.id, patch: { name: name.trim(), description: description.trim() || null, targetRsvpStatuses: rsvpStatuses, targetProspectStatuses: prospectStatuses } },
         { onSuccess: () => onOpenChange(false) }
       )
     } else {
       create.mutate(
-        { name: name.trim(), description: description.trim() || null, targetRsvpStatuses: statuses },
+        { name: name.trim(), description: description.trim() || null, targetRsvpStatuses: rsvpStatuses, targetProspectStatuses: prospectStatuses },
         { onSuccess: () => onOpenChange(false) }
       )
     }
@@ -131,17 +144,38 @@ function CommSheet({
             />
           </div>
           <div className="space-y-2">
-            <Label>Destinataires <span className="text-muted-foreground font-normal">(tous si vide)</span></Label>
+            <Label>Statut RSVP <span className="text-muted-foreground font-normal">(tous si vide)</span></Label>
             <div className="flex flex-col gap-2">
               {(["pending", "confirmed", "declined"] as RsvpStatus[]).map((status) => (
                 <label key={status} className="flex items-center gap-2 cursor-pointer">
                   <Checkbox
                     checked={targetRsvpStatuses.includes(status)}
-                    onCheckedChange={() => toggleStatus(status)}
+                    onCheckedChange={() => toggleRsvpStatus(status)}
                   />
                   <span className="text-sm">
                     {status === "pending" ? "En attente" : status === "confirmed" ? "Confirmés" : "Déclinés"}
                   </span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Statut liste <span className="text-muted-foreground font-normal">(tous si vide)</span></Label>
+            <div className="flex flex-col gap-2">
+              {([
+                ["main_list",      "Liste A"],
+                ["secondary_list", "Liste B"],
+                ["deferred",       "Liste différée"],
+                ["faire_part",     "Faire-part"],
+                ["pending",        "En réflexion"],
+                ["not_invited",    "Hors liste"],
+              ] as [ProspectStatus, string][]).map(([status, label]) => (
+                <label key={status} className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={targetProspectStatuses.includes(status)}
+                    onCheckedChange={() => toggleProspectStatus(status)}
+                  />
+                  <span className="text-sm">{label}</span>
                 </label>
               ))}
             </div>
@@ -196,14 +230,29 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
   const markSent = useMarkCommunicationSent(comm.id)
   const unmark = useUnmarkCommunicationSent(comm.id)
 
-  const targetStatuses: RsvpStatus[] = useMemo(
-    () => (comm.targetRsvpStatuses?.length ? (comm.targetRsvpStatuses as RsvpStatus[]) : ["confirmed"]),
-    [comm.targetRsvpStatuses]
+  const targetStatuses: RsvpStatus[] = useMemo(() => {
+    if (comm.targetRsvpStatuses?.length) return comm.targetRsvpStatuses as RsvpStatus[]
+    // Si un filtre prospect est actif, ne pas restreindre par RSVP (les prospects sont souvent encore "pending")
+    if (comm.targetProspectStatuses?.length) return ["pending", "confirmed", "declined", "no_show"]
+    return ["confirmed"]
+  }, [comm.targetRsvpStatuses, comm.targetProspectStatuses])
+
+  const targetProspectStatuses: ProspectStatus[] | null = useMemo(
+    () => (comm.targetProspectStatuses?.length ? (comm.targetProspectStatuses as ProspectStatus[]) : null),
+    [comm.targetProspectStatuses]
   )
 
   const eligible = useMemo(
-    () => guests.filter((g) => targetStatuses.includes(g.rsvpStatus) && !isUnder18(g)),
-    [guests, targetStatuses]
+    () => guests.filter((g) => {
+      if (!targetStatuses.includes(g.rsvpStatus)) return false
+      if (targetProspectStatuses) {
+        // null prospectStatus = invité historique, traité comme main_list
+        const ps: ProspectStatus = g.prospectStatus ?? "main_list"
+        if (!targetProspectStatuses.includes(ps)) return false
+      }
+      return !isUnder18(g)
+    }),
+    [guests, targetStatuses, targetProspectStatuses]
   )
 
   // Index nom par id pour résoudre les partenaires
@@ -267,11 +316,16 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
             {comm.description && (
               <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{comm.description}</p>
             )}
-            {comm.targetRsvpStatuses && comm.targetRsvpStatuses.length > 0 && (
+            {((comm.targetRsvpStatuses?.length ?? 0) > 0 || (comm.targetProspectStatuses?.length ?? 0) > 0) && (
               <div className="flex flex-wrap gap-1 mt-1.5">
                 {targetStatuses.map((s) => (
-                  <span key={s} className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">
+                  <span key={`rsvp-${s}`} className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">
                     {s === "pending" ? "En attente" : s === "confirmed" ? "Confirmés" : "Déclinés"}
+                  </span>
+                ))}
+                {targetProspectStatuses?.map((s) => (
+                  <span key={`ps-${s}`} className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-400">
+                    {s === "main_list" ? "Liste A" : s === "secondary_list" ? "Liste B" : s === "deferred" ? "Différée" : s === "faire_part" ? "Faire-part" : s === "pending" ? "En réflexion" : "Hors liste"}
                   </span>
                 ))}
               </div>
@@ -366,6 +420,72 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
+function SortableCommRow({
+  comm,
+  isSelected,
+  onSelect,
+  onEdit,
+}: {
+  comm: Communication
+  isSelected: boolean
+  onSelect: () => void
+  onEdit: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: comm.id })
+  const style = { transform: CSS.Transform.toString(transform), transition }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={[
+        "flex items-center gap-2 rounded-2xl border bg-card px-3 py-3 transition-colors",
+        isSelected ? "border-primary/60 bg-primary/5" : "hover:bg-muted/40",
+        isDragging ? "opacity-50" : "",
+      ].join(" ")}
+    >
+      <button
+        type="button"
+        aria-label="Réordonner"
+        className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing shrink-0"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="size-4" />
+      </button>
+      <div className="min-w-0 flex-1 cursor-pointer" onClick={onSelect}>
+        <p className="text-sm font-medium">{comm.name}</p>
+        {comm.description && (
+          <p className="text-xs text-muted-foreground truncate">{comm.description}</p>
+        )}
+        {((comm.targetRsvpStatuses?.length ?? 0) > 0 || (comm.targetProspectStatuses?.length ?? 0) > 0) && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {(comm.targetRsvpStatuses ?? []).map((s) => (
+              <span key={s} className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">
+                {s === "pending" ? "En attente" : s === "confirmed" ? "Confirmés" : "Déclinés"}
+              </span>
+            ))}
+            {(comm.targetProspectStatuses ?? []).map((s) => (
+              <span key={`ps-${s}`} className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-400">
+                {s === "main_list" ? "Liste A" : s === "secondary_list" ? "Liste B" : s === "deferred" ? "Différée" : s === "faire_part" ? "Faire-part" : s === "pending" ? "En réflexion" : "Hors liste"}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={(e) => { e.stopPropagation(); onEdit() }}
+        aria-label="Modifier"
+        className="shrink-0"
+      >
+        <Pencil className="size-4" />
+      </Button>
+    </div>
+  )
+}
+
 export function MessageSuiviPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -374,10 +494,28 @@ export function MessageSuiviPage() {
   const { data: comms, isLoading: commsLoading } = useCommunications()
   const { data: guests, isLoading: guestsLoading } = useGuests()
   const { data: groups = [], isLoading: groupsLoading } = useGuestGroups()
+  const reorder = useReorderCommunications()
 
   const isLoading = commsLoading || guestsLoading || groupsLoading
 
-  const selectedComm = (comms ?? []).find((c) => c.id === selectedId) ?? null
+  const sortedComms = useMemo(
+    () => [...(comms ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
+    [comms]
+  )
+
+  const selectedComm = sortedComms.find((c) => c.id === selectedId) ?? null
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = sortedComms.findIndex((c) => c.id === active.id)
+    const newIndex = sortedComms.findIndex((c) => c.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+    const reordered = arrayMove(sortedComms, oldIndex, newIndex).map((c, i) => ({ ...c, sortOrder: i }))
+    reorder.mutate(reordered.map(({ id, sortOrder }) => ({ id, sortOrder })))
+  }
 
   function openCreate() {
     setEditingComm(null)
@@ -423,48 +561,21 @@ export function MessageSuiviPage() {
           }
         />
       ) : (
-        <div className="space-y-2">
-          {comms.map((comm) => {
-            const isSelected = comm.id === selectedId
-            return (
-              <div
-                key={comm.id}
-                onClick={() => setSelectedId(isSelected ? null : comm.id)}
-                className={[
-                  "flex items-center justify-between gap-3 rounded-2xl border bg-card px-4 py-3 cursor-pointer transition-colors",
-                  isSelected ? "border-primary/60 bg-primary/5" : "hover:bg-muted/40",
-                ].join(" ")}
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{comm.name}</p>
-                  {comm.description && (
-                    <p className="text-xs text-muted-foreground truncate">{comm.description}</p>
-                  )}
-                  {comm.targetRsvpStatuses && comm.targetRsvpStatuses.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {comm.targetRsvpStatuses.map((s) => (
-                        <span key={s} className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">
-                          {s === "pending" ? "En attente" : s === "confirmed" ? "Confirmés" : "Déclinés"}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    openEdit(comm)
-                  }}
-                  aria-label="Modifier"
-                >
-                  <Pencil className="size-4" />
-                </Button>
-              </div>
-            )
-          })}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={sortedComms.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {sortedComms.map((comm) => (
+                <SortableCommRow
+                  key={comm.id}
+                  comm={comm}
+                  isSelected={comm.id === selectedId}
+                  onSelect={() => setSelectedId(comm.id === selectedId ? null : comm.id)}
+                  onEdit={() => openEdit(comm)}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {selectedComm && (

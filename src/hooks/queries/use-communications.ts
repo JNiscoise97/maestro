@@ -20,8 +20,8 @@ export function useCommunications() {
 export function useCreateCommunication() {
   const invalidate = useInvalidateComms()
   return useMutation({
-    mutationFn: ({ name, description, targetRsvpStatuses }: { name: string; description: string | null; targetRsvpStatuses?: string[] | null }) =>
-      communicationsService.create(name, description, targetRsvpStatuses),
+    mutationFn: ({ name, description, targetRsvpStatuses, targetProspectStatuses }: { name: string; description: string | null; targetRsvpStatuses?: string[] | null; targetProspectStatuses?: string[] | null }) =>
+      communicationsService.create(name, description, targetRsvpStatuses, targetProspectStatuses),
     onSuccess: invalidate,
   })
 }
@@ -29,7 +29,7 @@ export function useCreateCommunication() {
 export function useUpdateCommunication() {
   const invalidate = useInvalidateComms()
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: { name?: string; description?: string | null; targetRsvpStatuses?: string[] | null } }) =>
+    mutationFn: ({ id, patch }: { id: string; patch: { name?: string; description?: string | null; targetRsvpStatuses?: string[] | null; targetProspectStatuses?: string[] | null } }) =>
       communicationsService.update(id, patch),
     onSuccess: invalidate,
   })
@@ -64,5 +64,13 @@ export function useUnmarkCommunicationSent(commId: string) {
   return useMutation({
     mutationFn: (sendId: string) => communicationsService.unmarkSent(sendId),
     onSuccess: () => qc.invalidateQueries({ queryKey: sendsKey(commId) }),
+  })
+}
+
+export function useReorderCommunications() {
+  const invalidate = useInvalidateComms()
+  return useMutation({
+    mutationFn: (items: { id: string; sortOrder: number }[]) => communicationsService.reorder(items),
+    onSuccess: invalidate,
   })
 }

@@ -251,9 +251,9 @@ function MappingStep({
 }
 
 function PreviewStep({
-  raw, mapping, rows, onRows, onBack, onClose,
+  rows, onRows, onBack, onClose,
 }: {
-  raw: RawCsv; mapping: Mapping; rows: MappedRow[]; onRows: (r: MappedRow[]) => void; onBack: () => void; onClose: () => void
+  rows: MappedRow[]; onRows: (r: MappedRow[]) => void; onBack: () => void; onClose: () => void
 }) {
   const [isImporting, setIsImporting] = useState(false)
   const createGuest = useCreateGuest()
@@ -393,7 +393,7 @@ function ProspectCsvImport({ onClose }: { onClose: () => void }) {
           onBack={() => { setRaw(null); setStep("upload") }} />
       )}
       {step === "preview" && raw && (
-        <PreviewStep raw={raw} mapping={mapping} rows={rows} onRows={setRows}
+        <PreviewStep rows={rows} onRows={setRows}
           onBack={() => setStep("mapping")} onClose={onClose} />
       )}
     </div>

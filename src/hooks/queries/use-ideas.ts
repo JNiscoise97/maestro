@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import type { Idea, IdeaSource, IdeaStatus } from "@/types/domain"
+import type { IdeaSource, IdeaStatus } from "@/types/domain"
 import { ideasService } from "@/services/supabase/ideas"
 
 const KEY = ["ideas"]

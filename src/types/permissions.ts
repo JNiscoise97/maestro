@@ -34,6 +34,7 @@ export type Capability =
   | "view:tour-tables"
   | "view:messages"
   | "view:cadeaux"
+  | "view:ideas"
 
 const FIANCE_CAPABILITIES: Capability[] = [
   "view:dashboard",
@@ -65,6 +66,7 @@ const FIANCE_CAPABILITIES: Capability[] = [
   "view:tour-tables",
   "view:messages",
   "view:cadeaux",
+  "view:ideas",
 ]
 
 const REFERENT_CAPABILITIES: Capability[] = [

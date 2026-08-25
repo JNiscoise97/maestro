@@ -16,6 +16,7 @@
   UtensilsCrossed,
   MessageSquare,
   Gift,
+  Lightbulb,
   type LucideIcon,
 } from "lucide-react"
 
@@ -80,6 +81,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Tour des tables", path: "/tour-tables", icon: UtensilsCrossed, capability: "view:tour-tables" },
   { label: "Cadeaux", path: "/cadeaux", icon: Gift, capability: "view:cadeaux" },
   { label: "Documents", path: "/documents", icon: FolderOpen, capability: "view:documents" },
+  { label: "Idées", path: "/idees", icon: Lightbulb, capability: "view:ideas", visibleToRoles: ["admin"] },
   { label: "Paramètres", path: "/parametres", icon: Settings, capability: "manage:settings" },
 ]
 

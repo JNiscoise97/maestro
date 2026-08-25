@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Armchair, ArrowUpDown, LayoutList, Network } from "lucide-react"
+import { Armchair, ArrowUpDown, GitBranch, LayoutList, Network, X } from "lucide-react"
 
 import type { Guest, GuestGroup, RsvpStatus } from "@/types/domain"
 import { groupLabel } from "@/lib/groups"
@@ -9,11 +9,11 @@ import { EmptyState } from "@/components/shared/EmptyState"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { RsvpBadge } from "@/components/invites/RsvpBadge"
-import { useGuestGroups, useGuests } from "@/hooks/queries/use-guests"
+import { useGuestGroups, useGuests, useUpdateGuest } from "@/hooks/queries/use-guests"
 import { GuestTable } from "@/components/invites/GuestTable"
 import { GuestCreateDialog } from "@/components/invites/GuestCreateDialog"
 import { GuestTreeView } from "@/components/invites/GuestTreeView"
@@ -30,8 +30,108 @@ const ALL_GROUPS = "all"
 
 // ── Vue arbre par groupe ──────────────────────────────────────────────────────
 
+const NONE = "__none_parent__"
+const SEE_MORE = "__voir_plus__"
+
+function HierarchyEditor({
+  groupGuests,
+  allGuests,
+  groupsById,
+}: {
+  groupGuests: Guest[]
+  allGuests: Guest[]
+  groupsById: Map<string, GuestGroup>
+}) {
+  const update = useUpdateGuest()
+  // IDs des guests dont le select est étendu à tous les groupes
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  const sortedGroup = useMemo(
+    () => [...groupGuests].sort((a, b) => a.fullName.localeCompare(b.fullName, "fr")),
+    [groupGuests],
+  )
+
+  // Invités hors du groupe courant, groupés par groupe
+  const otherByGroup = useMemo(() => {
+    const groupIds = new Set(groupGuests.map((g) => g.id))
+    const map = new Map<string, Guest[]>()
+    for (const g of allGuests) {
+      if (groupIds.has(g.id)) continue
+      const key = g.groupId ?? "__none__"
+      const list = map.get(key) ?? []
+      list.push(g)
+      map.set(key, list)
+    }
+    for (const list of map.values()) list.sort((a, b) => a.fullName.localeCompare(b.fullName, "fr"))
+    return map
+  }, [groupGuests, allGuests])
+
+  const othersCount = allGuests.length - groupGuests.length
+
+  function handleChange(guestId: string, v: string) {
+    if (v === SEE_MORE) {
+      setExpanded((prev) => new Set([...prev, guestId]))
+      return
+    }
+    update.mutate({ id: guestId, patch: { parentId: v === NONE ? null : v } })
+  }
+
+  return (
+    <div className="space-y-1.5 pt-1">
+      {sortedGroup.map((g) => {
+        const isExpanded = expanded.has(g.id) ||
+          // auto-expand si le parent actuel est hors du groupe
+          (!!g.parentId && !sortedGroup.some((p) => p.id === g.parentId))
+
+        return (
+          <div key={g.id} className="flex items-center gap-2">
+            <span className="flex-1 min-w-0 truncate text-sm">{g.fullName}</span>
+            <Select value={g.parentId ?? NONE} onValueChange={(v) => handleChange(g.id, v)}>
+              <SelectTrigger className="h-7 w-56 text-xs shrink-0">
+                <SelectValue placeholder="— Sans parent" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>— Sans parent</SelectItem>
+                <SelectGroup>
+                  <SelectLabel className="text-[10px]">Ce groupe</SelectLabel>
+                  {sortedGroup
+                    .filter((p) => p.id !== g.id)
+                    .map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.fullName}</SelectItem>
+                    ))}
+                </SelectGroup>
+                {isExpanded
+                  ? [...otherByGroup.entries()].map(([gid, members]) => {
+                      const grp = gid === "__none__" ? null : groupsById.get(gid)
+                      const label = grp ? grp.familyName : "Sans groupe"
+                      return (
+                        <SelectGroup key={gid}>
+                          <SelectLabel className="text-[10px]">{label}</SelectLabel>
+                          {members
+                            .filter((p) => p.id !== g.id)
+                            .map((p) => (
+                              <SelectItem key={p.id} value={p.id}>{p.fullName}</SelectItem>
+                            ))}
+                        </SelectGroup>
+                      )
+                    })
+                  : othersCount > 0 && (
+                      <SelectItem value={SEE_MORE} className="italic text-muted-foreground">
+                        Voir plus ({othersCount} dans d'autres groupes…)
+                      </SelectItem>
+                    )}
+              </SelectContent>
+            </Select>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function GuestGroupTree({ guests, groups }: { guests: Guest[]; groups: GuestGroup[] }) {
   const navigate = useNavigate()
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
   const groupsById = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups])
 
   const byGroup = useMemo(() => {
@@ -75,15 +175,35 @@ function GuestGroupTree({ guests, groups }: { guests: Guest[]; groups: GuestGrou
       {sortedGroupIds.map((groupId) => {
         const groupGuests = byGroup.get(groupId) ?? []
         const group = groupId === "__none__" ? null : groupsById.get(groupId)
+        const isEditing = editingGroupId === groupId
+
         return (
           <div key={groupId} className="rounded-2xl border border-border bg-card p-4">
-            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              {group ? groupLabel(group, groups) : "Sans groupe"}
-              <span className="ml-2 font-normal normal-case tracking-normal">
-                {groupGuests.length} invité{groupGuests.length > 1 ? "s" : ""}
-              </span>
-            </p>
-            <GuestTreeView guests={groupGuests} renderGuest={renderGuest} />
+            <div className="mb-2 flex items-center gap-2">
+              <p className="flex-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                {group ? groupLabel(group, groups) : "Sans groupe"}
+                <span className="ml-2 font-normal normal-case tracking-normal">
+                  {groupGuests.length} invité{groupGuests.length > 1 ? "s" : ""}
+                </span>
+              </p>
+              <button
+                type="button"
+                onClick={() => setEditingGroupId(isEditing ? null : groupId)}
+                className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors ${
+                  isEditing
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                {isEditing ? <X className="size-3" /> : <GitBranch className="size-3" />}
+                {isEditing ? "Fermer" : "Hiérarchie"}
+              </button>
+            </div>
+            {isEditing ? (
+              <HierarchyEditor groupGuests={groupGuests} allGuests={guests} groupsById={groupsById} />
+            ) : (
+              <GuestTreeView guests={groupGuests} renderGuest={renderGuest} />
+            )}
           </div>
         )
       })}

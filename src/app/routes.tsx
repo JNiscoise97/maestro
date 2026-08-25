@@ -23,6 +23,7 @@ import { MesResponsabilitesPage } from "@/pages/mes-responsabilites"
 import { TourTablesIndexPage } from "@/pages/tour-tables"
 import { MessagesPage } from "@/pages/messages"
 import { CadeauxPage } from "@/pages/cadeaux"
+import { IdeasPage } from "@/pages/ideas"
 import { NotFoundPage } from "@/pages/not-found"
 import { RsvpPage } from "@/pages/rsvp"
 import { RsvpInvitationPage } from "@/pages/rsvp/invitation"
@@ -147,6 +148,14 @@ export function AppRoutes() {
             element={
               <RoleGuard capability="view:cadeaux">
                 <CadeauxPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="idees"
+            element={
+              <RoleGuard capability="view:ideas">
+                <IdeasPage />
               </RoleGuard>
             }
           />

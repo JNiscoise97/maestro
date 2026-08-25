@@ -325,6 +325,21 @@ export interface Guest {
   postalAddress?: string | null
 }
 
+export type IdeaSource = "us" | "pinterest" | "social" | "other"
+export type IdeaStatus = "to_study" | "keeping" | "discarded" | "in_progress"
+
+export interface Idea {
+  id: string
+  title: string
+  description?: string | null
+  source: IdeaSource
+  sourceDetail?: string | null
+  category?: string | null
+  status: IdeaStatus
+  notes?: string | null
+  createdAt: string
+}
+
 export type PhotoGroupStatus = "pending" | "done" | "skipped"
 
 /** Une séance photo (ex. "Avant cérémonie", "Cocktail") — purement organisationnelle, juste un nom et un ordre, voir 0052_photo_sessions.sql. Chaque groupe de photo appartient à une séance et son `sortOrder` est scopé à celle-ci. */

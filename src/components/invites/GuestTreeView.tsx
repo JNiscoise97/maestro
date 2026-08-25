@@ -60,9 +60,18 @@ export function buildGuestTree(guests: Guest[]): GuestTreeNode[] {
     return { primary: guest, partner, children: rawChildren.map(buildNode) }
   }
 
-  // Root nodes: guests that are not children of anyone in this list
+  // Conjoints d'un enfant : ils ne doivent pas être racine, ils apparaissent
+  // en position imbriquée aux côtés de leur partenaire enfant.
+  const partnerOfChild = new Set<string>()
+  for (const g of guests) {
+    if (childIds.has(g.id) && g.pairedWithId && guestIds.has(g.pairedWithId)) {
+      partnerOfChild.add(g.pairedWithId)
+    }
+  }
+
+  // Root nodes: guests that are not children and not the partner of a child
   const roots = guests
-    .filter(g => !childIds.has(g.id))
+    .filter(g => !childIds.has(g.id) && !partnerOfChild.has(g.id))
     .sort((a, b) => a.fullName.localeCompare(b.fullName, "fr"))
 
   consumed.clear()

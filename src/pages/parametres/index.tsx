@@ -19,6 +19,7 @@ import { ResetRsvpButton } from "@/components/parametres/ResetRsvpButton"
 import { SyncFromFiancaillesButton } from "@/components/parametres/SyncFromFiancaillesButton"
 import { GuestCsvImport } from "@/components/parametres/GuestCsvImport"
 import { EquipmentManager } from "@/components/parametres/EquipmentManager"
+import { EventSequencesManager } from "@/components/parametres/EventSequencesManager"
 import { AccessCodesManager } from "@/components/parametres/AccessCodesManager"
 import { MessagesConfig } from "@/components/timing/MessagesConfig"
 import { MessagesManager } from "@/components/parametres/MessagesManager"
@@ -33,6 +34,7 @@ import { cn } from "@/lib/utils"
 
 type Section =
   | "evenement"
+  | "evenement-sequences"
   | "organisation"
   | "timing-messages-crud"
   | "timing-messages"
@@ -53,7 +55,10 @@ interface NavGroup { label: string; items: NavItem[] }
 const NAV: NavGroup[] = [
   {
     label: "Événement",
-    items: [{ id: "evenement", label: "Configuration" }],
+    items: [
+      { id: "evenement", label: "Configuration" },
+      { id: "evenement-sequences", label: "Séquences" },
+    ],
   },
   {
     label: "Organisation",
@@ -153,6 +158,7 @@ function OutilsSection() {
 function ContentPanel({ section }: { section: Section }) {
   switch (section) {
     case "evenement":              return <EventConfigForm />
+    case "evenement-sequences":    return <EventSequencesManager />
     case "organisation":           return <ParametresTree />
     case "timing-missions":         return <MissionsManager />
     case "timing-taches":           return <TachesManager />

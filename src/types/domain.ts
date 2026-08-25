@@ -382,6 +382,31 @@ export interface Prestataire {
   notes?: string | null
 }
 
+export interface EventSequence {
+  id: string
+  name: string
+  eventDate?: string | null
+  startTime?: string | null
+  endDate?: string | null
+  endTime?: string | null
+  description?: string | null
+  sortOrder: number
+  createdAt: string
+}
+
+export interface GuestCheckin {
+  id: string
+  guestId: string
+  sequenceId: string
+  checkedInAt: string
+}
+
+export interface GuestMealChoice {
+  guestId: string
+  sequenceId: string
+  mealChoice: MealChoice | null
+}
+
 export interface SeatingTable {
   id: string
   name: string
@@ -390,6 +415,7 @@ export interface SeatingTable {
   posX?: number | null
   posY?: number | null
   confirmedAt?: string | null
+  sequenceId?: string | null
 }
 
 /** Le siège est attribué à un invité, un fiancé ou un prestataire — jamais plusieurs à la fois. */

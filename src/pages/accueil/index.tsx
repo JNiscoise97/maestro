@@ -24,6 +24,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils"
 import { useAddWalkInGuest, useCheckInGuest, useGuestGroups, useGuests } from "@/hooks/queries/use-guests"
 import { GuestTreeView } from "@/components/invites/GuestTreeView"
+import { useEventSequences } from "@/hooks/queries/use-event-sequences"
+import { useGuestSequences } from "@/hooks/queries/use-guest-sequences"
+import { useGuestCheckins, useCheckInForSequence, useUndoCheckinForSequence } from "@/hooks/queries/use-guest-checkins"
 
 const NO_FAMILY = "__no_family__"
 
@@ -43,28 +46,68 @@ function formatTime(iso: string): string {
 export function AccueilPage() {
   const { data: guests, isLoading: guestsLoading } = useGuests()
   const { data: groups, isLoading: groupsLoading } = useGuestGroups()
+  const { data: sequences = [] } = useEventSequences()
+  const { data: assignedByGuest = {} } = useGuestSequences()
   const checkIn = useCheckInGuest()
+  const checkInSeq = useCheckInForSequence()
+  const undoSeq = useUndoCheckinForSequence()
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<Filter>("all")
+  const [selectedSequenceId, setSelectedSequenceId] = useState<string | null>(null)
+
+  const sortedSequences = useMemo(
+    () => [...sequences].sort((a, b) => a.sortOrder - b.sortOrder),
+    [sequences]
+  )
+  const hasMultipleSequences = sortedSequences.length > 1
+
+  // Resolve active sequence (null = global view)
+  const activeSequenceId = hasMultipleSequences ? selectedSequenceId ?? sortedSequences[0]?.id ?? null : null
+
+  const { data: seqCheckins = [] } = useGuestCheckins(activeSequenceId)
+  const checkinedInSeq = useMemo(
+    () => new Set(seqCheckins.map((c) => c.guestId)),
+    [seqCheckins]
+  )
 
   const isLoading = guestsLoading || groupsLoading
 
   const groupsById = useMemo(() => new Map((groups ?? []).map((g) => [g.id, g])), [groups])
   const guestById = useMemo(() => new Map((guests ?? []).map((g) => [g.id, g])), [guests])
 
-  const filteredGuests = useMemo(() => {
+  // Guests assigned to the active sequence (or all guests in global mode)
+  const scopedGuests = useMemo(() => {
     if (!guests) return []
+    if (!activeSequenceId) return guests
+    return guests.filter((g) => (assignedByGuest[g.id] ?? []).includes(activeSequenceId))
+  }, [guests, activeSequenceId, assignedByGuest])
+
+  function isArrived(guest: Guest): boolean {
+    if (activeSequenceId) return checkinedInSeq.has(guest.id)
+    return !!guest.checkedInAt
+  }
+
+  function getCheckinTime(guest: Guest): string | null {
+    if (activeSequenceId) {
+      const c = seqCheckins.find((x) => x.guestId === guest.id)
+      return c?.checkedInAt ?? null
+    }
+    return guest.checkedInAt ?? null
+  }
+
+  const filteredGuests = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return guests.filter((guest) => {
-      if (filter === "pending" && guest.checkedInAt) return false
-      if (filter === "arrived" && !guest.checkedInAt) return false
+    return scopedGuests.filter((guest) => {
+      if (filter === "pending" && isArrived(guest)) return false
+      if (filter === "arrived" && !isArrived(guest)) return false
       if (query) {
         const familyName = guest.groupId ? groupsById.get(guest.groupId)?.familyName ?? "" : ""
         if (!guest.fullName.toLowerCase().includes(query) && !familyName.toLowerCase().includes(query)) return false
       }
       return true
     })
-  }, [guests, search, filter, groupsById])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopedGuests, search, filter, groupsById, checkinedInSeq, activeSequenceId])
 
   const families = useMemo(() => {
     const map = new Map<string, { group: GuestGroup | null; guests: Guest[] }>()
@@ -82,23 +125,40 @@ export function AccueilPage() {
   }, [filteredGuests, groupsById])
 
   const stats = useMemo(() => {
-    if (!guests) return null
-    return {
-      total: guests.length,
-      arrived: guests.filter((g) => g.checkedInAt).length,
-      unexpected: guests.filter((g) => g.isUnexpected).length,
-    }
-  }, [guests])
+    if (!scopedGuests.length) return null
+    const arrived = activeSequenceId
+      ? scopedGuests.filter((g) => checkinedInSeq.has(g.id)).length
+      : scopedGuests.filter((g) => g.checkedInAt).length
+    const unexpected = scopedGuests.filter((g) => g.isUnexpected).length
+    return { total: scopedGuests.length, arrived, unexpected }
+  }, [scopedGuests, activeSequenceId, checkinedInSeq])
 
   function toggleGuest(guest: Guest) {
-    checkIn.mutate({ id: guest.id, checkedInAt: guest.checkedInAt ? null : new Date().toISOString() })
+    const arrived = isArrived(guest)
+    // Always update the global checkedInAt on the guest (backward compat)
+    checkIn.mutate({ id: guest.id, checkedInAt: arrived ? null : new Date().toISOString() })
+    // Also update per-sequence check-in if in sequence mode
+    if (activeSequenceId) {
+      if (arrived) {
+        undoSeq.mutate({ guestId: guest.id, sequenceId: activeSequenceId })
+      } else {
+        checkInSeq.mutate({ guestId: guest.id, sequenceId: activeSequenceId })
+      }
+    }
   }
 
   async function markFamily(guestsInFamily: Guest[], arrived: boolean) {
     await Promise.all(
-      guestsInFamily.map((g) =>
-        checkIn.mutateAsync({ id: g.id, checkedInAt: arrived ? new Date().toISOString() : null })
-      )
+      guestsInFamily.map(async (g) => {
+        await checkIn.mutateAsync({ id: g.id, checkedInAt: arrived ? new Date().toISOString() : null })
+        if (activeSequenceId) {
+          if (arrived) {
+            await checkInSeq.mutateAsync({ guestId: g.id, sequenceId: activeSequenceId })
+          } else {
+            await undoSeq.mutateAsync({ guestId: g.id, sequenceId: activeSequenceId })
+          }
+        }
+      })
     )
   }
 
@@ -109,6 +169,23 @@ export function AccueilPage() {
         description="Pointez les arrivées des invités au fur et à mesure."
         actions={<AddWalkInGuestDialog />}
       />
+
+      {/* Sélecteur de séquence */}
+      {hasMultipleSequences && (
+        <div className="flex flex-wrap gap-2">
+          {sortedSequences.map((seq) => (
+            <Button
+              key={seq.id}
+              size="sm"
+              variant={activeSequenceId === seq.id ? "default" : "outline"}
+              onClick={() => setSelectedSequenceId(seq.id)}
+            >
+              {seq.name}
+              {seq.startTime && <span className="ml-1.5 text-xs opacity-70">{seq.startTime.slice(0, 5)}</span>}
+            </Button>
+          ))}
+        </div>
+      )}
 
       {isLoading ? (
         <Skeleton className="h-64 rounded-2xl" />
@@ -161,7 +238,7 @@ export function AccueilPage() {
           ) : (
             <div className="space-y-4">
               {families.map((family) => {
-                const arrivedCount = family.guests.filter((g) => g.checkedInAt).length
+                const arrivedCount = family.guests.filter((g) => isArrived(g)).length
                 const allArrived = arrivedCount === family.guests.length
                 const key = family.group?.id ?? NO_FAMILY
                 const canBulkMark =
@@ -205,6 +282,8 @@ export function AccueilPage() {
                           <GuestTreeView
                             guests={family.guests}
                             renderGuest={(guest) => {
+                              const arrived = isArrived(guest)
+                              const checkinTime = getCheckinTime(guest)
                               const crossFamilyPartner =
                                 guest.pairedWithId && !familyGuestIds.has(guest.pairedWithId)
                                   ? guestById.get(guest.pairedWithId)
@@ -215,7 +294,7 @@ export function AccueilPage() {
                                   onClick={() => toggleGuest(guest)}
                                   className={cn(
                                     "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-left text-sm transition-colors",
-                                    guest.checkedInAt
+                                    arrived
                                       ? "border-vert-vegetal/40 bg-vert-vegetal/10"
                                       : "border-border hover:bg-muted/50"
                                   )}
@@ -223,7 +302,7 @@ export function AccueilPage() {
                                   <CheckCircle2
                                     className={cn(
                                       "size-3.5 shrink-0",
-                                      guest.checkedInAt ? "text-vert-vegetal" : "text-muted-foreground/40"
+                                      arrived ? "text-vert-vegetal" : "text-muted-foreground/40"
                                     )}
                                   />
                                   <span className="text-foreground">{guest.fullName}</span>
@@ -243,9 +322,9 @@ export function AccueilPage() {
                                       Imprévu
                                     </Badge>
                                   ) : null}
-                                  {guest.checkedInAt ? (
+                                  {checkinTime ? (
                                     <span className="shrink-0 text-xs text-muted-foreground">
-                                      {formatTime(guest.checkedInAt)}
+                                      {formatTime(checkinTime)}
                                     </span>
                                   ) : null}
                                 </button>

@@ -24,6 +24,7 @@ import { MessageSuiviPage } from "@/pages/invites/MessageSuiviPage"
 import { RsvpSuiviTab } from "@/pages/invites/RsvpSuiviTab"
 import { AtelierTab } from "@/pages/invites/AtelierTab"
 import { PapeterieTab } from "@/pages/invites/PapeterieTab"
+import { SequencesTab } from "@/pages/invites/SequencesTab"
 import { GuestExportDialog } from "@/components/invites/GuestExportDialog"
 
 const ALL_GROUPS = "all"
@@ -395,7 +396,7 @@ export function InvitesList() {
 
 // ── Page composite ─────────────────────────────────────────────────────────────
 
-type InvitesTab = "liste" | "rsvp" | "plan-table" | "enfants" | "accessibilite" | "messages" | "atelier" | "papeterie"
+type InvitesTab = "liste" | "rsvp" | "plan-table" | "enfants" | "accessibilite" | "messages" | "atelier" | "papeterie" | "sequences"
 
 export function InvitesPage() {
   const [tab, setTab] = useState<InvitesTab>("liste")
@@ -421,6 +422,7 @@ export function InvitesPage() {
           <TabsTrigger value="accessibilite">Besoins spéciaux</TabsTrigger>
           <TabsTrigger value="messages">Communications</TabsTrigger>
           <TabsTrigger value="papeterie">Papeterie</TabsTrigger>
+          <TabsTrigger value="sequences">Séquences</TabsTrigger>
         </TabsList>
       </Tabs>
       {tab === "liste" && <InvitesList />}
@@ -431,6 +433,7 @@ export function InvitesPage() {
       {tab === "accessibilite" && <PersonnesAgeesPage />}
       {tab === "messages" && <MessageSuiviPage />}
       {tab === "papeterie" && <PapeterieTab />}
+      {tab === "sequences" && <SequencesTab />}
     </div>
   )
 }

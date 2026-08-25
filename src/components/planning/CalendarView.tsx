@@ -2,7 +2,7 @@ import { eachDayOfInterval, format, isSameDay, isWithinInterval, parseISO } from
 import { fr } from "date-fns/locale"
 import { useEffect, useRef, useState } from "react"
 
-import type { ChecklistItem, PlanningEvent, RosMessage, RunOfShowStep } from "@/types/domain"
+import type { ChecklistItem, EventSequence, PlanningEvent, RosMessage, RunOfShowStep } from "@/types/domain"
 import type { PhaseRange } from "@/context/EventConfigContext"
 import { useEventConfig } from "@/context/EventConfigContext"
 import { EVENT_TYPE_LABELS } from "@/services/settings.service"
@@ -15,6 +15,7 @@ import { useRosMessages } from "@/hooks/queries/use-ros-messages"
 import { useGuests } from "@/hooks/queries/use-guests"
 import { usePeople } from "@/hooks/queries/use-people"
 import { useRunOfShow } from "@/hooks/queries/use-run-of-show"
+import { useEventSequences } from "@/hooks/queries/use-event-sequences"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -126,12 +127,12 @@ interface DayCol {
 
 interface TimedEvent {
   id: string
-  kind: "step" | "jalon" | "message" | "task"
+  kind: "step" | "jalon" | "message" | "task" | "sequence"
   title: string
   startMin: number
   duration: number
   isHighlight?: boolean
-  raw: RunOfShowStep | PlanningEvent | RosMessage | ChecklistItem
+  raw: RunOfShowStep | PlanningEvent | RosMessage | ChecklistItem | EventSequence
   assigneeName?: string
   missionTitle?: string
   domaineName?: string
@@ -279,6 +280,7 @@ export function CalendarView({ dateRange, phaseFilter, granularity = "1h", messa
   const { data: missions       = []                } = useMissions()
   const { data: domaines       = []                } = useDomaines()
   const { data: poles          = []                } = usePoles()
+  const { data: sequences      = []                } = useEventSequences()
   const isLoading = l1 || l4 || l5 || l6 || l7 || l8
 
   const guestMap   = new Map(guests.map((g)   => [g.id, g.fullName]))
@@ -381,6 +383,39 @@ export function CalendarView({ dateRange, phaseFilter, granularity = "1h", messa
     })
   }
 
+  // Séquences d'événement
+  for (const seq of sequences) {
+    if (!seq.eventDate || !seq.startTime) continue
+    if (!timedByIso.has(seq.eventDate)) continue
+    const startMin = hmToMin(seq.startTime)
+    // Si la séquence finit un autre jour, on l'étend jusqu'à minuit sur le jour de début
+    const crossDay = seq.endDate && seq.endDate !== seq.eventDate
+    const endMin   = crossDay
+      ? HOUR_END * 60
+      : seq.endTime ? hmToMin(seq.endTime) : startMin + 60
+    const duration = Math.max(30, endMin - startMin)
+    timedByIso.get(seq.eventDate)!.push({
+      id: `seq-${seq.id}`,
+      kind: "sequence",
+      title: seq.name + (crossDay ? " →" : ""),
+      startMin,
+      duration,
+      raw: seq,
+    })
+    // Continuation sur le jour de fin si présente dans la grille
+    if (crossDay && seq.endDate && timedByIso.has(seq.endDate)) {
+      const endMin2 = seq.endTime ? hmToMin(seq.endTime) : 60
+      timedByIso.get(seq.endDate)!.push({
+        id: `seq-${seq.id}-end`,
+        kind: "sequence",
+        title: "← " + seq.name,
+        startMin: 0,
+        duration: endMin2,
+        raw: seq,
+      })
+    }
+  }
+
   // Scroll initial : 8h pour avoir le début de matinée visible en haut
   const scrollRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -414,6 +449,9 @@ export function CalendarView({ dateRange, phaseFilter, granularity = "1h", messa
         </span>
         <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-medium text-rose-600 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-400">
           Programme
+        </span>
+        <span className="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2.5 py-1 text-[11px] font-medium text-fuchsia-600 dark:border-fuchsia-800 dark:bg-fuchsia-950 dark:text-fuchsia-400">
+          Séquence
         </span>
       </div>
 
@@ -638,7 +676,9 @@ function TimedBlock({ ev, cellH, guestMap, personMap }: { ev: TimedEvent; cellH:
   const compact = height < 38
 
   let blockCls: string
-  if (ev.kind === "task") {
+  if (ev.kind === "sequence") {
+    blockCls = "border-2 border-fuchsia-400 dark:border-fuchsia-600 bg-fuchsia-50 dark:bg-fuchsia-950/70 text-fuchsia-800 dark:text-fuchsia-200 font-semibold shadow-sm"
+  } else if (ev.kind === "task") {
     blockCls = "border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"
   } else if (ev.kind === "jalon") {
     blockCls = "border border-violet-300 dark:border-violet-700 bg-violet-50 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300"
@@ -682,6 +722,25 @@ function TimedBlock({ ev, cellH, guestMap, personMap }: { ev: TimedEvent; cellH:
 function TimedDetail({ ev, guestMap, personMap }: { ev: TimedEvent; guestMap: Map<string, string>; personMap: Map<string, string> }) {
   const endMin    = ev.startMin + ev.duration
   const timeRange = `${minToLabel(ev.startMin)} – ${minToLabel(endMin)}`
+
+  if (ev.kind === "sequence") {
+    const seq = ev.raw as EventSequence
+    const endMin = ev.startMin + ev.duration
+    return (
+      <div className="space-y-1.5">
+        <p className="font-semibold text-fuchsia-700 dark:text-fuchsia-300">{seq.name}</p>
+        <p className="text-xs text-muted-foreground">
+          {minToLabel(ev.startMin)}{seq.endTime ? ` – ${minToLabel(endMin)}` : ""} · {fmtDuration(ev.duration)}
+        </p>
+        {seq.description && <p className="text-xs">{seq.description}</p>}
+        {seq.eventDate && (
+          <p className="text-xs text-muted-foreground">
+            {new Date(seq.eventDate).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+          </p>
+        )}
+      </div>
+    )
+  }
 
   if (ev.kind === "task") {
     return (

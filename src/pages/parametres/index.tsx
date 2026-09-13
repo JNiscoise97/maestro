@@ -20,6 +20,7 @@ import { SyncFromFiancaillesButton } from "@/components/parametres/SyncFromFianc
 import { GuestCsvImport } from "@/components/parametres/GuestCsvImport"
 import { EquipmentManager } from "@/components/parametres/EquipmentManager"
 import { EventSequencesManager } from "@/components/parametres/EventSequencesManager"
+import { CortegeSettingsManager } from "@/components/parametres/CortegeSettingsManager"
 import { AccessCodesManager } from "@/components/parametres/AccessCodesManager"
 import { MessagesConfig } from "@/components/timing/MessagesConfig"
 import { MessagesManager } from "@/components/parametres/MessagesManager"
@@ -35,6 +36,7 @@ import { cn } from "@/lib/utils"
 type Section =
   | "evenement"
   | "evenement-sequences"
+  | "invites-cortege"
   | "organisation"
   | "timing-messages-crud"
   | "timing-messages"
@@ -76,10 +78,11 @@ const NAV: NavGroup[] = [
   {
     label: "Invités",
     items: [
-      { id: "invites-groupes", label: "Groupes & familles" },
-      { id: "invites-import", label: "Import CSV" },
-      { id: "invites-photos", label: "Photos de groupe" },
-      { id: "invites-tables", label: "Plan de table" },
+      { id: "invites-groupes",  label: "Groupes & familles" },
+      { id: "invites-import",   label: "Import CSV" },
+      { id: "invites-photos",   label: "Photos de groupe" },
+      { id: "invites-tables",   label: "Plan de table" },
+      { id: "invites-cortege",  label: "Cortège" },
     ],
   },
   {
@@ -167,7 +170,8 @@ function ContentPanel({ section }: { section: Section }) {
     case "invites-groupes": return <GuestGroupsManager />
     case "invites-import":  return <GuestCsvImport />
     case "invites-photos":  return <PhotoGroupsManager />
-    case "invites-tables":  return <SeatingTablesManager />
+    case "invites-tables":   return <SeatingTablesManager />
+    case "invites-cortege":  return <CortegeSettingsManager />
     case "materiel":        return <EquipmentManager />
     case "acces-fiancies":  return <PersonManager />
     case "acces-comptes":   return <AccessCodesManager />

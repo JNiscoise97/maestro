@@ -182,51 +182,59 @@ function GuestEditForm({ guest, groups, allGuests, onCancel, onSaved }: GuestEdi
   const updateGuest = useUpdateGuest()
 
   async function handleSubmit() {
-    if (!firstName.trim() || !lastName.trim()) return
-    await updateGuest.mutateAsync({
-      id: guest.id,
-      patch: {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        nickname: nickname.trim() || null,
-        groupId: groupId === NONE ? null : groupId,
-        ageRange: ageRange.trim() || null,
-        relationCategory: relationCategory.trim() || null,
-        city: city.trim() || null,
-        parentId: parentId === NONE ? null : parentId,
-        isChild,
-        childAge: isChild && childAge.trim() ? Number(childAge) : null,
-        isReducedMobility,
-        assignable,
-        rsvpStatus,
-        rsvpRespondedAt: rsvpRespondedAt || null,
-        rsvpChannel: rsvpChannel.trim() || null,
-        mealMessageSent,
-        mealChoice: mealChoice === NONE ? null : mealChoice,
-        dietaryConstraints: dietaryConstraints.trim() || null,
-        allergies: allergies.trim() || null,
-        drinksAlcohol: boolFromTri(drinksAlcohol),
-        needsAccommodation,
-        accommodation: accommodation.trim() || null,
-        reservationDone,
-        hasVehicle,
-        needsLateTransport,
-        arrivalInfo: arrivalInfo.trim() || null,
-        guideSent,
-        addressChangeSent,
-        communicationJ30Sent,
-        communicationJ15Sent,
-        communicationJ3Sent,
-        culturalOrigin: culturalOrigin.trim() || null,
-        primaryLanguage: primaryLanguage.trim() || null,
-        inCortege,
-        hasCeremonialRole,
-        likelyTraditionalAttire,
-        notes: notes.trim() || null,
-      },
-    })
-    toast.success("Invité mis à jour.")
-    onSaved()
+    if (!firstName.trim() || !lastName.trim()) {
+      toast.error("Le prénom et le nom sont obligatoires.")
+      return
+    }
+    try {
+      await updateGuest.mutateAsync({
+        id: guest.id,
+        patch: {
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          nickname: nickname.trim() || null,
+          groupId: groupId === NONE ? null : groupId,
+          ageRange: ageRange.trim() || null,
+          relationCategory: relationCategory.trim() || null,
+          city: city.trim() || null,
+          parentId: parentId === NONE ? null : parentId,
+          isChild,
+          childAge: isChild && childAge.trim() ? Number(childAge) : null,
+          isReducedMobility,
+          assignable,
+          rsvpStatus,
+          rsvpRespondedAt: rsvpRespondedAt || null,
+          rsvpChannel: rsvpChannel.trim() || null,
+          mealMessageSent,
+          mealChoice: mealChoice === NONE ? null : mealChoice,
+          dietaryConstraints: dietaryConstraints.trim() || null,
+          allergies: allergies.trim() || null,
+          drinksAlcohol: boolFromTri(drinksAlcohol),
+          needsAccommodation,
+          accommodation: accommodation.trim() || null,
+          reservationDone,
+          hasVehicle,
+          needsLateTransport,
+          arrivalInfo: arrivalInfo.trim() || null,
+          guideSent,
+          addressChangeSent,
+          communicationJ30Sent,
+          communicationJ15Sent,
+          communicationJ3Sent,
+          culturalOrigin: culturalOrigin.trim() || null,
+          primaryLanguage: primaryLanguage.trim() || null,
+          inCortege,
+          hasCeremonialRole,
+          likelyTraditionalAttire,
+          notes: notes.trim() || null,
+        },
+      })
+      toast.success("Invité mis à jour.")
+      onSaved()
+    } catch (err) {
+      console.error("updateGuest error:", err)
+      toast.error("Erreur lors de la mise à jour. Réessaie.")
+    }
   }
 
   return (

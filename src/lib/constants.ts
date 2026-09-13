@@ -17,6 +17,7 @@
   MessageSquare,
   Gift,
   Lightbulb,
+  PiggyBank,
   type LucideIcon,
 } from "lucide-react"
 
@@ -82,6 +83,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Cadeaux", path: "/cadeaux", icon: Gift, capability: "view:cadeaux" },
   { label: "Documents", path: "/documents", icon: FolderOpen, capability: "view:documents" },
   { label: "Idées", path: "/idees", icon: Lightbulb, capability: "view:ideas", visibleToRoles: ["admin"] },
+  { label: "Budget", path: "/budget", icon: PiggyBank, capability: "view:budget", visibleToRoles: ["admin"] },
   { label: "Paramètres", path: "/parametres", icon: Settings, capability: "manage:settings" },
 ]
 

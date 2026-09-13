@@ -48,7 +48,7 @@ export function useUpdateCortegeGroup() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({
-      id, sequenceId, patch,
+      id, patch,
     }: { id: string; sequenceId: string; patch: Parameters<typeof cortegeService.updateGroup>[1] }) =>
       cortegeService.updateGroup(id, patch),
     onSuccess: (_, { sequenceId }) => qc.invalidateQueries({ queryKey: groupsKey(sequenceId) }),
@@ -86,7 +86,7 @@ export function useReorderCortegeGroups() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({
-      groups, sequenceId,
+      groups,
     }: { groups: { id: string; sortOrder: number }[]; sequenceId: string }) =>
       cortegeService.reorderGroups(groups),
     onSuccess: (_, { sequenceId }) => qc.invalidateQueries({ queryKey: groupsKey(sequenceId) }),

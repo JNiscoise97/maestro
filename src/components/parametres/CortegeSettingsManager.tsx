@@ -455,7 +455,7 @@ function SequenceEditor({
   const { data: config, isLoading } = useCortegeConfig(sequenceId)
   const save      = useSaveCortegeConfig()
   const duplicate = useDuplicateCortegeConfig()
-  const [dupOpen, setDupOpen] = useState(false)
+  const [, setDupOpen] = useState(false)
 
   const enabledRoles      = useMemo(() => new Set(config?.enabledRoles ?? []), [config])
   const cavalierCount     = config?.cavalierCount     ?? 0

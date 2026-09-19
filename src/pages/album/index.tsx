@@ -231,26 +231,16 @@ function AlbumGrid({ sequenceId }: { sequenceId: string }) {
     <div className="flex flex-col flex-1 min-h-0">
       {/* ── Sticky header ── */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-4 py-2 flex flex-col gap-2">
-        {/* Stats row */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="font-semibold tabular-nums text-sm">
-            ❤️ {mySelected}
-            <span className="text-muted-foreground font-normal">/{ALBUM_TARGET}</span>
+        {/* Row 1: progress + actions */}
+        <div className="flex items-center gap-2">
+          <span className="font-semibold tabular-nums text-sm shrink-0">
+            ❤️ {mySelected}<span className="text-muted-foreground font-normal text-xs">/{ALBUM_TARGET}</span>
           </span>
-          {otherName && (
-            <span className="text-sm text-muted-foreground tabular-nums">
-              {otherName} ❤️ {[...otherVotes.values()].filter(IS_SEL).length}
-            </span>
-          )}
-          {otherName && common > 0 && (
-            <span className="text-sm font-medium text-emerald-600 tabular-nums">
-              {common} en commun
-            </span>
-          )}
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {myVoted}/{photos.length} votées
+          <Progress value={(mySelected / ALBUM_TARGET) * 100} className="h-1.5 flex-1 max-w-28" />
+          <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+            {myVoted}/{photos.length}
           </span>
-          <div className="ml-auto flex gap-1.5">
+          <div className="ml-auto flex gap-1.5 shrink-0">
             {otherName && (
               <button
                 onClick={() => setShowPartner(v => !v)}
@@ -263,13 +253,17 @@ function AlbumGrid({ sequenceId }: { sequenceId: string }) {
                 {otherName}
               </button>
             )}
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setUploadOpen(true)}>
-              <Upload className="h-3 w-3 mr-1" /> Importer
-            </Button>
+            <button
+              onClick={() => setUploadOpen(true)}
+              className="flex items-center justify-center w-7 h-7 rounded-lg border border-border hover:bg-muted transition-colors"
+              title="Importer des photos"
+            >
+              <Upload className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
 
-        {/* Filter pills */}
+        {/* Row 2: filter pills */}
         <div className="flex gap-1.5 flex-wrap">
           {filterDefs.filter(f => f.show).map(f => (
             <button

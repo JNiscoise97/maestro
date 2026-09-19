@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { ChevronLeft, Upload, Images, GitMerge, Scissors, X, Check } from "lucide-react"
+import { ChevronLeft, Upload, Images, GitMerge, Scissors, X, Check, LayoutGrid } from "lucide-react"
 
 import { useIdentity } from "@/context/IdentityContext"
 import { useEventSequences } from "@/hooks/queries/use-event-sequences"
@@ -16,15 +16,15 @@ import { supabase } from "@/supabase/client"
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 type Rating = 1 | 2 | 3 | 4
-type Mode = "swipe" | "compare" | "tranche" | "upload"
+type Mode = "swipe" | "gallery" | "compare" | "tranche" | "upload"
 
 const ALBUM_TARGET = 50
 
 const RATINGS = [
-  { value: 1 as Rating, emoji: "🙈", label: "Non merci",    ring: "ring-slate-400",   bg: "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700" },
-  { value: 2 as Rating, emoji: "👎", label: "Pas vraiment", ring: "ring-orange-400",  bg: "bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/50 dark:hover:bg-orange-900/60" },
-  { value: 3 as Rating, emoji: "👍", label: "J'aime bien",  ring: "ring-emerald-400", bg: "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60" },
-  { value: 4 as Rating, emoji: "❤️", label: "J'adore",      ring: "ring-rose-400",    bg: "bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60" },
+  { value: 1 as Rating, emoji: "🙈", label: "Non merci",   ring: "ring-slate-500",   bg: "bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600",           text: "text-slate-800 dark:text-slate-100" },
+  { value: 2 as Rating, emoji: "👎🏾", label: "Neutre",      ring: "ring-slate-600",   bg: "bg-slate-600 hover:bg-slate-700 dark:bg-slate-500 dark:hover:bg-slate-400",           text: "text-white" },
+  { value: 3 as Rating, emoji: "👍🏾", label: "J'aime bien", ring: "ring-emerald-600", bg: "bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500",   text: "text-white" },
+  { value: 4 as Rating, emoji: "❤️", label: "J'adore",     ring: "ring-rose-500",    bg: "bg-rose-100 hover:bg-rose-200 dark:bg-rose-950/50 dark:hover:bg-rose-900/60",         text: "text-rose-700 dark:text-rose-300" },
 ] as const
 
 const IS_SEL = (r: Rating | undefined) => !!r && r >= 3
@@ -192,6 +192,13 @@ function SequenceAlbum({ sequenceId }: { sequenceId: string }) {
               <Images className="h-4 w-4 mr-1" /> Voter
             </Button>
             <Button
+              variant={mode === "gallery" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setMode("gallery")}
+            >
+              <LayoutGrid className="h-4 w-4 mr-1" /> Galerie
+            </Button>
+            <Button
               variant={mode === "compare" ? "default" : "outline"}
               size="sm"
               onClick={() => setMode("compare")}
@@ -250,6 +257,16 @@ function SequenceAlbum({ sequenceId }: { sequenceId: string }) {
           onVote={handleVote}
           onPrev={() => setIndex(i => Math.max(0, i - 1))}
           onNext={() => setIndex(i => Math.min(photos.length - 1, i + 1))}
+          onPreview={setPreview}
+        />
+      )}
+
+      {mode === "gallery" && photos.length > 0 && (
+        <GalleryPanel
+          photos={photos}
+          localVotes={localVotes}
+          otherVotes={otherVotes}
+          onPhotoClick={(i) => { setIndex(i); setMode("swipe") }}
           onPreview={setPreview}
         />
       )}
@@ -453,6 +470,7 @@ function SwipePanel({
             onClick={() => { onVote(photo.id, r.value); onNext() }}
             className={cn(
               "flex flex-col items-center gap-1 rounded-xl border-2 px-2 py-3 text-sm font-medium transition-all",
+              r.text,
               currentRating === r.value
                 ? `${r.ring} ring-2 ring-offset-1 ${r.bg}`
                 : `border-transparent ${r.bg}`,
@@ -707,6 +725,117 @@ function TranchagePanel({
           <ChevronLeft className="h-4 w-4 rotate-180" />
         </Button>
       </div>
+    </div>
+  )
+}
+
+// ── GalleryPanel ──────────────────────────────────────────────────────────────
+
+type GalleryFilter = "all" | "unvoted" | "selected" | "rejected"
+
+function GalleryPanel({
+  photos,
+  localVotes,
+  otherVotes,
+  onPhotoClick,
+  onPreview,
+}: {
+  photos: AlbumPhoto[]
+  localVotes: Map<string, Rating>
+  otherVotes: Map<string, Rating>
+  onPhotoClick: (index: number) => void
+  onPreview: (p: AlbumPhoto) => void
+}) {
+  const [filter, setFilter] = useState<GalleryFilter>("all")
+
+  const filtered = useMemo(() => {
+    switch (filter) {
+      case "unvoted":  return photos.filter(p => !localVotes.has(p.id))
+      case "selected": return photos.filter(p => IS_SEL(localVotes.get(p.id)))
+      case "rejected": return photos.filter(p => { const r = localVotes.get(p.id); return r !== undefined && !IS_SEL(r) })
+      default:         return photos
+    }
+  }, [photos, localVotes, filter])
+
+  const counts = useMemo(() => ({
+    all:      photos.length,
+    unvoted:  photos.filter(p => !localVotes.has(p.id)).length,
+    selected: photos.filter(p => IS_SEL(localVotes.get(p.id))).length,
+    rejected: photos.filter(p => { const r = localVotes.get(p.id); return r !== undefined && !IS_SEL(r) }).length,
+  }), [photos, localVotes])
+
+  const filters: { key: GalleryFilter; label: string }[] = [
+    { key: "all",      label: `Toutes (${counts.all})` },
+    { key: "unvoted",  label: `Non votées (${counts.unvoted})` },
+    { key: "selected", label: `❤️ Sélectionnées (${counts.selected})` },
+    { key: "rejected", label: `Refusées (${counts.rejected})` },
+  ]
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex gap-1.5 flex-wrap">
+        {filters.map(f => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={cn(
+              "px-3 py-1 text-xs rounded-lg border transition-colors",
+              filter === f.key ? "bg-secondary border-transparent font-medium" : "border-border hover:bg-muted",
+            )}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-1.5">
+        {filtered.map(p => {
+          const globalIdx = photos.indexOf(p)
+          const myR  = localVotes.get(p.id)
+          const thR  = otherVotes.get(p.id)
+          const rDef = myR !== undefined ? RATINGS.find(r => r.value === myR) : undefined
+
+          return (
+            <div
+              key={p.id}
+              className="relative aspect-square cursor-pointer group overflow-hidden rounded-lg"
+            >
+              <img
+                src={p.url}
+                alt={p.filename}
+                className="w-full h-full object-cover group-hover:opacity-80 transition"
+                onClick={() => onPhotoClick(globalIdx)}
+              />
+              {/* Rating badge */}
+              {rDef && (
+                <div className={cn(
+                  "absolute inset-0 rounded-lg border-2 pointer-events-none",
+                  IS_SEL(myR!) ? "border-emerald-500" : "border-slate-400/50",
+                )} />
+              )}
+              <div className="absolute bottom-0.5 right-0.5 flex gap-0.5 pointer-events-none">
+                {myR && <span className="text-xs leading-none drop-shadow">{RATINGS.find(r => r.value === myR)?.emoji}</span>}
+                {thR && <span className="text-xs leading-none drop-shadow">{RATINGS.find(r => r.value === thR)?.emoji}</span>}
+              </div>
+              {/* Unvoted indicator */}
+              {myR === undefined && (
+                <div className="absolute top-1 left-1 w-2 h-2 rounded-full bg-amber-400 pointer-events-none" />
+              )}
+              {/* Preview button on hover */}
+              <button
+                className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                onClick={e => { e.stopPropagation(); onPreview(p) }}
+              >
+                <span className="bg-black/50 rounded-full px-2 py-0.5 text-white text-xs">⤢</span>
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      {filtered.length === 0 && (
+        <p className="text-sm text-muted-foreground text-center py-8">Aucune photo dans cette catégorie.</p>
+      )}
     </div>
   )
 }

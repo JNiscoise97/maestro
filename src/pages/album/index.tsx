@@ -343,6 +343,7 @@ function PhotoCard({
   isActive,
   onActivate,
   onVote,
+  onDeleteVote,
   onLightbox,
 }: {
   photo: AlbumPhoto

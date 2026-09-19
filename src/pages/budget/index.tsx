@@ -83,11 +83,94 @@ function parseCsvLine(line: string): string[] {
 
 type ParsedRow = Omit<BudgetItem, "id" | "sortOrder">
 
-function parseCsv(text: string): ParsedRow[] {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim())
-  if (lines.length < 2) return []
-  const headers = parseCsvLine(lines[0]).map((h) => h.trim().toLowerCase())
+// ── Format "Inventaire fiançailles" ──────────────────────────────────────────
+// Colonnes : Item | Argent reçu | Argent à débourser | Déjà versé | Reste à payer | Provenance
 
+type FRaw = {
+  label: string
+  received: number | null
+  toSpend: number | null
+  paid: number | null
+  remaining: number | null
+  provenance: string | null
+}
+
+function parseCsvFiancailles(lines: string[]): ParsedRow[] {
+  const nonNull: FRaw[] = []
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCsvLine(lines[i])
+    const label = cols[0]?.trim() ?? ""
+    if (!label) continue
+    nonNull.push({
+      label,
+      received:   parseFrNumber(cols[1] ?? ""),
+      toSpend:    parseFrNumber(cols[2] ?? ""),
+      paid:       parseFrNumber(cols[3] ?? ""),
+      remaining:  parseFrNumber(cols[4] ?? ""),
+      provenance: cols[5]?.trim() || null,
+    })
+  }
+
+  // Candidate category header: all amount cols empty, short, no digits, no parens
+  const isCandidate = (r: FRaw) =>
+    r.received == null && r.toSpend == null && r.paid == null &&
+    r.remaining == null && !r.provenance &&
+    r.label.length <= 25 && !/\d/.test(r.label) && !r.label.includes("(")
+
+  // Two-pass: candidate is a real section header only if
+  // at least one row with amounts follows before the next candidate
+  const catIdx = new Set<number>()
+  for (let i = 0; i < nonNull.length; i++) {
+    if (!isCandidate(nonNull[i])) continue
+    let hasAmounts = false
+    for (let j = i + 1; j < nonNull.length; j++) {
+      const nx = nonNull[j]
+      if (isCandidate(nx)) break
+      if (nx.toSpend != null || nx.paid != null || nx.remaining != null) { hasAmounts = true; break }
+    }
+    if (hasAmounts) catIdx.add(i)
+  }
+
+  let currentCategory = ""
+  const result: ParsedRow[] = []
+  for (let i = 0; i < nonNull.length; i++) {
+    const r = nonNull[i]
+    if (catIdx.has(i)) { currentCategory = r.label; continue }
+    if (r.label.toUpperCase().startsWith("TOTAL")) continue
+    // Pure income rows (only "Argent reçu" filled, nothing to pay)
+    if (r.received != null && r.toSpend == null && r.paid == null && r.remaining == null) continue
+
+    // Compute estimated total when "Argent à débourser" is absent but paid+remaining are known
+    let estimatedTotal = r.toSpend
+    if (estimatedTotal == null && r.paid != null && r.remaining != null) {
+      estimatedTotal = r.paid + r.remaining
+    } else if (estimatedTotal == null && r.remaining != null && r.remaining > 0) {
+      estimatedTotal = (r.paid ?? 0) + r.remaining
+    }
+
+    result.push({
+      sequenceId:     null,
+      category:       currentCategory,
+      label:          r.label,
+      quantity:       null,
+      unitPrice:      null,
+      estimatedTotal,
+      actualTotal:    r.paid,
+      vendor:         null,
+      paidDate:       null,
+      account:        r.provenance,
+      origin:         null,
+      itemType:       null,
+      notes:          null,
+    })
+  }
+  return result
+}
+
+// ── Format générique (Produit / Catégorie / Unité / Prix unitaire / …) ────────
+
+function parseCsvGeneric(lines: string[]): ParsedRow[] {
+  const headers = parseCsvLine(lines[0]).map((h) => h.trim().toLowerCase())
   const idx = (names: string[]) => {
     for (const n of names) {
       const i = headers.findIndex((h) => h.includes(n))
@@ -95,45 +178,32 @@ function parseCsv(text: string): ParsedRow[] {
     }
     return -1
   }
-
-  const iLabel     = idx(["produit"])
-  const iCat       = idx(["cat"])
-  const iQty       = idx(["unit"])
-  const iPU        = idx(["prix unitaire", "prix"])
-  const iTotal     = idx(["total"])
-  const iEstim     = idx(["tarif", "estim"])
-  const iVendor    = idx(["enseigne"])
-  const iDate      = idx(["date"])
-  const iAccount   = idx(["compte"])
-  const iOrigin    = idx(["origine"])
-  const iType      = idx(["type"])
-  const iNotes     = idx(["notes"])
+  const iLabel   = idx(["produit"])
+  const iCat     = idx(["cat"])
+  const iQty     = idx(["unit"])
+  const iPU      = idx(["prix unitaire", "prix"])
+  const iTotal   = idx(["total"])
+  const iEstim   = idx(["tarif", "estim"])
+  const iVendor  = idx(["enseigne"])
+  const iDate    = idx(["date"])
+  const iAccount = idx(["compte"])
+  const iOrigin  = idx(["origine"])
+  const iType    = idx(["type"])
+  const iNotes   = idx(["notes"])
 
   const rows: ParsedRow[] = []
   for (let i = 1; i < lines.length; i++) {
     const cols = parseCsvLine(lines[i])
     const label = iLabel >= 0 ? cols[iLabel]?.trim() : ""
     if (!label) continue
-
-    // Si total estimé est sur la même colonne que total réel, on prend la bonne
-    // Le CSV a : ..., Total, Tarif estimé — on cherche les deux
-    let actualTotal    = iTotal >= 0 ? parseFrNumber(cols[iTotal] ?? "") : null
-    let estimatedTotal = iEstim >= 0 ? parseFrNumber(cols[iEstim] ?? "") : null
-
-    // Si les deux colonnes ne sont pas trouvées séparément, on prend la 5e et 6e
-    // (format du CSV fourni: col4=total, col5=tarif estimé mais la detection peut foirer)
-    // Sécurité : si estimé > actual et actual exist, c'est probablement l'inverse
-    if (actualTotal != null && estimatedTotal == null) estimatedTotal = null
-    if (actualTotal == null && estimatedTotal != null) { actualTotal = null }
-
     rows.push({
       sequenceId:     null,
       category:       (iCat >= 0 ? cols[iCat]?.trim() : "") || "",
       label,
-      quantity:       iQty  >= 0 ? parseFrNumber(cols[iQty]  ?? "") : null,
-      unitPrice:      iPU   >= 0 ? parseFrNumber(cols[iPU]   ?? "") : null,
-      estimatedTotal,
-      actualTotal,
+      quantity:       iQty    >= 0 ? parseFrNumber(cols[iQty]    ?? "") : null,
+      unitPrice:      iPU     >= 0 ? parseFrNumber(cols[iPU]     ?? "") : null,
+      estimatedTotal: iEstim  >= 0 ? parseFrNumber(cols[iEstim]  ?? "") : null,
+      actualTotal:    iTotal  >= 0 ? parseFrNumber(cols[iTotal]  ?? "") : null,
       vendor:         iVendor  >= 0 ? cols[iVendor]?.trim()  || null : null,
       paidDate:       iDate    >= 0 ? parseFrDate(cols[iDate] ?? "")  : null,
       account:        iAccount >= 0 ? cols[iAccount]?.trim() || null : null,
@@ -143,6 +213,20 @@ function parseCsv(text: string): ParsedRow[] {
     })
   }
   return rows
+}
+
+// ── Auto-détection du format ──────────────────────────────────────────────────
+
+function parseCsv(text: string): ParsedRow[] {
+  // Try both UTF-8 and latin-1 (garbled chars when opened as wrong encoding)
+  const lines = text.split(/\r?\n/).filter((l) => l.trim())
+  if (lines.length < 2) return []
+  const firstHeader = parseCsvLine(lines[0])[0]?.trim().toLowerCase() ?? ""
+  // "Item" ou "item" en première colonne → format inventaire fiançailles
+  if (firstHeader === "item" || firstHeader.startsWith("item")) {
+    return parseCsvFiancailles(lines)
+  }
+  return parseCsvGeneric(lines)
 }
 
 // ── Formulaire d'édition ──────────────────────────────────────────────────────
@@ -375,14 +459,25 @@ function ImportCsvDialog({
   function reset() { setParsed(null); setError(null); setSeqId(NONE) }
 
   function handleFile(file: File) {
+    const tryParse = (text: string) => {
+      const rows = parseCsv(text)
+      if (rows.length === 0) { setError("Aucune ligne valide trouvée dans le fichier."); return }
+      setParsed(rows)
+      setError(null)
+    }
+    // Try UTF-8 first; fall back to windows-1252 if the result looks garbled
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
         const text = e.target?.result as string
-        const rows = parseCsv(text)
-        if (rows.length === 0) { setError("Aucune ligne valide trouvée dans le fichier."); return }
-        setParsed(rows)
-        setError(null)
+        // Heuristic: garbled UTF-8 read as latin-1 produces sequences like "Ã©", "Ã ", "Ã§"
+        if (text.includes("Ã©") || text.includes("Ã ") || text.includes("Ã§") || text.includes("dÃ")) {
+          const r2 = new FileReader()
+          r2.onload = (e2) => { try { tryParse(e2.target?.result as string) } catch { setError("Erreur lors de la lecture du fichier.") } }
+          r2.readAsText(file, "windows-1252")
+        } else {
+          tryParse(text)
+        }
       } catch {
         setError("Erreur lors de la lecture du fichier.")
       }
@@ -454,32 +549,26 @@ function ImportCsvDialog({
                 <table className="w-full text-xs">
                   <thead className="bg-muted/50">
                     <tr>
-                      {["Poste","Catégorie","Qté","P.U.","Estimé","Réel","Enseigne","Date","Compte","Origine","Type"].map((h) => (
+                      {["Poste","Catégorie","Estimé","Payé","Compte"].map((h) => (
                         <th key={h} className="px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
-                    {parsed.slice(0, 20).map((row, i) => (
+                    {parsed.slice(0, 30).map((row, i) => (
                       <tr key={i} className="hover:bg-muted/20">
-                        <td className="px-3 py-1.5 font-medium max-w-[150px] truncate">{row.label}</td>
-                        <td className="px-3 py-1.5 text-muted-foreground">{row.category}</td>
-                        <td className="px-3 py-1.5 tabular-nums">{row.quantity ?? "—"}</td>
-                        <td className="px-3 py-1.5 tabular-nums">{row.unitPrice != null ? row.unitPrice : "—"}</td>
-                        <td className="px-3 py-1.5 tabular-nums">{row.estimatedTotal != null ? row.estimatedTotal : "—"}</td>
-                        <td className="px-3 py-1.5 tabular-nums">{row.actualTotal   != null ? row.actualTotal   : "—"}</td>
-                        <td className="px-3 py-1.5 text-muted-foreground">{row.vendor ?? "—"}</td>
-                        <td className="px-3 py-1.5 text-muted-foreground">{row.paidDate ?? "—"}</td>
-                        <td className="px-3 py-1.5">{row.account ?? "—"}</td>
-                        <td className="px-3 py-1.5 text-muted-foreground">{row.origin ?? "—"}</td>
-                        <td className="px-3 py-1.5 text-muted-foreground">{row.itemType ?? "—"}</td>
+                        <td className="px-3 py-1.5 font-medium max-w-[200px] truncate" title={row.label}>{row.label}</td>
+                        <td className="px-3 py-1.5 text-muted-foreground">{row.category || "—"}</td>
+                        <td className="px-3 py-1.5 tabular-nums">{row.estimatedTotal != null ? fmt(row.estimatedTotal) : "—"}</td>
+                        <td className="px-3 py-1.5 tabular-nums">{row.actualTotal   != null ? fmt(row.actualTotal)   : "—"}</td>
+                        <td className="px-3 py-1.5 text-muted-foreground">{row.account ?? "—"}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {parsed.length > 20 && (
+                {parsed.length > 30 && (
                   <p className="text-xs text-muted-foreground text-center py-2">
-                    … et {parsed.length - 20} ligne{parsed.length - 20 > 1 ? "s" : ""} supplémentaire{parsed.length - 20 > 1 ? "s" : ""}
+                    … et {parsed.length - 30} ligne{parsed.length - 30 > 1 ? "s" : ""} supplémentaire{parsed.length - 30 > 1 ? "s" : ""}
                   </p>
                 )}
               </div>

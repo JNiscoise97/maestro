@@ -25,6 +25,7 @@ import { MessagesPage } from "@/pages/messages"
 import { CadeauxPage } from "@/pages/cadeaux"
 import { IdeasPage } from "@/pages/ideas"
 import { BudgetPage } from "@/pages/budget"
+import { AlbumPage } from "@/pages/album"
 import { NotFoundPage } from "@/pages/not-found"
 import { RsvpPage } from "@/pages/rsvp"
 import { RsvpInvitationPage } from "@/pages/rsvp/invitation"
@@ -165,6 +166,14 @@ export function AppRoutes() {
             element={
               <RoleGuard capability="view:budget">
                 <BudgetPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="album"
+            element={
+              <RoleGuard capability="view:album">
+                <AlbumPage />
               </RoleGuard>
             }
           />

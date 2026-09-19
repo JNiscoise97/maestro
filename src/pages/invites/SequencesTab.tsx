@@ -83,6 +83,18 @@ export function SequencesTab() {
     return map
   }, [assignedPairs])
 
+  // Parmi les assignés, combien sont probablement absents
+  const absentBySeq = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const g of guests) {
+      if (!g.likelyAbsent) continue
+      for (const seqId of (assignedByGuest[g.id] ?? [])) {
+        map.set(seqId, (map.get(seqId) ?? 0) + 1)
+      }
+    }
+    return map
+  }, [guests, assignedByGuest])
+
   // Invités filtrés (base commune mobile + desktop)
   const allFilteredGuests = useMemo(() => {
     const q = nameSearch.trim().toLowerCase()
@@ -272,10 +284,12 @@ export function SequencesTab() {
       {/* Sélecteur séquence */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         {sorted.map((seq) => {
-          const active  = mobileSeqId === seq.id
-          const checked = filteredBySeq.get(seq.id) ?? 0
-          const total   = totalBySeq.get(seq.id) ?? 0
-          const date    = seq.eventDate
+          const active   = mobileSeqId === seq.id
+          const checked  = filteredBySeq.get(seq.id) ?? 0
+          const total    = totalBySeq.get(seq.id) ?? 0
+          const absent   = absentBySeq.get(seq.id) ?? 0
+          const expected = total - absent
+          const date     = seq.eventDate
             ? new Date(seq.eventDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })
             : null
           return (
@@ -293,6 +307,11 @@ export function SequencesTab() {
               <span className={`text-[10px] font-medium mt-1 tabular-nums ${active ? "text-primary-foreground/80" : "text-primary"}`}>
                 {checked}/{total} invité{total > 1 ? "s" : ""}
               </span>
+              {absent > 0 && (
+                <span className={`text-[10px] tabular-nums mt-0.5 ${active ? "text-primary-foreground/70" : "text-amber-500"}`}>
+                  ≈ {expected} attendus
+                </span>
+              )}
             </button>
           )
         })}
@@ -324,11 +343,19 @@ export function SequencesTab() {
                 {/* Invités */}
                 {deduped.map((guest) => {
                   const partners = partnersIn(guest, filtered)
-                  const names    = [guest, ...partners].map((g) => g.fullName).join(" & ")
                   const checked  = assignedPairs.has(`${guest.id}:${mobileSeqId}`)
+                  const absent   = guest.likelyAbsent || partners.some((p) => p.likelyAbsent)
                   return (
-                    <label key={guest.id} className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/10 active:bg-muted/20">
-                      <span className="text-sm pr-4">{names}</span>
+                    <label key={guest.id} className={`flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/10 active:bg-muted/20 ${absent ? "opacity-60" : ""}`}>
+                      <span className="text-sm pr-4 flex items-center gap-1.5 flex-wrap">
+                        {[guest, ...partners].map((g, i) => (
+                          <span key={g.id}>
+                            {i > 0 && " & "}
+                            <span className={g.likelyAbsent ? "line-through text-muted-foreground/60" : undefined}>{g.fullName}</span>
+                          </span>
+                        ))}
+                        {absent && <span className="text-[10px] rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 px-1.5 py-0.5 font-medium">~absent</span>}
+                      </span>
                       <input
                         type="checkbox"
                         checked={checked}
@@ -358,11 +385,19 @@ export function SequencesTab() {
                 </div>
                 {deduped.map((guest) => {
                   const partners = partnersIn(guest, filtered)
-                  const names    = [guest, ...partners].map((g) => g.fullName).join(" & ")
                   const checked  = assignedPairs.has(`${guest.id}:${mobileSeqId}`)
+                  const absent   = guest.likelyAbsent || partners.some((p) => p.likelyAbsent)
                   return (
-                    <label key={guest.id} className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/10">
-                      <span className="text-sm pr-4">{names}</span>
+                    <label key={guest.id} className={`flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/10 ${absent ? "opacity-60" : ""}`}>
+                      <span className="text-sm pr-4 flex items-center gap-1.5 flex-wrap">
+                        {[guest, ...partners].map((g, i) => (
+                          <span key={g.id}>
+                            {i > 0 && " & "}
+                            <span className={g.likelyAbsent ? "line-through text-muted-foreground/60" : undefined}>{g.fullName}</span>
+                          </span>
+                        ))}
+                        {absent && <span className="text-[10px] rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 px-1.5 py-0.5 font-medium">~absent</span>}
+                      </span>
                       <input type="checkbox" checked={checked} onChange={() => toggleGuest(guest.id, mobileSeqId)}
                         className="size-5 cursor-pointer rounded border-border accent-primary flex-shrink-0" />
                     </label>
@@ -384,7 +419,8 @@ export function SequencesTab() {
   const desktopView = (
     <div className="hidden md:block space-y-3">
       {filterBar}
-      <div className="overflow-x-auto rounded-xl border border-border">
+      <div className="rounded-xl border border-border">
+        <div className="overflow-auto max-h-[calc(100vh-260px)]">
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="border-b border-border bg-muted">
@@ -393,7 +429,12 @@ export function SequencesTab() {
               </th>
               {sorted.map((seq) => (
                 <th key={seq.id} className="sticky top-0 z-20 bg-muted px-2 py-2 text-center min-w-[100px] max-w-[140px]">
-                  <DesktopSeqHeader seq={seq} visible={filteredBySeq.get(seq.id) ?? 0} total={totalBySeq.get(seq.id) ?? 0} />
+                  <DesktopSeqHeader
+                    seq={seq}
+                    visible={filteredBySeq.get(seq.id) ?? 0}
+                    total={totalBySeq.get(seq.id) ?? 0}
+                    absent={absentBySeq.get(seq.id) ?? 0}
+                  />
                 </th>
               ))}
             </tr>
@@ -450,6 +491,7 @@ export function SequencesTab() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
@@ -464,17 +506,25 @@ export function SequencesTab() {
 
 // ── Composants desktop ─────────────────────────────────────────────────────────
 
-function DesktopSeqHeader({ seq, visible, total }: { seq: EventSequence; visible: number; total: number }) {
+function DesktopSeqHeader({ seq, visible, total, absent }: {
+  seq: EventSequence; visible: number; total: number; absent: number
+}) {
   const date = seq.eventDate
     ? new Date(seq.eventDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })
     : null
+  const expected = total - absent
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-0.5">
       <span className="text-[11px] font-semibold leading-snug text-center">{seq.name}</span>
       {date && <span className="text-[10px] text-muted-foreground font-normal">{date}</span>}
       <span className="text-[10px] font-medium text-primary tabular-nums">
         {visible}/{total} invité{total > 1 ? "s" : ""}
       </span>
+      {absent > 0 && (
+        <span className="text-[10px] tabular-nums text-amber-500 font-medium">
+          ≈ {expected} attendus
+        </span>
+      )}
     </div>
   )
 }
@@ -521,10 +571,23 @@ function DesktopGuestRow({ guest, partners, sequences, assignedPairs, onToggle }
   guest: Guest; partners: Guest[]; sequences: EventSequence[]
   assignedPairs: Set<string>; onToggle: (id: string, seqId: string) => void
 }) {
-  const names = [guest, ...partners].map((g) => g.fullName).join(" & ")
+  const absent = guest.likelyAbsent || partners.some((p) => p.likelyAbsent)
+  const nameNodes = [guest, ...partners].map((g, i) => (
+    <span key={g.id}>
+      {i > 0 && " & "}
+      <span className={g.likelyAbsent ? "line-through text-muted-foreground/60" : undefined}>
+        {g.fullName}
+      </span>
+    </span>
+  ))
   return (
-    <tr className="border-t border-border/40 hover:bg-muted/20 transition-colors">
-      <td className="sticky left-0 z-10 bg-card px-3 py-2 text-sm">{names}</td>
+    <tr className={`border-t border-border/40 hover:bg-muted/20 transition-colors ${absent ? "opacity-60" : ""}`}>
+      <td className="sticky left-0 z-10 bg-card px-3 py-2 text-sm">
+        <span className="flex items-center gap-1.5">
+          {nameNodes}
+          {absent && <span className="text-[10px] rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 px-1.5 py-0.5 font-medium shrink-0">~absent</span>}
+        </span>
+      </td>
       {sequences.map((seq) => (
         <td key={seq.id} className="px-3 py-2 text-center">
           <input type="checkbox" checked={assignedPairs.has(`${guest.id}:${seq.id}`)}

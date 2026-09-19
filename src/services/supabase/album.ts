@@ -111,6 +111,15 @@ export const albumService = {
       )
     if (error) throw error
   },
+
+  async deleteVote(photoId: string, voterId: string): Promise<void> {
+    const { error } = await db
+      .from(tbl("album_votes"))
+      .delete()
+      .eq("photo_id", photoId)
+      .eq("voter_id", voterId)
+    if (error) throw error
+  },
 }
 
 export async function compressImage(file: File, maxPx = 1500, quality = 0.82): Promise<Blob> {

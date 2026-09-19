@@ -4,7 +4,7 @@ import { Upload, X, Maximize2, Eye, EyeOff } from "lucide-react"
 
 import { useIdentity } from "@/context/IdentityContext"
 import { useEventSequences } from "@/hooks/queries/use-event-sequences"
-import { useAlbumPhotos, useAlbumVotes, useAlbumVote } from "@/hooks/queries/use-album"
+import { useAlbumPhotos, useAlbumVotes, useAlbumVote, useDeleteAlbumVote } from "@/hooks/queries/use-album"
 import { albumService, compressImage } from "@/services/supabase/album"
 import type { AlbumPhoto } from "@/services/supabase/album"
 import { Button } from "@/components/ui/button"
@@ -68,6 +68,7 @@ function AlbumGrid({ sequenceId }: { sequenceId: string }) {
   const { data: rawPhotos = [], isLoading } = useAlbumPhotos(sequenceId)
   const { data: allVotes  = [] }            = useAlbumVotes(sequenceId)
   const voteMutation                        = useAlbumVote(sequenceId)
+  const deleteMutation                      = useDeleteAlbumVote(sequenceId)
 
   // Natural sort
   const photos = useMemo(
@@ -111,6 +112,13 @@ function AlbumGrid({ sequenceId }: { sequenceId: string }) {
     setActiveId(null)
     voteMutation.mutate({ photoId, voterId: person.id, voterName: person.fullName, rating })
   }, [person, voteMutation])
+
+  const handleDeleteVote = useCallback((photoId: string) => {
+    if (!person) return
+    setLocalVotes(prev => { const next = new Map(prev); next.delete(photoId); return next })
+    setActiveId(null)
+    deleteMutation.mutate({ photoId, voterId: person.id })
+  }, [person, deleteMutation])
 
   const handleUpload = useCallback(async (files: FileList) => {
     if (!person) return
@@ -297,6 +305,7 @@ function AlbumGrid({ sequenceId }: { sequenceId: string }) {
               isActive={activeId === photo.id}
               onActivate={() => setActiveId(id => id === photo.id ? null : photo.id)}
               onVote={rating => handleVote(photo.id, rating)}
+              onDeleteVote={() => handleDeleteVote(photo.id)}
               onLightbox={() => { setActiveId(null); setLightbox(photo) }}
             />
           ))}
@@ -343,6 +352,7 @@ function PhotoCard({
   isActive: boolean
   onActivate: () => void
   onVote: (r: Rating) => void
+  onDeleteVote: () => void
   onLightbox: () => void
 }) {
   return (
@@ -416,12 +426,12 @@ function PhotoCard({
             {RATINGS.map(r => (
               <button
                 key={r.value}
-                onClick={() => onVote(r.value)}
-                title={r.label}
+                onClick={() => myRating === r.value ? onDeleteVote() : onVote(r.value)}
+                title={myRating === r.value ? "Annuler le vote" : r.label}
                 className={cn(
                   "flex items-center justify-center rounded-lg py-2 text-xl leading-none transition-all",
                   myRating === r.value
-                    ? "bg-white shadow-lg scale-110"
+                    ? "bg-white shadow-lg scale-110 ring-2 ring-white/60"
                     : "bg-black/60 hover:bg-black/30",
                 )}
               >

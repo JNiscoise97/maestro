@@ -42,6 +42,17 @@ export function useAlbumVote(sequenceId: string | null) {
   })
 }
 
+export function useDeleteAlbumVote(sequenceId: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ photoId, voterId }: { photoId: string; voterId: string }) =>
+      albumService.deleteVote(photoId, voterId),
+    onSuccess: () => {
+      if (sequenceId) qc.invalidateQueries({ queryKey: votesKey(sequenceId) })
+    },
+  })
+}
+
 export function useDeleteAlbumPhoto(sequenceId: string | null) {
   const qc = useQueryClient()
   return useMutation({

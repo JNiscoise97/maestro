@@ -102,38 +102,6 @@ function AlbumGrid({ sequenceId }: { sequenceId: string }) {
   const [uploadOpen,  setUploadOpen]  = useState(false)
   const [dlProgress,  setDlProgress]  = useState<{ done: number; total: number } | null>(null)
 
-  // Download all visible photos
-  const handleDownloadAll = useCallback(async () => {
-    if (!filtered.length || dlProgress) return
-    setDlProgress({ done: 0, total: filtered.length })
-    try {
-      const files: File[] = []
-      for (let i = 0; i < filtered.length; i++) {
-        setDlProgress({ done: i, total: filtered.length })
-        const res  = await fetch(filtered[i].url)
-        const blob = await res.blob()
-        files.push(new File([blob], filtered[i].filename, { type: blob.type || "image/jpeg" }))
-      }
-      setDlProgress({ done: filtered.length, total: filtered.length })
-
-      if (typeof navigator.canShare === "function" && navigator.canShare({ files })) {
-        await navigator.share({ files, title: "Album photos" })
-      } else {
-        for (const file of files) {
-          const url = URL.createObjectURL(file)
-          const a   = Object.assign(document.createElement("a"), { href: url, download: file.name })
-          a.click()
-          URL.revokeObjectURL(url)
-          await new Promise<void>(r => setTimeout(r, 80))
-        }
-      }
-    } catch (err) {
-      if ((err as Error)?.name !== "AbortError") console.error("Download error", err)
-    } finally {
-      setDlProgress(null)
-    }
-  }, [filtered, dlProgress])
-
   // Upload state
   const [uploading,       setUploading]       = useState(false)
   const [uploadProgress,  setUploadProgress]  = useState<{ done: number; total: number; label: string } | null>(null)
@@ -200,6 +168,38 @@ function AlbumGrid({ sequenceId }: { sequenceId: string }) {
       default: return photos
     }
   }, [photos, localVotes, otherVotes, filter])
+
+  // Download all visible photos
+  const handleDownloadAll = useCallback(async () => {
+    if (!filtered.length || dlProgress) return
+    setDlProgress({ done: 0, total: filtered.length })
+    try {
+      const files: File[] = []
+      for (let i = 0; i < filtered.length; i++) {
+        setDlProgress({ done: i, total: filtered.length })
+        const res  = await fetch(filtered[i].url)
+        const blob = await res.blob()
+        files.push(new File([blob], filtered[i].filename, { type: blob.type || "image/jpeg" }))
+      }
+      setDlProgress({ done: filtered.length, total: filtered.length })
+
+      if (typeof navigator.canShare === "function" && navigator.canShare({ files })) {
+        await navigator.share({ files, title: "Album photos" })
+      } else {
+        for (const file of files) {
+          const url = URL.createObjectURL(file)
+          const a   = Object.assign(document.createElement("a"), { href: url, download: file.name })
+          a.click()
+          URL.revokeObjectURL(url)
+          await new Promise<void>(r => setTimeout(r, 80))
+        }
+      }
+    } catch (err) {
+      if ((err as Error)?.name !== "AbortError") console.error("Download error", err)
+    } finally {
+      setDlProgress(null)
+    }
+  }, [filtered, dlProgress])
 
   // Stats
   const mySelected    = useMemo(() => [...localVotes.values()].filter(IS_SEL).length, [localVotes])

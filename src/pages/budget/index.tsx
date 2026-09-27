@@ -167,6 +167,7 @@ function parseCsvFiancailles(lines: string[]): ParsedRow[] {
     }
 
     result.push({
+      parentId:       null,
       sequenceId:     null,
       category:       currentCategory,
       label:          r.label,
@@ -215,6 +216,7 @@ function parseCsvGeneric(lines: string[]): ParsedRow[] {
     const label = iLabel >= 0 ? cols[iLabel]?.trim() : ""
     if (!label) continue
     rows.push({
+      parentId:       null,
       sequenceId:     null,
       category:       (iCat >= 0 ? cols[iCat]?.trim() : "") || "",
       label,

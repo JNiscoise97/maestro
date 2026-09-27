@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { Upload, X, Maximize2, Eye, EyeOff } from "lucide-react"
+import { Download, Upload, X, Maximize2, Eye, EyeOff } from "lucide-react"
 
 import { useIdentity } from "@/context/IdentityContext"
 import { useEventSequences } from "@/hooks/queries/use-event-sequences"
@@ -100,6 +100,39 @@ function AlbumGrid({ sequenceId }: { sequenceId: string }) {
   const [activeId,    setActiveId]    = useState<string | null>(null)
   const [lightbox,    setLightbox]    = useState<AlbumPhoto | null>(null)
   const [uploadOpen,  setUploadOpen]  = useState(false)
+  const [dlProgress,  setDlProgress]  = useState<{ done: number; total: number } | null>(null)
+
+  // Download all visible photos
+  const handleDownloadAll = useCallback(async () => {
+    if (!filtered.length || dlProgress) return
+    setDlProgress({ done: 0, total: filtered.length })
+    try {
+      const files: File[] = []
+      for (let i = 0; i < filtered.length; i++) {
+        setDlProgress({ done: i, total: filtered.length })
+        const res  = await fetch(filtered[i].url)
+        const blob = await res.blob()
+        files.push(new File([blob], filtered[i].filename, { type: blob.type || "image/jpeg" }))
+      }
+      setDlProgress({ done: filtered.length, total: filtered.length })
+
+      if (typeof navigator.canShare === "function" && navigator.canShare({ files })) {
+        await navigator.share({ files, title: "Album photos" })
+      } else {
+        for (const file of files) {
+          const url = URL.createObjectURL(file)
+          const a   = Object.assign(document.createElement("a"), { href: url, download: file.name })
+          a.click()
+          URL.revokeObjectURL(url)
+          await new Promise<void>(r => setTimeout(r, 80))
+        }
+      }
+    } catch (err) {
+      if ((err as Error)?.name !== "AbortError") console.error("Download error", err)
+    } finally {
+      setDlProgress(null)
+    }
+  }, [filtered, dlProgress])
 
   // Upload state
   const [uploading,       setUploading]       = useState(false)
@@ -240,7 +273,12 @@ function AlbumGrid({ sequenceId }: { sequenceId: string }) {
           <span className="text-xs text-muted-foreground tabular-nums shrink-0">
             {myVoted}/{photos.length}
           </span>
-          <div className="ml-auto flex gap-1.5 shrink-0">
+          <div className="ml-auto flex items-center gap-1.5 shrink-0">
+            {dlProgress && (
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {dlProgress.done}/{dlProgress.total}
+              </span>
+            )}
             {otherName && (
               <button
                 onClick={() => setShowPartner(v => !v)}
@@ -253,6 +291,17 @@ function AlbumGrid({ sequenceId }: { sequenceId: string }) {
                 {otherName}
               </button>
             )}
+            <button
+              onClick={handleDownloadAll}
+              disabled={!!dlProgress}
+              className="flex items-center justify-center w-7 h-7 rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-40"
+              title={`Télécharger les ${filtered.length} photos`}
+            >
+              {dlProgress
+                ? <span className="block h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground animate-spin" />
+                : <Download className="h-3.5 w-3.5" />
+              }
+            </button>
             <button
               onClick={() => setUploadOpen(true)}
               className="flex items-center justify-center w-7 h-7 rounded-lg border border-border hover:bg-muted transition-colors"

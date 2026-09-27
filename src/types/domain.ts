@@ -337,6 +337,7 @@ export interface Idea {
   category?: string | null
   status: IdeaStatus
   notes?: string | null
+  sequenceId?: string | null
   createdAt: string
 }
 

@@ -13,6 +13,7 @@ type IdeaRow = {
   category: string | null
   status: IdeaStatus
   notes: string | null
+  sequence_id: string | null
   created_at: string
 }
 
@@ -26,6 +27,7 @@ function toIdea(r: IdeaRow): Idea {
     category: r.category,
     status: r.status,
     notes: r.notes,
+    sequenceId: r.sequence_id,
     createdAt: r.created_at,
   }
 }
@@ -48,6 +50,7 @@ export const ideasService = {
     category?: string | null
     status?: IdeaStatus
     notes?: string | null
+    sequenceId?: string | null
   }): Promise<Idea> {
     const { data, error } = await db
       .from(tbl("ideas") as any)
@@ -59,6 +62,7 @@ export const ideasService = {
         category: payload.category ?? null,
         status: payload.status ?? "to_study",
         notes: payload.notes ?? null,
+        sequence_id: payload.sequenceId ?? null,
       })
       .select("*")
       .single()
@@ -74,6 +78,7 @@ export const ideasService = {
     category: string | null
     status: IdeaStatus
     notes: string | null
+    sequenceId: string | null
   }>): Promise<Idea> {
     const row: Partial<Record<string, unknown>> = {}
     if (patch.title !== undefined) row.title = patch.title
@@ -83,6 +88,7 @@ export const ideasService = {
     if (patch.category !== undefined) row.category = patch.category
     if (patch.status !== undefined) row.status = patch.status
     if (patch.notes !== undefined) row.notes = patch.notes
+    if (patch.sequenceId !== undefined) row.sequence_id = patch.sequenceId
     const { data, error } = await db
       .from(tbl("ideas") as any)
       .update(row)

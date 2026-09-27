@@ -3,6 +3,7 @@ import { Lightbulb, Plus, Trash2 } from "lucide-react"
 
 import type { Idea, IdeaSource, IdeaStatus } from "@/types/domain"
 import { useIdeas, useCreateIdea, useUpdateIdea, useDeleteIdea } from "@/hooks/queries/use-ideas"
+import { useEventSequences } from "@/hooks/queries/use-event-sequences"
 import { PageHeader } from "@/components/shared/PageHeader"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
@@ -55,6 +56,7 @@ function IdeaSheet({ idea, open, onClose }: IdeaSheetProps) {
   const create = useCreateIdea()
   const update = useUpdateIdea()
   const del = useDeleteIdea()
+  const { data: sequences = [] } = useEventSequences()
 
   const [title, setTitle] = useState(idea?.title ?? "")
   const [description, setDescription] = useState(idea?.description ?? "")
@@ -63,6 +65,7 @@ function IdeaSheet({ idea, open, onClose }: IdeaSheetProps) {
   const [category, setCategory] = useState(idea?.category ?? "")
   const [status, setStatus] = useState<IdeaStatus>(idea?.status ?? "to_study")
   const [notes, setNotes] = useState(idea?.notes ?? "")
+  const [sequenceId, setSequenceId] = useState<string | null>(idea?.sequenceId ?? null)
 
   // Reset quand l'idée change
   function resetToIdea(i?: Idea | null) {
@@ -73,6 +76,7 @@ function IdeaSheet({ idea, open, onClose }: IdeaSheetProps) {
     setCategory(i?.category ?? "")
     setStatus(i?.status ?? "to_study")
     setNotes(i?.notes ?? "")
+    setSequenceId(i?.sequenceId ?? null)
   }
 
   function handleOpenChange(v: boolean) {
@@ -92,6 +96,7 @@ function IdeaSheet({ idea, open, onClose }: IdeaSheetProps) {
       category: category.trim() || null,
       status,
       notes: notes.trim() || null,
+      sequenceId: sequenceId || null,
     }
     if (idea) {
       await update.mutateAsync({ id: idea.id, patch: payload })
@@ -196,6 +201,24 @@ function IdeaSheet({ idea, open, onClose }: IdeaSheetProps) {
             </div>
           </div>
 
+          {/* Séquence */}
+          {sequences.length > 0 && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Séquence</label>
+              <Select value={sequenceId ?? "__none__"} onValueChange={v => setSequenceId(v === "__none__" ? null : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Toutes séquences" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Toutes séquences</SelectItem>
+                  {sequences.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Notes */}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">Notes / Décision</label>
@@ -235,7 +258,7 @@ function IdeaSheet({ idea, open, onClose }: IdeaSheetProps) {
 
 // ── Carte idée ─────────────────────────────────────────────────────────────────
 
-function IdeaCard({ idea, onClick }: { idea: Idea; onClick: () => void }) {
+function IdeaCard({ idea, sequenceName, onClick }: { idea: Idea; sequenceName?: string; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -263,6 +286,11 @@ function IdeaCard({ idea, onClick }: { idea: Idea; onClick: () => void }) {
             {idea.category}
           </span>
         )}
+        {sequenceName && (
+          <span className="rounded-full px-2 py-0.5 text-[10px] bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-400">
+            {sequenceName}
+          </span>
+        )}
       </div>
 
       {idea.notes && (
@@ -280,13 +308,18 @@ type StatusFilter = "all" | IdeaStatus
 
 export function IdeasPage() {
   const { data: ideas = [], isLoading } = useIdeas()
+  const { data: sequences = [] } = useEventSequences()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [sourceFilter, setSourceFilter] = useState<IdeaSource | "all">("all")
+  const [seqFilter, setSeqFilter] = useState<string | "all">("all")
   const [sheetIdea, setSheetIdea] = useState<Idea | null | undefined>(undefined)
+
+  const seqMap = new Map(sequences.map(s => [s.id, s.name]))
 
   const filtered = ideas
     .filter((i) => statusFilter === "all" || i.status === statusFilter)
     .filter((i) => sourceFilter === "all" || i.source === sourceFilter)
+    .filter((i) => seqFilter === "all" || i.sequenceId === seqFilter)
 
   const countByStatus = (s: IdeaStatus) => ideas.filter((i) => i.status === s).length
 
@@ -338,6 +371,24 @@ export function IdeasPage() {
               </Button>
             ))}
           </div>
+          {sequences.length > 1 && (
+            <div className="flex flex-wrap gap-2">
+              {([{ id: "all", name: "Toutes séquences" }, ...sequences]).map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSeqFilter(s.id)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    seqFilter === s.id
+                      ? "bg-foreground text-background"
+                      : "bg-muted text-muted-foreground hover:bg-muted/60"
+                  }`}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
             {(["all", ...SOURCES] as const).map((s) => (
               <button
@@ -383,7 +434,7 @@ export function IdeasPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((idea) => (
-            <IdeaCard key={idea.id} idea={idea} onClick={() => setSheetIdea(idea)} />
+            <IdeaCard key={idea.id} idea={idea} sequenceName={idea.sequenceId ? seqMap.get(idea.sequenceId) : undefined} onClick={() => setSheetIdea(idea)} />
           ))}
         </div>
       )}

@@ -4,7 +4,7 @@ import { tbl } from "@/lib/event"
 const db = supabase! as any
 
 export type FilmConfig = {
-  videoUrl: string | null
+  masterCode: string | null
 }
 
 export type FilmGroup = {
@@ -12,6 +12,13 @@ export type FilmGroup = {
   name: string
   code: string
   introMessage: string | null
+  sortOrder: number
+}
+
+export type FilmVideo = {
+  id: string
+  title: string
+  url: string
   sortOrder: number
 }
 
@@ -33,7 +40,18 @@ function fromGroup(r: any): FilmGroup {
   }
 }
 
+function fromVideo(r: any): FilmVideo {
+  return {
+    id:        r.id,
+    title:     r.title,
+    url:       r.url,
+    sortOrder: r.sort_order ?? 0,
+  }
+}
+
 export const filmService = {
+
+  // ── Config ──────────────────────────────────────────────────────────────────
 
   async getConfig(): Promise<FilmConfig> {
     const { data, error } = await db
@@ -42,15 +60,54 @@ export const filmService = {
       .eq("id", "main")
       .maybeSingle()
     if (error) throw error
-    return { videoUrl: data?.video_url ?? null }
+    return { masterCode: data?.master_code ?? null }
   },
 
-  async setConfig(config: FilmConfig): Promise<void> {
-    const { error } = await db
-      .from(tbl("film_config"))
-      .upsert({ id: "main", video_url: config.videoUrl, updated_at: new Date().toISOString() })
+  async setConfig(config: Partial<FilmConfig>): Promise<void> {
+    const row: Record<string, unknown> = { id: "main", updated_at: new Date().toISOString() }
+    if (config.masterCode !== undefined) row.master_code = config.masterCode
+    const { error } = await db.from(tbl("film_config")).upsert(row)
     if (error) throw error
   },
+
+  // ── Videos ──────────────────────────────────────────────────────────────────
+
+  async listVideos(): Promise<FilmVideo[]> {
+    const { data, error } = await db
+      .from(tbl("film_videos"))
+      .select("*")
+      .order("sort_order")
+      .order("created_at")
+    if (error) throw error
+    return (data ?? []).map(fromVideo)
+  },
+
+  async createVideo(video: Omit<FilmVideo, "id">): Promise<FilmVideo> {
+    const { data, error } = await db
+      .from(tbl("film_videos"))
+      .insert({ title: video.title, url: video.url, sort_order: video.sortOrder })
+      .select()
+      .single()
+    if (error) throw error
+    return fromVideo(data)
+  },
+
+  async updateVideo(id: string, patch: Partial<Omit<FilmVideo, "id">>): Promise<void> {
+    const row: Record<string, unknown> = {}
+    if (patch.title     !== undefined) row.title      = patch.title
+    if (patch.url       !== undefined) row.url        = patch.url
+    if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
+    if (!Object.keys(row).length) return
+    const { error } = await db.from(tbl("film_videos")).update(row).eq("id", id)
+    if (error) throw error
+  },
+
+  async deleteVideo(id: string): Promise<void> {
+    const { error } = await db.from(tbl("film_videos")).delete().eq("id", id)
+    if (error) throw error
+  },
+
+  // ── Groups ──────────────────────────────────────────────────────────────────
 
   async listGroups(): Promise<FilmGroup[]> {
     const { data, error } = await db
@@ -103,6 +160,8 @@ export const filmService = {
     return data ? fromGroup(data) : null
   },
 
+  // ── Views ───────────────────────────────────────────────────────────────────
+
   async logView(groupId: string, viewerName: string): Promise<void> {
     const { error } = await db
       .from(tbl("film_views"))
@@ -119,11 +178,11 @@ export const filmService = {
     if (e2) throw e2
     const groupMap = new Map<string, string>((groups ?? []).map((g: any) => [g.id, g.name]))
     return (views ?? []).map((r: any) => ({
-      id:          r.id,
-      groupId:     r.group_id,
-      groupName:   groupMap.get(r.group_id) ?? "—",
-      viewerName:  r.viewer_name,
-      playedAt:    r.played_at,
+      id:         r.id,
+      groupId:    r.group_id,
+      groupName:  groupMap.get(r.group_id) ?? "—",
+      viewerName: r.viewer_name,
+      playedAt:   r.played_at,
     }))
   },
 }

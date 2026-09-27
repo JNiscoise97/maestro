@@ -170,9 +170,9 @@ function AccessForm({ onAccess }: { onAccess: (name: string, group: FilmGroup) =
             <OrnamentalDivider />
             <h1
               className="text-base font-medium tracking-wide"
-              style={{ fontFamily: "var(--font-heading)", color: "var(--brun)" }}
+              style={{ fontFamily: ARIAL, color: "var(--brun)" }}
             >
-              Notre film
+              Notre teaser
             </h1>
           </div>
 
@@ -248,7 +248,7 @@ function AccessForm({ onAccess }: { onAccess: (name: string, group: FilmGroup) =
                 opacity: loading || !name.trim() || !code.trim() ? 0.45 : 1,
               }}
             >
-              {loading ? "Vérification…" : "Regarder le film →"}
+              {loading ? "Vérification…" : "Regarder le teaser →"}
             </button>
           </form>
         </div>
@@ -346,7 +346,7 @@ function WatchScreen({
           <div className="mt-5">
             <p
               style={{
-                fontFamily: "var(--font-heading)",
+                fontFamily: ARIAL,
                 textAlign: "justify",
                 fontSize: "1rem",
                 lineHeight: 1.9,

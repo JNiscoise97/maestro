@@ -101,6 +101,7 @@ function AlbumGrid({ sequenceId }: { sequenceId: string }) {
   const [lightbox,    setLightbox]    = useState<AlbumPhoto | null>(null)
   const [uploadOpen,  setUploadOpen]  = useState(false)
   const [dlProgress,  setDlProgress]  = useState<{ done: number; total: number } | null>(null)
+  const [dlFiles,     setDlFiles]     = useState<File[] | null>(null)
 
   // Upload state
   const [uploading,       setUploading]       = useState(false)
@@ -169,27 +170,28 @@ function AlbumGrid({ sequenceId }: { sequenceId: string }) {
     }
   }, [photos, localVotes, otherVotes, filter])
 
-  // Download all visible photos
-  const handleDownloadAll = useCallback(async () => {
+  // Étape 1 : fetch tous les blobs (async — pas de share ici)
+  const handleFetchAll = useCallback(async () => {
     if (!filtered.length || dlProgress) return
     setDlProgress({ done: 0, total: filtered.length })
     try {
       const files: File[] = []
       for (let i = 0; i < filtered.length; i++) {
-        setDlProgress({ done: i, total: filtered.length })
+        setDlProgress({ done: i + 1, total: filtered.length })
         const res  = await fetch(filtered[i].url)
         const blob = await res.blob()
         files.push(new File([blob], filtered[i].filename, { type: blob.type || "image/jpeg" }))
       }
-      setDlProgress({ done: filtered.length, total: filtered.length })
-
       if (typeof navigator.canShare === "function" && navigator.canShare({ files })) {
-        await navigator.share({ files, title: "Album photos" })
+        setDlFiles(files) // → affiche le bouton "Partager" (nouveau user gesture requis)
       } else {
+        // Desktop : téléchargement direct
         for (const file of files) {
           const url = URL.createObjectURL(file)
           const a   = Object.assign(document.createElement("a"), { href: url, download: file.name })
+          document.body.appendChild(a)
           a.click()
+          document.body.removeChild(a)
           URL.revokeObjectURL(url)
           await new Promise<void>(r => setTimeout(r, 80))
         }
@@ -200,6 +202,18 @@ function AlbumGrid({ sequenceId }: { sequenceId: string }) {
       setDlProgress(null)
     }
   }, [filtered, dlProgress])
+
+  // Étape 2 : share (appelée depuis un clic — user gesture intact)
+  const handleShare = useCallback(async () => {
+    if (!dlFiles) return
+    try {
+      await navigator.share({ files: dlFiles, title: "Album photos" })
+    } catch (err) {
+      if ((err as Error)?.name !== "AbortError") console.error("Share error", err)
+    } finally {
+      setDlFiles(null)
+    }
+  }, [dlFiles])
 
   // Stats
   const mySelected    = useMemo(() => [...localVotes.values()].filter(IS_SEL).length, [localVotes])
@@ -279,6 +293,15 @@ function AlbumGrid({ sequenceId }: { sequenceId: string }) {
                 {dlProgress.done}/{dlProgress.total}
               </span>
             )}
+            {dlFiles && (
+              <button
+                onClick={handleShare}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-primary text-primary-foreground border border-transparent transition-colors"
+              >
+                <Download className="h-3 w-3" />
+                Enregistrer dans Photos
+              </button>
+            )}
             {otherName && (
               <button
                 onClick={() => setShowPartner(v => !v)}
@@ -292,14 +315,16 @@ function AlbumGrid({ sequenceId }: { sequenceId: string }) {
               </button>
             )}
             <button
-              onClick={handleDownloadAll}
+              onClick={dlFiles ? () => setDlFiles(null) : handleFetchAll}
               disabled={!!dlProgress}
               className="flex items-center justify-center w-7 h-7 rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-40"
-              title={`Télécharger les ${filtered.length} photos`}
+              title={dlFiles ? "Annuler" : `Télécharger les ${filtered.length} photos`}
             >
               {dlProgress
                 ? <span className="block h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground animate-spin" />
-                : <Download className="h-3.5 w-3.5" />
+                : dlFiles
+                  ? <X className="h-3.5 w-3.5" />
+                  : <Download className="h-3.5 w-3.5" />
               }
             </button>
             <button

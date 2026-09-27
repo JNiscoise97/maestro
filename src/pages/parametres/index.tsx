@@ -22,6 +22,7 @@ import { EquipmentManager } from "@/components/parametres/EquipmentManager"
 import { EventSequencesManager } from "@/components/parametres/EventSequencesManager"
 import { CortegeSettingsManager } from "@/components/parametres/CortegeSettingsManager"
 import { AccessCodesManager } from "@/components/parametres/AccessCodesManager"
+import { FilmManager } from "@/components/parametres/FilmManager"
 import { MessagesConfig } from "@/components/timing/MessagesConfig"
 import { MessagesManager } from "@/components/parametres/MessagesManager"
 import { MissionsManager } from "@/components/parametres/MissionsManager"
@@ -49,6 +50,7 @@ type Section =
   | "materiel"
   | "acces-fiancies"
   | "acces-comptes"
+  | "film"
   | "outils"
 
 interface NavItem { id: Section; label: string }
@@ -95,6 +97,10 @@ const NAV: NavGroup[] = [
       { id: "acces-fiancies", label: "Profils fiancés" },
       { id: "acces-comptes", label: "Comptes & accès" },
     ],
+  },
+  {
+    label: "Film",
+    items: [{ id: "film", label: "Partage vidéo" }],
   },
   {
     label: "Outils",
@@ -175,6 +181,7 @@ function ContentPanel({ section }: { section: Section }) {
     case "materiel":        return <EquipmentManager />
     case "acces-fiancies":  return <PersonManager />
     case "acces-comptes":   return <AccessCodesManager />
+    case "film":            return <FilmManager />
     case "outils":          return <OutilsSection />
   }
 }

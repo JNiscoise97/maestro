@@ -29,12 +29,14 @@ import { AlbumPage } from "@/pages/album"
 import { NotFoundPage } from "@/pages/not-found"
 import { RsvpPage } from "@/pages/rsvp"
 import { RsvpInvitationPage } from "@/pages/rsvp/invitation"
+import { FilmPage } from "@/pages/film"
 
 export function AppRoutes() {
   return (
     <Routes>
       <Route path="/rsvp" element={<RsvpPage />} />
       <Route path="/rsvp/invitation" element={<RsvpInvitationPage />} />
+      <Route path="/film" element={<FilmPage />} />
       <Route path="/connexion" element={<LoginPage />} />
 
       <Route element={<ProtectedLayout />}>

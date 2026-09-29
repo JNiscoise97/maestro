@@ -231,8 +231,22 @@ function EditDialog({ entry }: { entry: AlbumPartage }) {
 
 const EMOJIS: Record<number, string> = { 1: "🙈", 2: "👎🏾", 3: "👍🏾", 4: "❤️" }
 
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const s = Math.floor(diff / 1000)
+  if (s < 60)  return "à l'instant"
+  const m = Math.floor(s / 60)
+  if (m < 60)  return `il y a ${m} min`
+  const h = Math.floor(m / 60)
+  if (h < 24)  return `il y a ${h}h`
+  const d = Math.floor(h / 24)
+  if (d === 1) return "hier"
+  if (d < 7)   return `il y a ${d}j`
+  return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })
+}
+
 function ReactionsPanel({ entry }: { entry: AlbumPartage }) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, dataUpdatedAt } = useQuery({
     queryKey: ["partage_reactions", entry.id],
     queryFn: async () => {
       const [photos, result] = await Promise.all([
@@ -241,12 +255,13 @@ function ReactionsPanel({ entry }: { entry: AlbumPartage }) {
       ])
       return { photos, ...result }
     },
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchInterval: 15_000,
   })
 
   if (isLoading) return (
     <div className="px-4 py-3 border-t border-border bg-muted/20">
-      <div className="flex gap-2">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="size-14 rounded-lg" />)}</div>
+      <div className="flex gap-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 rounded-lg flex-1" />)}</div>
     </div>
   )
 
@@ -254,23 +269,26 @@ function ReactionsPanel({ entry }: { entry: AlbumPartage }) {
   const photoMap = new Map(photos.map(p => [p.id, p]))
 
   if (!tagged.length && !legacy.length) return (
-    <div className="px-4 py-3 border-t border-border bg-muted/20">
+    <div className="px-4 py-3 border-t border-border bg-muted/20 flex items-center justify-between">
       <p className="text-xs text-muted-foreground">Aucune réaction pour l'instant.</p>
+      <p className="text-[10px] text-muted-foreground/50">Mise à jour toutes les 15s</p>
     </div>
   )
 
-  function VoterGroup({ votes, label }: { votes: AlbumVote[]; label?: string }) {
+  function VoteList({ votes, label }: { votes: AlbumVote[]; label?: string }) {
+    // Tri par date desc
+    const sorted = [...votes].sort((a, b) => new Date(b.votedAt).getTime() - new Date(a.votedAt).getTime())
     const byVoter = new Map<string, AlbumVote[]>()
-    votes.forEach(v => { const l = byVoter.get(v.voterName) ?? []; l.push(v); byVoter.set(v.voterName, l) })
+    sorted.forEach(v => { const l = byVoter.get(v.voterName) ?? []; l.push(v); byVoter.set(v.voterName, l) })
+
     return (
-      <>
+      <div className="space-y-3">
         {label && <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>}
         {[...byVoter.entries()].map(([name, voterVotes]) => {
-          const sorted = [...voterVotes].sort((a, b) => b.rating - a.rating)
-          const counts = [4, 3, 2, 1].map(r => ({ r, n: sorted.filter(v => v.rating === r).length })).filter(x => x.n > 0)
+          const counts = [4, 3, 2, 1].map(r => ({ r, n: voterVotes.filter(v => v.rating === r).length })).filter(x => x.n > 0)
           return (
             <div key={name}>
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-1.5">
                 <p className="text-xs font-semibold text-foreground">{name}</p>
                 <div className="flex gap-1.5">
                   {counts.map(({ r, n }) => (
@@ -278,16 +296,20 @@ function ReactionsPanel({ entry }: { entry: AlbumPartage }) {
                   ))}
                 </div>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {sorted.map(vote => {
+              <div className="space-y-1">
+                {voterVotes.map(vote => {
                   const photo = photoMap.get(vote.photoId)
                   if (!photo) return null
                   return (
-                    <div key={vote.photoId} className="relative size-14 rounded-lg overflow-hidden shrink-0">
-                      <img src={photo.url} alt={photo.filename} className="w-full h-full object-cover" />
-                      <span className="absolute bottom-0.5 right-0.5 text-sm leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,.8)]">
-                        {EMOJIS[vote.rating]}
-                      </span>
+                    <div key={`${vote.photoId}-${vote.votedAt}`} className="flex items-center gap-2.5">
+                      <div className="relative size-9 rounded-md overflow-hidden shrink-0">
+                        <img src={photo.url} alt={photo.filename} className="w-full h-full object-cover" />
+                      </div>
+                      <span className="text-lg leading-none">{EMOJIS[vote.rating]}</span>
+                      <p className="text-xs text-muted-foreground flex-1 truncate">{photo.filename}</p>
+                      <p className="text-[11px] text-muted-foreground/70 shrink-0 tabular-nums">
+                        {relativeTime(vote.votedAt)}
+                      </p>
                     </div>
                   )
                 })}
@@ -295,14 +317,21 @@ function ReactionsPanel({ entry }: { entry: AlbumPartage }) {
             </div>
           )
         })}
-      </>
+      </div>
     )
   }
 
+  const lastUpdate = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null
+
   return (
     <div className="border-t border-border bg-muted/20 px-4 py-3 space-y-4">
-      {tagged.length > 0 && <VoterGroup votes={tagged} />}
-      {legacy.length > 0 && <VoterGroup votes={legacy} label="Avant migration (non attribués)" />}
+      {tagged.length > 0  && <VoteList votes={tagged} />}
+      {legacy.length > 0  && <VoteList votes={legacy} label="Avant migration (non attribués)" />}
+      {lastUpdate && (
+        <p className="text-[10px] text-muted-foreground/50 text-right">
+          Mis à jour à {lastUpdate} · toutes les 15s
+        </p>
+      )}
     </div>
   )
 }

@@ -71,7 +71,7 @@ function VideoRow({ video, onSaved }: { video: FilmVideo; onSaved: () => void })
         <p className="font-medium text-sm">{video.title}</p>
         <p className="text-xs text-muted-foreground font-mono truncate mt-0.5">{video.url}</p>
       </div>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+      <div className="flex items-center gap-1 shrink-0">
         <button type="button" onClick={() => setEditing(true)} className="rounded p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground">
           <Pencil className="size-3.5" />
         </button>
@@ -219,7 +219,7 @@ function GroupRow({ group }: { group: FilmGroup }) {
           <p className="text-xs text-muted-foreground line-clamp-2">{group.introMessage}</p>
         )}
       </div>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+      <div className="flex items-center gap-1 shrink-0">
         <button type="button" onClick={openPreview} title="Voir ce que voit ce groupe"
           className="rounded p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground">
           <Eye className="size-3.5" />

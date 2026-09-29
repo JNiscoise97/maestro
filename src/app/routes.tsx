@@ -30,6 +30,7 @@ import { NotFoundPage } from "@/pages/not-found"
 import { RsvpPage } from "@/pages/rsvp"
 import { RsvpInvitationPage } from "@/pages/rsvp/invitation"
 import { FilmPage } from "@/pages/film"
+import { GaleriePage } from "@/pages/galerie"
 
 export function AppRoutes() {
   return (
@@ -37,6 +38,7 @@ export function AppRoutes() {
       <Route path="/rsvp" element={<RsvpPage />} />
       <Route path="/rsvp/invitation" element={<RsvpInvitationPage />} />
       <Route path="/film" element={<FilmPage />} />
+      <Route path="/galerie" element={<GaleriePage />} />
       <Route path="/connexion" element={<LoginPage />} />
 
       <Route element={<ProtectedLayout />}>

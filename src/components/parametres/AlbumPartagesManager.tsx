@@ -1,0 +1,226 @@
+import { useState } from "react"
+import { Check, Copy, Images, Plus, Trash2, X } from "lucide-react"
+import { toast } from "sonner"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+
+import { albumService, type AlbumPartage } from "@/services/supabase/album"
+import { useEventSequences } from "@/hooks/queries/use-event-sequences"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Switch } from "@/components/ui/switch"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
+
+const QK = ["album_partages"] as const
+
+function usePartages()       { return useQuery({ queryKey: QK, queryFn: () => albumService.listPartages() }) }
+function useCreatePartage()  {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ label, code, sequenceId }: { label: string; code: string; sequenceId: string }) =>
+      albumService.createPartage(label, code, sequenceId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: QK }),
+  })
+}
+function useTogglePartage() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, active }: { id: string; active: boolean }) =>
+      albumService.updatePartage(id, { active }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: QK }),
+  })
+}
+function useDeletePartage() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => albumService.deletePartage(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: QK }),
+  })
+}
+
+// ── CopyLink ──────────────────────────────────────────────────────────────────
+
+function CopyLink({ partage }: { partage: AlbumPartage }) {
+  const [copied, setCopied] = useState(false)
+  const url = `${window.location.origin}/galerie?code=${partage.code}`
+  function handle() {
+    void navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
+  }
+  return (
+    <div className="flex items-center gap-1.5 min-w-0">
+      <code className="truncate max-w-48 rounded-md border border-border bg-muted/60 px-2 py-1 font-mono text-xs text-foreground">
+        {url}
+      </code>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button type="button" variant="ghost" size="icon-xs" onClick={handle}
+            className={cn("shrink-0", copied && "text-vert-vegetal")}>
+            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{copied ? "Copié !" : "Copier le lien"}</TooltipContent>
+      </Tooltip>
+    </div>
+  )
+}
+
+// ── DeleteButton ──────────────────────────────────────────────────────────────
+
+function DeleteButton({ onConfirm, isPending }: { onConfirm: () => void; isPending: boolean }) {
+  const [confirming, setConfirming] = useState(false)
+  if (confirming) return (
+    <div className="flex items-center gap-0.5">
+      <Button type="button" variant="ghost" size="icon-xs" onClick={() => setConfirming(false)}><X className="size-3.5" /></Button>
+      <Button type="button" variant="destructive" size="sm" disabled={isPending} onClick={() => { onConfirm(); setConfirming(false) }}>Supprimer</Button>
+    </div>
+  )
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button type="button" variant="ghost" size="icon-xs" onClick={() => setConfirming(true)}>
+          <Trash2 className="size-3.5" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Supprimer ce partage</TooltipContent>
+    </Tooltip>
+  )
+}
+
+// ── CreateDialog ──────────────────────────────────────────────────────────────
+
+function CreateDialog() {
+  const [open, setOpen]   = useState(false)
+  const [label, setLabel] = useState("")
+  const [code,  setCode]  = useState("")
+  const [seqId, setSeqId] = useState("")
+  const { data: sequences = [] } = useEventSequences()
+  const create = useCreatePartage()
+
+  function reset() { setLabel(""); setCode(""); setSeqId("") }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!label.trim() || !code.trim() || !seqId) return
+    try {
+      await create.mutateAsync({ label: label.trim(), code, sequenceId: seqId })
+      toast.success("Partage créé.")
+      reset(); setOpen(false)
+    } catch (err: any) {
+      if (err?.code === "23505") toast.error("Ce code est déjà utilisé.")
+      else toast.error("Erreur lors de la création.")
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) reset() }}>
+      <DialogTrigger asChild>
+        <Button size="sm" className="gap-1.5"><Plus className="size-3.5" /> Nouveau partage</Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="font-heading">Nouveau lien de partage</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="ap-label">Nom (pour toi)</FieldLabel>
+              <Input id="ap-label" value={label} onChange={e => setLabel(e.target.value)}
+                placeholder="Ex. Ma sœur" required />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="ap-seq">Séquence photo</FieldLabel>
+              <Select value={seqId} onValueChange={setSeqId}>
+                <SelectTrigger><SelectValue placeholder="Choisir une séquence…" /></SelectTrigger>
+                <SelectContent>
+                  {sequences.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="ap-code">Code d'accès</FieldLabel>
+              <Input id="ap-code" value={code} onChange={e => setCode(e.target.value.toUpperCase())}
+                placeholder="Ex. SOEUR2026" className="font-mono uppercase" required />
+            </Field>
+          </FieldGroup>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Annuler</Button>
+            <Button type="submit" disabled={create.isPending || !label.trim() || !code.trim() || !seqId}>
+              Créer
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Row ───────────────────────────────────────────────────────────────────────
+
+function PartageRow({ entry }: { entry: AlbumPartage }) {
+  const toggle    = useTogglePartage()
+  const deletePar = useDeletePartage()
+  const { data: sequences = [] } = useEventSequences()
+  const seqName = sequences.find(s => s.id === entry.sequenceId)?.name ?? "—"
+
+  return (
+    <div className="flex flex-col gap-1.5 px-4 py-3">
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">{entry.label}</p>
+          <p className="text-xs text-muted-foreground">{seqName}</p>
+        </div>
+        <Badge variant="outline" className={cn("shrink-0 text-[10px]", entry.active ? "border-vert-vegetal/40 text-vert-vegetal" : "text-muted-foreground")}>
+          {entry.active ? "Actif" : "Inactif"}
+        </Badge>
+        <Switch
+          checked={entry.active}
+          onCheckedChange={v => toggle.mutate({ id: entry.id, active: v })}
+          className="shrink-0"
+        />
+        <DeleteButton isPending={deletePar.isPending} onConfirm={() => {
+          deletePar.mutate(entry.id, { onSuccess: () => toast.success("Partage supprimé.") })
+        }} />
+      </div>
+      <CopyLink partage={entry} />
+    </div>
+  )
+}
+
+// ── Composant principal ───────────────────────────────────────────────────────
+
+export function AlbumPartagesManager() {
+  const { data: entries, isLoading } = usePartages()
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Images className="size-4 text-muted-foreground" />
+            Partages photos publics
+          </CardTitle>
+          <CreateDialog />
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>
+        ) : !entries?.length ? (
+          <p className="text-sm text-muted-foreground">
+            Aucun partage. Crée un lien pour partager une galerie avec un code.
+          </p>
+        ) : (
+          <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+            {entries.map(e => <PartageRow key={e.id} entry={e} />)}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}

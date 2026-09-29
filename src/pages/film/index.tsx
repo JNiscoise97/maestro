@@ -2,11 +2,29 @@ import { useState, useRef, useEffect } from "react"
 import { Maximize2, Minimize2 } from "lucide-react"
 import { filmService, type FilmGroup, type FilmVideo } from "@/services/supabase/film"
 
-type Step = "form" | "watch"
-
+const PHOTO = "https://igyhlwonztzdrciogfuz.supabase.co/storage/v1/object/public/album-photos/1a2e3bdf-ec22-4263-9bf8-8fe9de5fb576/mu8z8lvp_S&J395.jpg"
 const ARIAL = "Arial, sans-serif"
 
-// ── Mini-Markdown : sauts de ligne + **gras** ─────────────────────────────────
+type Step = "form" | "watch"
+
+// ── Scroll-reveal ─────────────────────────────────────────────────────────────
+
+function useReveal() {
+  useEffect(() => {
+    const els = document.querySelectorAll(".nr")
+    if (!els.length) return
+    const obs = new IntersectionObserver(
+      entries => entries.forEach(e =>
+        e.isIntersecting ? e.target.classList.add("nr-in") : e.target.classList.remove("nr-in")
+      ),
+      { threshold: 0.1 }
+    )
+    els.forEach(el => obs.observe(el))
+    return () => obs.disconnect()
+  })
+}
+
+// ── Mini-Markdown ─────────────────────────────────────────────────────────────
 
 function renderMessage(text: string) {
   return text.split("\n").map((line, li) => {
@@ -20,46 +38,105 @@ function renderMessage(text: string) {
   })
 }
 
-// ── Ornement SVG ──────────────────────────────────────────────────────────────
+// ── Divider ornemental ────────────────────────────────────────────────────────
 
-function FloralCorner({ className, style }: { className?: string; style?: React.CSSProperties }) {
+function Divider({ color = "var(--dore)" }: { color?: string }) {
   return (
-    <svg
-      viewBox="0 0 120 120"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      style={style}
-      aria-hidden="true"
-    >
-      <path d="M10 110 Q30 70 60 40 Q80 20 110 10" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.6"/>
-      <path d="M35 80 Q20 60 15 45" stroke="currentColor" strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.5"/>
-      <path d="M65 48 Q80 45 90 30" stroke="currentColor" strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.5"/>
-      <ellipse cx="12" cy="42" rx="6" ry="10" transform="rotate(-30 12 42)" fill="currentColor" opacity="0.35"/>
-      <ellipse cx="20" cy="58" rx="5" ry="9" transform="rotate(-50 20 58)" fill="currentColor" opacity="0.3"/>
-      <ellipse cx="92" cy="28" rx="6" ry="10" transform="rotate(40 92 28)" fill="currentColor" opacity="0.35"/>
-      <ellipse cx="78" cy="42" rx="5" ry="8" transform="rotate(20 78 42)" fill="currentColor" opacity="0.3"/>
-      <circle cx="55" cy="53" r="3.5" fill="currentColor" opacity="0.7"/>
-      <circle cx="55" cy="53" r="6" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.4"/>
-      <circle cx="80" cy="20" r="2.5" fill="currentColor" opacity="0.6"/>
-      <circle cx="28" cy="88" r="2" fill="currentColor" opacity="0.5"/>
-    </svg>
-  )
-}
-
-// ── Séparateur ornemental ─────────────────────────────────────────────────────
-
-function OrnamentalDivider() {
-  return (
-    <div className="flex items-center gap-3 my-1">
-      <div className="h-px flex-1 bg-dore/40" />
-      <svg viewBox="0 0 24 12" width="24" height="12" className="text-dore/60 flex-none">
-        <path d="M12 6 L8 2 L4 6 L8 10 Z" fill="currentColor"/>
-        <path d="M12 6 L16 2 L20 6 L16 10 Z" fill="currentColor"/>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "6px 0" }}>
+      <div style={{ height: 1, flex: 1, backgroundColor: color, opacity: 0.5 }} />
+      <svg viewBox="0 0 20 10" width="16" height="8" style={{ flexShrink: 0, color, opacity: 0.8 }}>
+        <path d="M10 5 L7 2 L4 5 L7 8 Z" fill="currentColor"/>
+        <path d="M10 5 L13 2 L16 5 L13 8 Z" fill="currentColor"/>
       </svg>
-      <div className="h-px flex-1 bg-dore/40" />
+      <div style={{ height: 1, flex: 1, backgroundColor: color, opacity: 0.5 }} />
     </div>
   )
 }
+
+// ── Pattern de points ─────────────────────────────────────────────────────────
+
+function Dots({ style }: { style?: React.CSSProperties }) {
+  return (
+    <div aria-hidden="true" style={{
+      backgroundImage: "radial-gradient(circle, color-mix(in oklch, var(--corail) 50%, transparent 50%) 1.5px, transparent 1.5px)",
+      backgroundSize: "11px 11px",
+      ...style,
+    }} />
+  )
+}
+
+// ── CSS global de la page ─────────────────────────────────────────────────────
+
+const PAGE_CSS = `
+  /* Reveal */
+  .nr         { opacity: 0; transform: translateX(-32px); transition: opacity .75s cubic-bezier(.16,1,.3,1), transform .75s cubic-bezier(.16,1,.3,1); }
+  .nr.nr-up   { transform: translateY(24px); }
+  .nr.nr-in   { opacity: 1 !important; transform: none !important; }
+
+  /* Split-screen formulaire */
+  .np-split { display: flex; min-height: 100svh; }
+  .np-panel-left {
+    flex: 0 0 420px;
+    background: var(--ivoire);
+    padding: 64px 52px;
+    display: flex; flex-direction: column; justify-content: center; gap: 0;
+    border-right: 1px solid color-mix(in oklch, var(--dore) 30%, transparent 70%);
+  }
+  .np-panel-right { flex: 1; position: relative; overflow: hidden; }
+  .np-panel-right img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 60%; }
+
+  @media (max-width: 660px) {
+    .np-split { flex-direction: column-reverse; }
+    .np-panel-right { height: 52svh; }
+    .np-panel-left { flex: none; padding: 40px 28px; border-right: none; border-top: 1px solid color-mix(in oklch, var(--dore) 30%, transparent 70%); }
+  }
+
+  /* Inputs */
+  .np-label {
+    display: block; font-size: 10px; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--bordeaux); margin-bottom: 5px; font-family: Arial, sans-serif;
+  }
+  .np-input {
+    width: 100%; padding: 9px 0; font-family: Arial, sans-serif; font-size: 14px;
+    background: transparent; border: none;
+    border-bottom: 1px solid color-mix(in oklch, var(--brun) 18%, transparent 82%);
+    color: var(--brun); outline: none; transition: border-color .2s; box-sizing: border-box;
+  }
+  .np-input:focus { border-bottom-color: var(--bordeaux); }
+  .np-input::placeholder { color: color-mix(in oklch, var(--brun) 28%, transparent 72%); }
+
+  /* Bouton ghost */
+  .np-ghost {
+    display: block; width: 100%; padding: 14px 24px;
+    border: 1.5px solid var(--bordeaux); color: var(--bordeaux);
+    background: transparent; font-family: Arial, sans-serif;
+    font-size: 11px; letter-spacing: .18em; text-transform: uppercase;
+    cursor: pointer; transition: background .22s, color .22s;
+  }
+  .np-ghost:hover:not(:disabled) { background: var(--bordeaux); color: var(--ivoire); }
+  .np-ghost:disabled { opacity: .35; cursor: default; }
+
+  /* Bouton plein écran */
+  .np-fs {
+    position: absolute; bottom: 52px; right: 12px; padding: 8px; border-radius: 8px;
+    border: none; cursor: pointer; background: rgba(0,0,0,.5); color: #fff;
+    opacity: 0; transition: opacity .2s; display: flex; align-items: center;
+  }
+  .np-fs:hover { opacity: 1; }
+
+  /* Carte lettre */
+  .np-letter {
+    background: #fff;
+    border-radius: 2px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.06), 0 16px 48px rgba(0,0,0,.07);
+    padding: 48px 48px 40px;
+    max-width: 560px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+  @media (max-width: 640px) { .np-letter { padding: 32px 24px 28px; } }
+`
 
 // ── Page entry ────────────────────────────────────────────────────────────────
 
@@ -73,40 +150,22 @@ export function FilmPage() {
   useEffect(() => {
     const params    = new URLSearchParams(window.location.search)
     const previewId = params.get("preview")
-
     filmService.listVideos().then(setVideos)
-
     if (previewId) {
       filmService.listGroups().then(groups => {
         const g = groups.find(g => g.id === previewId) ?? null
-        setGroup(g)
-        setIsPreview(true)
-        setStep("watch")
+        setGroup(g); setIsPreview(true); setStep("watch")
       })
     }
   }, [])
 
-  function handleAccess(viewerName: string, g: FilmGroup) {
-    setName(viewerName)
-    setGroup(g)
-    setStep("watch")
-  }
-
   if (step === "watch") {
-    return (
-      <WatchScreen
-        group={group}
-        videos={videos}
-        viewerName={name}
-        isPreview={isPreview}
-      />
-    )
+    return <WatchScreen group={group} videos={videos} viewerName={name} isPreview={isPreview} />
   }
-
-  return <AccessForm onAccess={handleAccess} />
+  return <AccessForm onAccess={(n, g) => { setName(n); setGroup(g); setStep("watch") }} />
 }
 
-// ── Access form ────────────────────────────────────────────────────────────────
+// ── Formulaire d'accès ────────────────────────────────────────────────────────
 
 function AccessForm({ onAccess }: { onAccess: (name: string, group: FilmGroup) => void }) {
   const [name,    setName]    = useState("")
@@ -114,17 +173,15 @@ function AccessForm({ onAccess }: { onAccess: (name: string, group: FilmGroup) =
   const [error,   setError]   = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  useReveal()
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim() || !code.trim()) return
-    setLoading(true)
-    setError(null)
+    setLoading(true); setError(null)
     try {
       const g = await filmService.validateCode(code)
-      if (!g) {
-        setError("Code incorrect. Vérifie le code qui t'a été transmis.")
-        return
-      }
+      if (!g) { setError("Code incorrect. Vérifie le code qui t'a été transmis."); return }
       await filmService.logView(g.id, name.trim())
       onAccess(name.trim(), g)
     } catch {
@@ -135,143 +192,64 @@ function AccessForm({ onAccess }: { onAccess: (name: string, group: FilmGroup) =
   }
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden"
-      style={{ backgroundColor: "var(--ivoire)", fontFamily: ARIAL }}
-    >
-      {/* Ornements botaniques */}
-      <FloralCorner
-        className="absolute top-0 left-0 w-32 h-32 pointer-events-none select-none"
-        style={{ color: "var(--vert-vegetal)" }}
-      />
-      <FloralCorner
-        className="absolute bottom-0 right-0 w-32 h-32 pointer-events-none select-none rotate-180"
-        style={{ color: "var(--vert-vegetal)" }}
-      />
+    <>
+      <style>{PAGE_CSS}</style>
+      <div className="np-split" style={{ fontFamily: ARIAL }}>
 
-      <div className="w-full max-w-sm relative z-10">
-        {/* Cadre doré */}
-        <div
-          className="rounded-2xl p-8 space-y-6"
-          style={{
-            backgroundColor: "color-mix(in oklch, var(--ivoire) 85%, white 15%)",
-            border: "1.5px solid color-mix(in oklch, var(--dore) 60%, transparent 40%)",
-            boxShadow: "0 0 0 4px color-mix(in oklch, var(--dore) 15%, transparent 85%), 0 4px 24px color-mix(in oklch, var(--brun) 10%, transparent 90%)",
-          }}
-        >
-          {/* En-tête */}
-          <div className="text-center space-y-2">
-            <p
-              className="text-4xl leading-tight"
-              style={{ fontFamily: "Nickainley, serif", color: "var(--bordeaux)" }}
-            >
-              Sarah & Jordan
-            </p>
-            <OrnamentalDivider />
-            <h1
-              className="text-base font-medium tracking-wide"
-              style={{ fontFamily: ARIAL, color: "var(--brun)" }}
-            >
-              Notre teaser
-            </h1>
-          </div>
+        {/* ── Panneau gauche : formulaire ── */}
+        <div className="np-panel-left">
+          <div className="nr" style={{ display: "flex", flexDirection: "column", gap: 32 }}>
 
-          {/* Formulaire */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-3">
-              <div>
-                <label
-                  className="block text-[11px] tracking-widest uppercase mb-1.5 font-medium"
-                  style={{ color: "var(--bordeaux)" }}
-                >
-                  Ton prénom
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="Marie"
-                  autoComplete="given-name"
-                  required
-                  className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all"
-                  style={{
-                    fontFamily: ARIAL,
-                    backgroundColor: "color-mix(in oklch, white 80%, var(--ivoire) 20%)",
-                    border: "1.5px solid color-mix(in oklch, var(--brun) 20%, transparent 80%)",
-                    color: "var(--brun)",
-                  }}
-                  onFocus={e => (e.target.style.borderColor = "color-mix(in oklch, var(--bordeaux) 60%, transparent 40%)")}
-                  onBlur={e => (e.target.style.borderColor = "color-mix(in oklch, var(--brun) 20%, transparent 80%)")}
-                />
-              </div>
-              <div>
-                <label
-                  className="block text-[11px] tracking-widest uppercase mb-1.5 font-medium"
-                  style={{ color: "var(--bordeaux)" }}
-                >
-                  Code d'accès
-                </label>
-                <input
-                  type="text"
-                  value={code}
-                  onChange={e => setCode(e.target.value)}
-                  placeholder="••••••"
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  required
-                  className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all font-mono"
-                  style={{
-                    backgroundColor: "color-mix(in oklch, white 80%, var(--ivoire) 20%)",
-                    border: "1.5px solid color-mix(in oklch, var(--brun) 20%, transparent 80%)",
-                    color: "var(--brun)",
-                  }}
-                  onFocus={e => (e.target.style.borderColor = "color-mix(in oklch, var(--bordeaux) 60%, transparent 40%)")}
-                  onBlur={e => (e.target.style.borderColor = "color-mix(in oklch, var(--brun) 20%, transparent 80%)")}
-                />
-              </div>
+            {/* En-tête */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <p style={{ fontFamily: "Nickainley, serif", fontSize: "3.6rem", lineHeight: 1, color: "var(--bordeaux)", margin: 0 }}>
+                Sarah & Jordan
+              </p>
+              <Divider />
+              <p style={{ fontSize: 11, letterSpacing: "0.24em", textTransform: "uppercase", color: "color-mix(in oklch, var(--brun) 45%, transparent 55%)", margin: 0 }}>
+                Notre teaser · Fiançailles 2026
+              </p>
             </div>
 
-            {error && (
-              <p className="text-sm text-center" style={{ color: "var(--destructive)" }}>
-                {error}
-              </p>
-            )}
+            {/* Formulaire */}
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <div>
+                <label className="np-label">Ton prénom</label>
+                <input className="np-input" type="text" value={name}
+                  onChange={e => setName(e.target.value)} placeholder="Marie"
+                  autoComplete="given-name" required />
+              </div>
+              <div>
+                <label className="np-label">Code d'accès</label>
+                <input className="np-input" style={{ fontFamily: "monospace" }}
+                  type="text" value={code} onChange={e => setCode(e.target.value)}
+                  placeholder="••••••" autoComplete="off" autoCapitalize="none" required />
+              </div>
 
-            <button
-              type="submit"
-              disabled={loading || !name.trim() || !code.trim()}
-              className="w-full rounded-xl py-3 text-sm font-medium tracking-wide transition-all"
-              style={{
-                fontFamily: ARIAL,
-                backgroundColor: "var(--bordeaux)",
-                color: "var(--ivoire)",
-                opacity: loading || !name.trim() || !code.trim() ? 0.45 : 1,
-              }}
-            >
-              {loading ? "Vérification…" : "Regarder le teaser →"}
-            </button>
-          </form>
+              {error && (
+                <p style={{ fontSize: 12, color: "var(--destructive)", margin: 0 }}>{error}</p>
+              )}
+
+              <button className="np-ghost" type="submit"
+                disabled={loading || !name.trim() || !code.trim()}>
+                {loading ? "Vérification…" : "Regarder le teaser →"}
+              </button>
+            </form>
+          </div>
         </div>
 
-        <p
-          className="text-center text-[11px] tracking-widest uppercase mt-6"
-          style={{ color: "color-mix(in oklch, var(--brun) 35%, transparent 65%)", fontFamily: ARIAL }}
-        >
-          Fiançailles · 25 juillet 2026
-        </p>
+        {/* ── Panneau droit : photo ── */}
+        <div className="np-panel-right">
+          <img src={PHOTO} alt="" aria-hidden="true" />
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
-// ── Watch screen ───────────────────────────────────────────────────────────────
+// ── Écran de visionnage ───────────────────────────────────────────────────────
 
-function WatchScreen({
-  group,
-  videos,
-  viewerName,
-  isPreview,
-}: {
+function WatchScreen({ group, videos, viewerName, isPreview }: {
   group: FilmGroup | null
   videos: FilmVideo[]
   viewerName: string
@@ -281,18 +259,17 @@ function WatchScreen({
   const lastLogRef = useRef<number>(0)
   const [isFs, setIsFs]           = useState(false)
   const [activeIdx, setActiveIdx] = useState(0)
+  const currentVideo              = videos[activeIdx] ?? null
 
-  const currentVideo = videos[activeIdx] ?? null
+  useReveal()
 
   useEffect(() => {
-    const onChange = () => setIsFs(!!document.fullscreenElement)
-    document.addEventListener("fullscreenchange", onChange)
-    return () => document.removeEventListener("fullscreenchange", onChange)
+    const fn = () => setIsFs(!!document.fullscreenElement)
+    document.addEventListener("fullscreenchange", fn)
+    return () => document.removeEventListener("fullscreenchange", fn)
   }, [])
 
-  useEffect(() => {
-    videoRef.current?.load()
-  }, [activeIdx])
+  useEffect(() => { videoRef.current?.load() }, [activeIdx])
 
   function handlePlay() {
     if (isPreview || !group) return
@@ -303,142 +280,134 @@ function WatchScreen({
     }
   }
 
-  function toggleFullscreen() {
-    const el = videoRef.current
-    if (!el) return
-    if (!document.fullscreenElement) {
-      el.requestFullscreen?.()
-    } else {
-      document.exitFullscreen?.()
-    }
+  function toggleFs() {
+    const el = videoRef.current; if (!el) return
+    if (!document.fullscreenElement) el.requestFullscreen?.()
+    else document.exitFullscreen?.()
   }
 
   return (
-    <div
-      className="min-h-screen flex flex-col"
-      style={{ backgroundColor: "var(--ivoire)", fontFamily: ARIAL }}
-    >
-      {/* Bandeau prévisualisation */}
-      {isPreview && (
-        <div
-          className="px-4 py-2 text-center"
-          style={{
-            backgroundColor: "color-mix(in oklch, var(--dore) 15%, var(--ivoire) 85%)",
-            borderBottom: "1px solid color-mix(in oklch, var(--dore) 40%, transparent 60%)",
-          }}
-        >
-          <p className="text-xs font-medium tracking-wide" style={{ color: "var(--brun)" }}>
-            Mode prévisualisation — {group ? `groupe « ${group.name} »` : "sans groupe"} · aucun visionnage enregistré
-          </p>
-        </div>
-      )}
+    <>
+      <style>{PAGE_CSS}</style>
+      <div style={{ minHeight: "100svh", backgroundColor: "var(--ivoire)", fontFamily: ARIAL }}>
 
-      {/* Message d'intro façon lettre */}
-      {group?.introMessage && (
-        <div className="flex-none px-6 pt-10 pb-4 max-w-xl mx-auto w-full">
-          <p
-            className="text-[11px] tracking-widest uppercase text-center mb-4"
-            style={{ color: "color-mix(in oklch, var(--brun) 40%, transparent 60%)" }}
-          >
-            Fiançailles · 25 juillet 2026
-          </p>
-          <OrnamentalDivider />
-          <div className="mt-5">
-            <p
-              style={{
-                fontFamily: ARIAL,
-                textAlign: "justify",
-                fontSize: "1rem",
-                lineHeight: 1.9,
-                color: "var(--brun)",
-              }}
-            >
-              {renderMessage(group.introMessage)}
+        {/* Bandeau preview */}
+        {isPreview && (
+          <div style={{
+            padding: "8px 20px", textAlign: "center",
+            backgroundColor: "color-mix(in oklch, var(--dore) 18%, var(--ivoire) 82%)",
+            borderBottom: "1px solid color-mix(in oklch, var(--dore) 35%, transparent 65%)",
+          }}>
+            <p style={{ fontSize: 12, color: "var(--brun)", margin: 0 }}>
+              Mode prévisualisation — {group ? `groupe « ${group.name} »` : "sans groupe"} · aucun visionnage enregistré
             </p>
-            <p
-              className="mt-4"
-              style={{
-                fontFamily: "Nickainley, serif",
-                color: "var(--bordeaux)",
-                textAlign: "right",
-                fontSize: "1.5rem",
-                lineHeight: 1.2,
-              }}
-            >
+          </div>
+        )}
+
+        {/* ── Section lettre ── */}
+        {group?.introMessage && (
+          <section style={{
+            position: "relative", padding: "72px 24px 80px",
+            backgroundColor: "color-mix(in oklch, var(--beige) 45%, var(--ivoire) 55%)",
+            overflow: "hidden",
+          }}>
+            {/* Dots décoratifs */}
+            <Dots style={{ position: "absolute", top: 24, right: 0, width: 160, height: 120, opacity: 0.4 }} />
+            <Dots style={{ position: "absolute", bottom: 0, left: 0, width: 120, height: 90, opacity: 0.3 }} />
+
+            <div className="nr np-letter">
+              {/* En-tête lettre */}
+              <div style={{ marginBottom: 24 }}>
+                <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "color-mix(in oklch, var(--brun) 38%, transparent 62%)", margin: "0 0 10px" }}>
+                  Fiançailles · 25 juillet 2026
+                </p>
+                <Divider color="var(--dore)" />
+              </div>
+
+              {/* Corps de la lettre */}
+              <p style={{ fontSize: "1rem", lineHeight: 1.95, textAlign: "justify", color: "var(--brun)", margin: 0 }}>
+                {renderMessage(group.introMessage)}
+              </p>
+
+              {/* Signature */}
+              <div style={{ marginTop: 28, display: "flex", justifyContent: "flex-end" }}>
+                <p style={{ fontFamily: "Nickainley, serif", fontSize: "1.8rem", color: "var(--bordeaux)", margin: 0, lineHeight: 1.1 }}>
+                  Sarah & Jordan
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ── Section vidéo ── */}
+        <section style={{ padding: "60px 24px 80px", backgroundColor: "var(--ivoire)" }}>
+
+          {/* Heading section */}
+          <div className="nr nr-up" style={{ textAlign: "center", marginBottom: 36 }}>
+            <p style={{ fontSize: 10, letterSpacing: "0.24em", textTransform: "uppercase", color: "var(--bordeaux)", margin: "0 0 8px" }}>
               Sarah & Jordan
             </p>
+            <div style={{ width: 48, height: 1.5, backgroundColor: "var(--bordeaux)", margin: "0 auto 8px", opacity: 0.5 }} />
+            <p style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "color-mix(in oklch, var(--brun) 40%, transparent 60%)", margin: 0 }}>
+              Notre teaser
+            </p>
           </div>
-        </div>
-      )}
 
-      {/* Sélecteur de vidéo si plusieurs */}
-      {videos.length > 1 && (
-        <div className="flex justify-center gap-2 px-4 pt-4 pb-2">
-          {videos.map((v, i) => (
-            <button
-              key={v.id}
-              onClick={() => setActiveIdx(i)}
-              className="px-5 py-1.5 rounded-full text-sm font-medium transition-all"
-              style={{
-                fontFamily: ARIAL,
-                backgroundColor: i === activeIdx ? "var(--bordeaux)" : "var(--beige)",
-                color: i === activeIdx ? "var(--ivoire)" : "var(--brun)",
-              }}
-            >
-              {v.title}
-            </button>
-          ))}
-        </div>
-      )}
+          {/* Onglets multi-vidéos */}
+          {videos.length > 1 && (
+            <div className="nr nr-up" style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 28 }}>
+              {videos.map((v, i) => (
+                <button key={v.id} onClick={() => setActiveIdx(i)} style={{
+                  padding: "6px 20px", borderRadius: 999, fontSize: 13, cursor: "pointer",
+                  fontFamily: ARIAL, border: "none", transition: "all .2s",
+                  backgroundColor: i === activeIdx ? "var(--bordeaux)" : "var(--beige)",
+                  color: i === activeIdx ? "var(--ivoire)" : "var(--brun)",
+                }}>
+                  {v.title}
+                </button>
+              ))}
+            </div>
+          )}
 
-      {/* Player */}
-      <div className="flex-1 flex items-center justify-center px-4 pb-10 pt-4">
-        {currentVideo ? (
-          <div
-            className="relative w-full max-w-4xl rounded-2xl overflow-hidden"
-            style={{
-              border: "1.5px solid color-mix(in oklch, var(--dore) 40%, transparent 60%)",
-              boxShadow: "0 8px 32px color-mix(in oklch, var(--brun) 15%, transparent 85%)",
-            }}
-          >
-            <video
-              ref={videoRef}
-              src={currentVideo.url}
-              controls
-              controlsList="nodownload"
-              playsInline
-              onPlay={handlePlay}
-              onContextMenu={e => e.preventDefault()}
-              className="w-full bg-black aspect-video block"
-            />
-            <button
-              onClick={toggleFullscreen}
-              className="absolute bottom-14 right-3 rounded-lg p-2 transition-opacity opacity-0 hover:opacity-100 focus:opacity-100"
-              style={{
-                backgroundColor: "color-mix(in oklch, var(--brun) 70%, transparent 30%)",
-                color: "var(--ivoire)",
-              }}
-              title={isFs ? "Quitter le plein écran" : "Plein écran"}
-            >
-              {isFs ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            </button>
-          </div>
-        ) : (
-          <p
-            className="text-sm"
-            style={{ color: "color-mix(in oklch, var(--brun) 40%, transparent 60%)" }}
-          >
-            Aucune vidéo configurée.
+          {/* Player */}
+          {currentVideo ? (
+            <div className="nr nr-up" style={{
+              maxWidth: 880, margin: "0 auto", position: "relative",
+              borderRadius: 4, overflow: "hidden",
+              boxShadow: "0 4px 6px rgba(0,0,0,.04), 0 20px 60px rgba(0,0,0,.12)",
+              border: "1px solid color-mix(in oklch, var(--dore) 35%, transparent 65%)",
+            }}>
+              <video
+                ref={videoRef} src={currentVideo.url} controls controlsList="nodownload"
+                playsInline onPlay={handlePlay} onContextMenu={e => e.preventDefault()}
+                style={{ display: "block", width: "100%", aspectRatio: "16/9", backgroundColor: "#000" }}
+              />
+              <button onClick={toggleFs} className="np-fs" title={isFs ? "Quitter le plein écran" : "Plein écran"}>
+                {isFs ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              </button>
+            </div>
+          ) : (
+            <p style={{ textAlign: "center", color: "color-mix(in oklch, var(--brun) 38%, transparent 62%)", fontSize: 14 }}>
+              Aucune vidéo configurée.
+            </p>
+          )}
+        </section>
+
+        {/* ── Footer ── */}
+        <footer style={{
+          backgroundColor: "color-mix(in oklch, var(--brun) 90%, black 10%)",
+          padding: "44px 24px 36px", textAlign: "center",
+          borderTop: "3px solid color-mix(in oklch, var(--dore) 60%, transparent 40%)",
+        }}>
+          <p style={{ fontFamily: "Nickainley, serif", fontSize: "2.2rem", color: "var(--ivoire)", margin: "0 0 10px", lineHeight: 1 }}>
+            Sarah & Jordan
           </p>
-        )}
+          <Divider color="color-mix(in oklch, var(--ivoire) 30%, transparent 70%)" />
+          <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "color-mix(in oklch, var(--ivoire) 38%, transparent 62%)", margin: "10px 0 0" }}>
+            Fiançailles · 25 juillet 2026
+          </p>
+        </footer>
       </div>
-
-      <p
-        className="text-center text-[11px] tracking-widest uppercase pb-6"
-        style={{ color: "color-mix(in oklch, var(--brun) 30%, transparent 70%)" }}
-      >
-        Sarah & Jordan · Fiançailles
-      </p>
-    </div>
+    </>
   )
 }

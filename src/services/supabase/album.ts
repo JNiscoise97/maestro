@@ -36,6 +36,18 @@ function fromPhotoRow(r: any): AlbumPhoto {
   }
 }
 
+export type AlbumPartage = {
+  id: string
+  code: string
+  sequenceId: string
+  label: string
+  active: boolean
+}
+
+function fromPartageRow(r: any): AlbumPartage {
+  return { id: r.id, code: r.code, sequenceId: r.sequence_id, label: r.label, active: r.active }
+}
+
 export const albumService = {
   async listPhotos(sequenceId: string): Promise<AlbumPhoto[]> {
     const { data, error } = await db
@@ -118,6 +130,52 @@ export const albumService = {
       .delete()
       .eq("photo_id", photoId)
       .eq("voter_id", voterId)
+    if (error) throw error
+  },
+
+  // ── Partages publics ────────────────────────────────────────────────────────
+
+  async validatePartageCode(code: string): Promise<AlbumPartage | null> {
+    const { data, error } = await db
+      .from(tbl("album_partages"))
+      .select("*")
+      .eq("code", code.trim().toUpperCase())
+      .eq("active", true)
+      .maybeSingle()
+    if (error) throw error
+    return data ? fromPartageRow(data) : null
+  },
+
+  async listPartages(): Promise<AlbumPartage[]> {
+    const { data, error } = await db
+      .from(tbl("album_partages"))
+      .select("*")
+      .order("created_at", { ascending: false })
+    if (error) throw error
+    return (data ?? []).map(fromPartageRow)
+  },
+
+  async createPartage(label: string, code: string, sequenceId: string): Promise<AlbumPartage> {
+    const { data, error } = await db
+      .from(tbl("album_partages"))
+      .insert({ label, code: code.trim().toUpperCase(), sequence_id: sequenceId, active: true })
+      .select()
+      .single()
+    if (error) throw error
+    return fromPartageRow(data)
+  },
+
+  async updatePartage(id: string, patch: Partial<Pick<AlbumPartage, "code" | "label" | "active">>): Promise<void> {
+    const row: any = {}
+    if (patch.code    !== undefined) row.code   = patch.code.trim().toUpperCase()
+    if (patch.label   !== undefined) row.label  = patch.label
+    if (patch.active  !== undefined) row.active = patch.active
+    const { error } = await db.from(tbl("album_partages")).update(row).eq("id", id)
+    if (error) throw error
+  },
+
+  async deletePartage(id: string): Promise<void> {
+    const { error } = await db.from(tbl("album_partages")).delete().eq("id", id)
     if (error) throw error
   },
 }

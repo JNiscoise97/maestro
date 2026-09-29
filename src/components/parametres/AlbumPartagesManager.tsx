@@ -266,11 +266,11 @@ function ReactionsPanel({ entry }: { entry: AlbumPartage }) {
   const { data, isLoading, dataUpdatedAt } = useQuery({
     queryKey: ["partage_reactions", entry.id],
     queryFn: async () => {
-      const [photos, result] = await Promise.all([
+      const [photos, votes] = await Promise.all([
         albumService.listPhotos(entry.sequenceId),
-        albumService.listVotesByPartage(entry.id, entry.sequenceId),
+        albumService.listVotesByPartage(entry.id),
       ])
-      return { photos, ...result }
+      return { photos, tagged: votes }
     },
     staleTime: 0,
     refetchInterval: 15_000,
@@ -282,10 +282,10 @@ function ReactionsPanel({ entry }: { entry: AlbumPartage }) {
     </div>
   )
 
-  const { photos = [], tagged = [], legacy = [] } = data ?? {}
+  const { photos = [], tagged = [] } = data ?? {}
   const photoMap = new Map(photos.map(p => [p.id, p]))
 
-  if (!tagged.length && !legacy.length) return (
+  if (!tagged.length) return (
     <div className="px-4 py-3 border-t border-border bg-muted/20 flex items-center justify-between">
       <p className="text-xs text-muted-foreground">Aucune réaction pour l'instant.</p>
       <p className="text-[10px] text-muted-foreground/50">Mise à jour toutes les 15s</p>
@@ -346,8 +346,7 @@ function ReactionsPanel({ entry }: { entry: AlbumPartage }) {
 
   return (
     <div className="border-t border-border bg-muted/20 px-4 py-3 space-y-4">
-      {tagged.length > 0  && <VoteList votes={tagged} />}
-      {legacy.length > 0  && <VoteList votes={legacy} label="Avant migration (non attribués)" />}
+      {tagged.length > 0 && <VoteList votes={tagged} />}
       {lastUpdate && (
         <p className="text-[10px] text-muted-foreground/50 text-right">
           Mis à jour à {lastUpdate} · toutes les 15s

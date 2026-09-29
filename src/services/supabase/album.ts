@@ -114,14 +114,59 @@ export const albumService = {
     voterId: string,
     voterName: string,
     rating: 1 | 2 | 3 | 4,
+    partageId?: string,
   ): Promise<void> {
     const { error } = await db
       .from(tbl("album_votes"))
       .upsert(
-        { photo_id: photoId, voter_id: voterId, voter_name: voterName, rating },
+        { photo_id: photoId, voter_id: voterId, voter_name: voterName, rating, partage_id: partageId ?? null },
         { onConflict: "photo_id,voter_id" },
       )
     if (error) throw error
+  },
+
+  async listVotesByPartage(partageId: string, sequenceId: string): Promise<{ tagged: AlbumVote[]; legacy: AlbumVote[] }> {
+    const toVote = (r: any): AlbumVote => ({
+      photoId:   r.photo_id,
+      voterId:   r.voter_id,
+      voterName: r.voter_name,
+      rating:    r.rating as 1 | 2 | 3 | 4,
+      votedAt:   r.voted_at,
+    })
+
+    // Votes tagués avec ce partage
+    const { data: taggedData, error: e1 } = await db
+      .from(tbl("album_votes"))
+      .select("*")
+      .eq("partage_id", partageId)
+    if (e1) throw e1
+
+    // Votes legacy (partage_id NULL) sur les photos de cette séquence
+    const { data: photos, error: e2 } = await db
+      .from(tbl("album_photos"))
+      .select("id")
+      .eq("sequence_id", sequenceId)
+    if (e2) throw e2
+    const photoIds: string[] = (photos ?? []).map((p: any) => p.id)
+
+    let legacyData: any[] = []
+    if (photoIds.length) {
+      const CHUNK = 100
+      const chunks: string[][] = []
+      for (let i = 0; i < photoIds.length; i += CHUNK) chunks.push(photoIds.slice(i, i + CHUNK))
+      const rows = await Promise.all(
+        chunks.map(chunk =>
+          db.from(tbl("album_votes")).select("*").in("photo_id", chunk).is("partage_id", null)
+            .then(({ data, error }: any) => { if (error) throw error; return data ?? [] })
+        )
+      )
+      legacyData = rows.flat()
+    }
+
+    return {
+      tagged: (taggedData ?? []).map(toVote),
+      legacy: legacyData.map(toVote),
+    }
   },
 
   async deleteVote(photoId: string, voterId: string): Promise<void> {

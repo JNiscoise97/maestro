@@ -231,15 +231,15 @@ function EditDialog({ entry }: { entry: AlbumPartage }) {
 
 const EMOJIS: Record<number, string> = { 1: "🙈", 2: "👎🏾", 3: "👍🏾", 4: "❤️" }
 
-function ReactionsPanel({ sequenceId }: { sequenceId: string }) {
+function ReactionsPanel({ entry }: { entry: AlbumPartage }) {
   const { data, isLoading } = useQuery({
-    queryKey: ["partage_reactions", sequenceId],
+    queryKey: ["partage_reactions", entry.id],
     queryFn: async () => {
-      const [photos, votes] = await Promise.all([
-        albumService.listPhotos(sequenceId),
-        albumService.listVotes(sequenceId),
+      const [photos, result] = await Promise.all([
+        albumService.listPhotos(entry.sequenceId),
+        albumService.listVotesByPartage(entry.id, entry.sequenceId),
       ])
-      return { photos, votes }
+      return { photos, ...result }
     },
     staleTime: 30_000,
   })
@@ -250,57 +250,59 @@ function ReactionsPanel({ sequenceId }: { sequenceId: string }) {
     </div>
   )
 
-  const { photos = [], votes = [] } = data ?? {}
-  if (!votes.length) return (
+  const { photos = [], tagged = [], legacy = [] } = data ?? {}
+  const photoMap = new Map(photos.map(p => [p.id, p]))
+
+  if (!tagged.length && !legacy.length) return (
     <div className="px-4 py-3 border-t border-border bg-muted/20">
       <p className="text-xs text-muted-foreground">Aucune réaction pour l'instant.</p>
     </div>
   )
 
-  // Grouper par voter_name
-  const byVoter = new Map<string, AlbumVote[]>()
-  votes.forEach(v => {
-    const list = byVoter.get(v.voterName) ?? []
-    list.push(v)
-    byVoter.set(v.voterName, list)
-  })
-
-  const photoMap = new Map(photos.map(p => [p.id, p]))
+  function VoterGroup({ votes, label }: { votes: AlbumVote[]; label?: string }) {
+    const byVoter = new Map<string, AlbumVote[]>()
+    votes.forEach(v => { const l = byVoter.get(v.voterName) ?? []; l.push(v); byVoter.set(v.voterName, l) })
+    return (
+      <>
+        {label && <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>}
+        {[...byVoter.entries()].map(([name, voterVotes]) => {
+          const sorted = [...voterVotes].sort((a, b) => b.rating - a.rating)
+          const counts = [4, 3, 2, 1].map(r => ({ r, n: sorted.filter(v => v.rating === r).length })).filter(x => x.n > 0)
+          return (
+            <div key={name}>
+              <div className="flex items-center gap-2 mb-2">
+                <p className="text-xs font-semibold text-foreground">{name}</p>
+                <div className="flex gap-1.5">
+                  {counts.map(({ r, n }) => (
+                    <span key={r} className="text-xs text-muted-foreground">{EMOJIS[r]} {n}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {sorted.map(vote => {
+                  const photo = photoMap.get(vote.photoId)
+                  if (!photo) return null
+                  return (
+                    <div key={vote.photoId} className="relative size-14 rounded-lg overflow-hidden shrink-0">
+                      <img src={photo.url} alt={photo.filename} className="w-full h-full object-cover" />
+                      <span className="absolute bottom-0.5 right-0.5 text-sm leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,.8)]">
+                        {EMOJIS[vote.rating]}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </>
+    )
+  }
 
   return (
     <div className="border-t border-border bg-muted/20 px-4 py-3 space-y-4">
-      {[...byVoter.entries()].map(([name, voterVotes]) => {
-        const sorted = [...voterVotes].sort((a, b) => b.rating - a.rating)
-        const counts = [4, 3, 2, 1].map(r => ({ r, n: sorted.filter(v => v.rating === r).length })).filter(x => x.n > 0)
-        return (
-          <div key={name}>
-            <div className="flex items-center gap-2 mb-2">
-              <p className="text-xs font-semibold text-foreground">{name}</p>
-              <div className="flex gap-1.5">
-                {counts.map(({ r, n }) => (
-                  <span key={r} className="text-xs text-muted-foreground">
-                    {EMOJIS[r]} {n}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {sorted.map(vote => {
-                const photo = photoMap.get(vote.photoId)
-                if (!photo) return null
-                return (
-                  <div key={vote.photoId} className="relative size-14 rounded-lg overflow-hidden shrink-0">
-                    <img src={photo.url} alt={photo.filename} className="w-full h-full object-cover" />
-                    <span className="absolute bottom-0.5 right-0.5 text-sm leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,.8)]">
-                      {EMOJIS[vote.rating]}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )
-      })}
+      {tagged.length > 0 && <VoterGroup votes={tagged} />}
+      {legacy.length > 0 && <VoterGroup votes={legacy} label="Avant migration (non attribués)" />}
     </div>
   )
 }
@@ -344,7 +346,7 @@ function PartageRow({ entry }: { entry: AlbumPartage }) {
         </div>
         <CopyLink partage={entry} />
       </div>
-      {open && <ReactionsPanel sequenceId={entry.sequenceId} />}
+      {open && <ReactionsPanel entry={entry} />}
     </div>
   )
 }

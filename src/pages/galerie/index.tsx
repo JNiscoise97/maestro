@@ -211,7 +211,7 @@ export function GaleriePage() {
       next.push({ photoId, voterId: visitorIdRef.current, voterName: visitorName, rating, votedAt: new Date().toISOString() })
       return next
     })
-    albumService.vote(photoId, visitorIdRef.current, visitorName, rating).catch(() => {})
+    albumService.vote(photoId, visitorIdRef.current, visitorName, rating, partage.id).catch(() => {})
   }
 
   function handleDeleteVote(photoId: string) {

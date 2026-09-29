@@ -3,7 +3,7 @@ import { Check, ChevronDown, ChevronRight, Copy, Images, Pencil, Plus, Trash2, X
 import { toast } from "sonner"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { albumService, type AlbumPartage, type AlbumPhoto, type AlbumVote } from "@/services/supabase/album"
+import { albumService, type AlbumPartage, type AlbumVote } from "@/services/supabase/album"
 import { useEventSequences } from "@/hooks/queries/use-event-sequences"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"

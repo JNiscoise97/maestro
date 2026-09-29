@@ -1,9 +1,9 @@
 import { useState } from "react"
-import { Check, Copy, Images, Pencil, Plus, Trash2, X } from "lucide-react"
+import { Check, ChevronDown, ChevronRight, Copy, Images, Pencil, Plus, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { albumService, type AlbumPartage } from "@/services/supabase/album"
+import { albumService, type AlbumPartage, type AlbumPhoto, type AlbumVote } from "@/services/supabase/album"
 import { useEventSequences } from "@/hooks/queries/use-event-sequences"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -227,35 +227,124 @@ function EditDialog({ entry }: { entry: AlbumPartage }) {
   )
 }
 
+// ── ReactionsPanel ────────────────────────────────────────────────────────────
+
+const EMOJIS: Record<number, string> = { 1: "🙈", 2: "👎🏾", 3: "👍🏾", 4: "❤️" }
+
+function ReactionsPanel({ sequenceId }: { sequenceId: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["partage_reactions", sequenceId],
+    queryFn: async () => {
+      const [photos, votes] = await Promise.all([
+        albumService.listPhotos(sequenceId),
+        albumService.listVotes(sequenceId),
+      ])
+      return { photos, votes }
+    },
+    staleTime: 30_000,
+  })
+
+  if (isLoading) return (
+    <div className="px-4 py-3 border-t border-border bg-muted/20">
+      <div className="flex gap-2">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="size-14 rounded-lg" />)}</div>
+    </div>
+  )
+
+  const { photos = [], votes = [] } = data ?? {}
+  if (!votes.length) return (
+    <div className="px-4 py-3 border-t border-border bg-muted/20">
+      <p className="text-xs text-muted-foreground">Aucune réaction pour l'instant.</p>
+    </div>
+  )
+
+  // Grouper par voter_name
+  const byVoter = new Map<string, AlbumVote[]>()
+  votes.forEach(v => {
+    const list = byVoter.get(v.voterName) ?? []
+    list.push(v)
+    byVoter.set(v.voterName, list)
+  })
+
+  const photoMap = new Map(photos.map(p => [p.id, p]))
+
+  return (
+    <div className="border-t border-border bg-muted/20 px-4 py-3 space-y-4">
+      {[...byVoter.entries()].map(([name, voterVotes]) => {
+        const sorted = [...voterVotes].sort((a, b) => b.rating - a.rating)
+        const counts = [4, 3, 2, 1].map(r => ({ r, n: sorted.filter(v => v.rating === r).length })).filter(x => x.n > 0)
+        return (
+          <div key={name}>
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-xs font-semibold text-foreground">{name}</p>
+              <div className="flex gap-1.5">
+                {counts.map(({ r, n }) => (
+                  <span key={r} className="text-xs text-muted-foreground">
+                    {EMOJIS[r]} {n}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {sorted.map(vote => {
+                const photo = photoMap.get(vote.photoId)
+                if (!photo) return null
+                return (
+                  <div key={vote.photoId} className="relative size-14 rounded-lg overflow-hidden shrink-0">
+                    <img src={photo.url} alt={photo.filename} className="w-full h-full object-cover" />
+                    <span className="absolute bottom-0.5 right-0.5 text-sm leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,.8)]">
+                      {EMOJIS[vote.rating]}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Row ───────────────────────────────────────────────────────────────────────
 
 function PartageRow({ entry }: { entry: AlbumPartage }) {
+  const [open,    setOpen]    = useState(false)
   const toggle    = useTogglePartage()
   const deletePar = useDeletePartage()
   const { data: sequences = [] } = useEventSequences()
   const seqName = sequences.find(s => s.id === entry.sequenceId)?.name ?? "—"
 
   return (
-    <div className="flex flex-col gap-1.5 px-4 py-3">
-      <div className="flex items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-foreground">{entry.label}</p>
-          <p className="text-xs text-muted-foreground">{seqName}</p>
+    <div>
+      <div className="flex flex-col gap-1.5 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setOpen(v => !v)}
+            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-foreground">{entry.label}</p>
+            <p className="text-xs text-muted-foreground">{seqName}</p>
+          </div>
+          <Badge variant="outline" className={cn("shrink-0 text-[10px]", entry.active ? "border-vert-vegetal/40 text-vert-vegetal" : "text-muted-foreground")}>
+            {entry.active ? "Actif" : "Inactif"}
+          </Badge>
+          <Switch
+            checked={entry.active}
+            onCheckedChange={v => toggle.mutate({ id: entry.id, active: v })}
+            className="shrink-0"
+          />
+          <EditDialog entry={entry} />
+          <DeleteButton isPending={deletePar.isPending} onConfirm={() => {
+            deletePar.mutate(entry.id, { onSuccess: () => toast.success("Partage supprimé.") })
+          }} />
         </div>
-        <Badge variant="outline" className={cn("shrink-0 text-[10px]", entry.active ? "border-vert-vegetal/40 text-vert-vegetal" : "text-muted-foreground")}>
-          {entry.active ? "Actif" : "Inactif"}
-        </Badge>
-        <Switch
-          checked={entry.active}
-          onCheckedChange={v => toggle.mutate({ id: entry.id, active: v })}
-          className="shrink-0"
-        />
-        <EditDialog entry={entry} />
-        <DeleteButton isPending={deletePar.isPending} onConfirm={() => {
-          deletePar.mutate(entry.id, { onSuccess: () => toast.success("Partage supprimé.") })
-        }} />
+        <CopyLink partage={entry} />
       </div>
-      <CopyLink partage={entry} />
+      {open && <ReactionsPanel sequenceId={entry.sequenceId} />}
     </div>
   )
 }

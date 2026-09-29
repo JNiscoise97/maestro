@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Check, ChevronDown, ChevronRight, Copy, Images, Pencil, Plus, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -245,7 +245,24 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })
 }
 
+function Lightbox({ url, onClose }: { url: string; onClose: () => void }) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
+    window.addEventListener("keydown", h)
+    return () => window.removeEventListener("keydown", h)
+  }, [onClose])
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 100, backgroundColor: "rgba(0,0,0,.92)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+      onClick={onClose}
+    >
+      <img src={url} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 4 }} onClick={e => e.stopPropagation()} />
+    </div>
+  )
+}
+
 function ReactionsPanel({ entry }: { entry: AlbumPartage }) {
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const { data, isLoading, dataUpdatedAt } = useQuery({
     queryKey: ["partage_reactions", entry.id],
     queryFn: async () => {
@@ -301,7 +318,7 @@ function ReactionsPanel({ entry }: { entry: AlbumPartage }) {
                   if (!photo) return null
                   return (
                     <div key={`${vote.photoId}-${vote.votedAt}`} className="flex flex-col items-center gap-0.5" style={{ width: 56 }}>
-                      <div className="relative size-14 rounded-lg overflow-hidden shrink-0">
+                      <div className="relative size-14 rounded-lg overflow-hidden shrink-0 cursor-zoom-in" onClick={() => setLightboxUrl(photo.url)}>
                         <img src={photo.url} alt={photo.filename} className="w-full h-full object-cover" />
                         <span className="absolute bottom-0.5 right-0.5 text-sm leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,.8)]">
                           {EMOJIS[vote.rating]}
@@ -332,6 +349,7 @@ function ReactionsPanel({ entry }: { entry: AlbumPartage }) {
           Mis à jour à {lastUpdate} · toutes les 15s
         </p>
       )}
+      {lightboxUrl && <Lightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
     </div>
   )
 }

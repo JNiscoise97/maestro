@@ -276,19 +276,18 @@ function ReactionsPanel({ entry }: { entry: AlbumPartage }) {
   )
 
   function VoteList({ votes, label }: { votes: AlbumVote[]; label?: string }) {
-    // Tri par date desc
     const sorted = [...votes].sort((a, b) => new Date(b.votedAt).getTime() - new Date(a.votedAt).getTime())
     const byVoter = new Map<string, AlbumVote[]>()
     sorted.forEach(v => { const l = byVoter.get(v.voterName) ?? []; l.push(v); byVoter.set(v.voterName, l) })
 
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
         {label && <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>}
         {[...byVoter.entries()].map(([name, voterVotes]) => {
           const counts = [4, 3, 2, 1].map(r => ({ r, n: voterVotes.filter(v => v.rating === r).length })).filter(x => x.n > 0)
           return (
             <div key={name}>
-              <div className="flex items-center gap-2 mb-1.5">
+              <div className="flex items-center gap-2 mb-2">
                 <p className="text-xs font-semibold text-foreground">{name}</p>
                 <div className="flex gap-1.5">
                   {counts.map(({ r, n }) => (
@@ -296,18 +295,19 @@ function ReactionsPanel({ entry }: { entry: AlbumPartage }) {
                   ))}
                 </div>
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-wrap gap-2">
                 {voterVotes.map(vote => {
                   const photo = photoMap.get(vote.photoId)
                   if (!photo) return null
                   return (
-                    <div key={`${vote.photoId}-${vote.votedAt}`} className="flex items-center gap-2.5">
-                      <div className="relative size-9 rounded-md overflow-hidden shrink-0">
+                    <div key={`${vote.photoId}-${vote.votedAt}`} className="flex flex-col items-center gap-0.5" style={{ width: 56 }}>
+                      <div className="relative size-14 rounded-lg overflow-hidden shrink-0">
                         <img src={photo.url} alt={photo.filename} className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0.5 right-0.5 text-sm leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,.8)]">
+                          {EMOJIS[vote.rating]}
+                        </span>
                       </div>
-                      <span className="text-lg leading-none">{EMOJIS[vote.rating]}</span>
-                      <p className="text-xs text-muted-foreground flex-1 truncate">{photo.filename}</p>
-                      <p className="text-[11px] text-muted-foreground/70 shrink-0 tabular-nums">
+                      <p className="text-[10px] text-muted-foreground/70 tabular-nums text-center leading-tight">
                         {relativeTime(vote.votedAt)}
                       </p>
                     </div>

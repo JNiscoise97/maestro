@@ -293,7 +293,11 @@ function ReactionsPanel({ entry }: { entry: AlbumPartage }) {
   )
 
   function VoteList({ votes, label }: { votes: AlbumVote[]; label?: string }) {
-    const sorted = [...votes].sort((a, b) => new Date(b.votedAt).getTime() - new Date(a.votedAt).getTime())
+    // Filtrer sur le nom du partage (ex. "Coco") pour n'afficher que cette personne
+    const entryLabel = entry.label.trim().toLowerCase()
+    const filtered = votes.filter(v => v.voterName.trim().toLowerCase() === entryLabel)
+    const toShow = filtered.length > 0 ? filtered : votes  // fallback si aucun match exact
+    const sorted = [...toShow].sort((a, b) => new Date(b.votedAt).getTime() - new Date(a.votedAt).getTime())
     const byVoter = new Map<string, AlbumVote[]>()
     sorted.forEach(v => { const l = byVoter.get(v.voterName) ?? []; l.push(v); byVoter.set(v.voterName, l) })
 

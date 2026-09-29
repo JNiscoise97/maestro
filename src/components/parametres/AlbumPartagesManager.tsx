@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Check, Copy, Images, Plus, Trash2, X } from "lucide-react"
+import { Check, Copy, Images, Pencil, Plus, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
@@ -33,6 +33,14 @@ function useTogglePartage() {
   return useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) =>
       albumService.updatePartage(id, { active }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: QK }),
+  })
+}
+function useUpdatePartageLabel() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, label, code }: { id: string; label: string; code: string }) =>
+      albumService.updatePartage(id, { label, code }),
     onSuccess: () => qc.invalidateQueries({ queryKey: QK }),
   })
 }
@@ -160,6 +168,65 @@ function CreateDialog() {
   )
 }
 
+// ── EditDialog ────────────────────────────────────────────────────────────────
+
+function EditDialog({ entry }: { entry: AlbumPartage }) {
+  const [open,  setOpen]  = useState(false)
+  const [label, setLabel] = useState(entry.label)
+  const [code,  setCode]  = useState(entry.code)
+  const update = useUpdatePartageLabel()
+
+  function reset() { setLabel(entry.label); setCode(entry.code) }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!label.trim() || !code.trim()) return
+    try {
+      await update.mutateAsync({ id: entry.id, label: label.trim(), code })
+      toast.success("Partage mis à jour.")
+      setOpen(false)
+    } catch (err: any) {
+      if (err?.code === "23505") toast.error("Ce code est déjà utilisé.")
+      else toast.error("Erreur lors de la mise à jour.")
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) reset() }}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DialogTrigger asChild>
+            <Button type="button" variant="ghost" size="icon-xs"><Pencil className="size-3.5" /></Button>
+          </DialogTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Modifier</TooltipContent>
+      </Tooltip>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="font-heading">Modifier le partage</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="ep-label">Nom</FieldLabel>
+              <Input id="ep-label" value={label} onChange={e => setLabel(e.target.value)} required />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="ep-code">Code d'accès</FieldLabel>
+              <Input id="ep-code" value={code} onChange={e => setCode(e.target.value.toUpperCase())}
+                className="font-mono uppercase" required />
+            </Field>
+          </FieldGroup>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Annuler</Button>
+            <Button type="submit" disabled={update.isPending || !label.trim() || !code.trim()}>Enregistrer</Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ── Row ───────────────────────────────────────────────────────────────────────
 
 function PartageRow({ entry }: { entry: AlbumPartage }) {
@@ -183,6 +250,7 @@ function PartageRow({ entry }: { entry: AlbumPartage }) {
           onCheckedChange={v => toggle.mutate({ id: entry.id, active: v })}
           className="shrink-0"
         />
+        <EditDialog entry={entry} />
         <DeleteButton isPending={deletePar.isPending} onConfirm={() => {
           deletePar.mutate(entry.id, { onSuccess: () => toast.success("Partage supprimé.") })
         }} />

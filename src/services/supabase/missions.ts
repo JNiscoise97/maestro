@@ -18,6 +18,7 @@ function toMission(row: {
   scheduled_end_date: string | null
   scheduled_end_time: string | null
   sort_order: number
+  sequence_id?: string | null
   responsible_person_id?: string | null
   responsible_guest_id?: string | null
 }): Mission {
@@ -34,6 +35,7 @@ function toMission(row: {
     scheduledEndDate: row.scheduled_end_date,
     scheduledEndTime: row.scheduled_end_time,
     sortOrder: row.sort_order,
+    sequenceId: row.sequence_id ?? null,
     responsiblePersonId: row.responsible_person_id,
     responsibleGuestId: row.responsible_guest_id,
   }
@@ -88,6 +90,7 @@ export const missionsSupabaseService: MissionsService = {
       scheduled_end_date: string | null
       scheduled_end_time: string | null
       sort_order: number
+      sequence_id: string | null
       responsible_person_id: string | null
       responsible_guest_id: string | null
     }> = {}
@@ -102,6 +105,7 @@ export const missionsSupabaseService: MissionsService = {
     if (patch.scheduledEndDate !== undefined) row.scheduled_end_date = patch.scheduledEndDate ?? null
     if (patch.scheduledEndTime !== undefined) row.scheduled_end_time = patch.scheduledEndTime ?? null
     if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
+    if (patch.sequenceId !== undefined) row.sequence_id = patch.sequenceId ?? null
     if (patch.responsiblePersonId !== undefined) row.responsible_person_id = patch.responsiblePersonId ?? null
     if (patch.responsibleGuestId !== undefined) row.responsible_guest_id = patch.responsibleGuestId ?? null
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

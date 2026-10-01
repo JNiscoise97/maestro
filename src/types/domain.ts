@@ -46,6 +46,7 @@ export interface Pole {
   id: string
   name: string
   sortOrder: number
+  sequenceId?: string | null
   /** Responsable global de tout le pôle — uniquement un fiancé, voir 0042_poles_responsible_person.sql. */
   responsiblePersonId?: string | null
 }
@@ -64,6 +65,7 @@ export interface Domaine {
   sortOrder: number
   solicitedMilestone?: PlanningMilestone | null
   preferredContactId?: string | null
+  sequenceId?: string | null
 }
 
 /** Un responsable de domaine est soit un fiancé (`personId`), soit un invité de confiance qui en devient "référent" (`guestId`) — jamais les deux. */
@@ -93,6 +95,7 @@ export interface Mission {
   scheduledEndDate?: string | null
   scheduledEndTime?: string | null
   sortOrder: number
+  sequenceId?: string | null
   /** Responsable explicite : fiancé (personId) ou personne de confiance (guestId) — au plus un des deux. Sans affectation, hérite du domaine puis du pôle. */
   responsiblePersonId?: string | null
   responsibleGuestId?: string | null

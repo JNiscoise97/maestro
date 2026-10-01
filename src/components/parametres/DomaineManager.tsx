@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { useCreateDomaine, useDomaines, useUpdateDomaine } from "@/hooks/queries/use-domaines"
 import { usePoles } from "@/hooks/queries/use-poles"
 import { usePeople } from "@/hooks/queries/use-people"
+import { useEventSequences } from "@/hooks/queries/use-event-sequences"
 import type { Domaine, DomainePhase, PlanningMilestone } from "@/types/domain"
 import { MILESTONE_LABELS, MILESTONE_ORDER, DOMAINE_PHASE_LABELS, DOMAINE_PHASE_ORDER } from "@/lib/constants"
 import { Button } from "@/components/ui/button"
@@ -41,9 +42,11 @@ export function DomaineDialog({ domaine, initialPoleId }: { domaine?: Domaine; i
   const [phase, setPhase] = useState<DomainePhase | typeof NONE>(domaine?.phase ?? NONE)
   const [milestone, setMilestone] = useState<PlanningMilestone | typeof NONE>(domaine?.solicitedMilestone ?? NONE)
   const [contactId, setContactId] = useState(domaine?.preferredContactId ?? NONE)
+  const [sequenceId, setSequenceId] = useState(domaine?.sequenceId ?? NONE)
   const { data: poles } = usePoles()
   const { data: people } = usePeople()
   const { data: domaines } = useDomaines()
+  const { data: sequences = [] } = useEventSequences()
   const fiances = (people ?? []).filter((p) => p.role === "admin")
   const createDomaine = useCreateDomaine()
   const updateDomaine = useUpdateDomaine()
@@ -56,6 +59,7 @@ export function DomaineDialog({ domaine, initialPoleId }: { domaine?: Domaine; i
       phase: phase === NONE ? null : phase,
       solicitedMilestone: milestone === NONE ? null : milestone,
       preferredContactId: contactId === NONE ? null : contactId,
+      sequenceId: sequenceId === NONE ? null : sequenceId,
     }
     if (domaine) {
       await updateDomaine.mutateAsync({ id: domaine.id, patch: { name, slug: slugify(name), ...patch } })
@@ -170,6 +174,20 @@ export function DomaineDialog({ domaine, initialPoleId }: { domaine?: Domaine; i
                   <SelectItem key={fiance.id} value={fiance.id}>
                     {fiance.fullName}
                   </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field>
+            <FieldLabel>Séquence</FieldLabel>
+            <Select value={sequenceId} onValueChange={setSequenceId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Transverse" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>Transverse</SelectItem>
+                {sequences.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

@@ -4,6 +4,7 @@ import { toast } from "sonner"
 
 import { useCreatePole, useUpdatePole } from "@/hooks/queries/use-poles"
 import { usePeople } from "@/hooks/queries/use-people"
+import { useEventSequences } from "@/hooks/queries/use-event-sequences"
 import type { Pole } from "@/types/domain"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,14 +26,19 @@ export function PoleDialog({ pole }: { pole?: Pole }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(pole?.name ?? "")
   const [responsiblePersonId, setResponsiblePersonId] = useState(pole?.responsiblePersonId ?? NONE)
+  const [sequenceId, setSequenceId] = useState(pole?.sequenceId ?? NONE)
   const { data: people } = usePeople()
+  const { data: sequences = [] } = useEventSequences()
   const fiances = (people ?? []).filter((p) => p.role === "admin")
   const createPole = useCreatePole()
   const updatePole = useUpdatePole()
 
   async function handleSubmit() {
     if (!name.trim()) return
-    const patch = { responsiblePersonId: responsiblePersonId === NONE ? null : responsiblePersonId }
+    const patch = {
+      responsiblePersonId: responsiblePersonId === NONE ? null : responsiblePersonId,
+      sequenceId: sequenceId === NONE ? null : sequenceId,
+    }
     if (pole) {
       await updatePole.mutateAsync({ id: pole.id, patch: { name, ...patch } })
       toast.success("Pôle mis à jour.")
@@ -90,6 +96,20 @@ export function PoleDialog({ pole }: { pole?: Pole }) {
                   <SelectItem key={fiance.id} value={fiance.id}>
                     {fiance.fullName}
                   </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field>
+            <FieldLabel>Séquence</FieldLabel>
+            <Select value={sequenceId} onValueChange={setSequenceId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Transverse" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>Transverse</SelectItem>
+                {sequences.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

@@ -13,6 +13,7 @@ import {
   useReorderChecklistItems,
 } from "@/hooks/queries/use-checklists"
 import { useUpdateMission, useDeleteMission } from "@/hooks/queries/use-missions"
+import { useEventSequences } from "@/hooks/queries/use-event-sequences"
 import type { Checklist, ChecklistItem, Mission, MissionSchedulingType, ProgressStatus } from "@/types/domain"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -218,6 +219,8 @@ const SCHEDULING_OPTIONS: { value: MissionSchedulingType; label: string; descrip
   { value: "en_continu", label: "En continu", description: "Se déroule tout au long de l'événement" },
 ]
 
+const SEQ_NONE = "__none__"
+
 export function MissionEditDialog({ mission }: { mission: Mission }) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState(mission.title)
@@ -229,9 +232,11 @@ export function MissionEditDialog({ mission }: { mission: Mission }) {
   const [scheduledStartTime, setScheduledStartTime] = useState(mission.scheduledStartTime ?? "")
   const [scheduledEndDate, setScheduledEndDate] = useState(mission.scheduledEndDate ?? "")
   const [scheduledEndTime, setScheduledEndTime] = useState(mission.scheduledEndTime ?? "")
+  const [sequenceId, setSequenceId] = useState(mission.sequenceId ?? SEQ_NONE)
 
   const { data: allChecklists } = useAllChecklists()
   const { data: allItems } = useAllChecklistItems()
+  const { data: sequences = [] } = useEventSequences()
   const updateMission = useUpdateMission()
   const deleteMission = useDeleteMission()
   const deleteChecklist = useDeleteChecklist()
@@ -250,6 +255,7 @@ export function MissionEditDialog({ mission }: { mission: Mission }) {
     setScheduledStartTime(mission.scheduledStartTime ?? "")
     setScheduledEndDate(mission.scheduledEndDate ?? "")
     setScheduledEndTime(mission.scheduledEndTime ?? "")
+    setSequenceId(mission.sequenceId ?? SEQ_NONE)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
@@ -288,6 +294,7 @@ export function MissionEditDialog({ mission }: { mission: Mission }) {
         scheduledStartTime: schedulingType === "planifiee" ? (scheduledStartTime || null) : null,
         scheduledEndDate:   schedulingType === "planifiee" ? (scheduledEndDate || null) : null,
         scheduledEndTime:   schedulingType === "planifiee" ? (scheduledEndTime || null) : null,
+        sequenceId: sequenceId === SEQ_NONE ? null : sequenceId,
       },
     })
     toast.success("Mission mise à jour.")
@@ -346,6 +353,20 @@ export function MissionEditDialog({ mission }: { mission: Mission }) {
                 value={prerequisites}
                 onChange={(e) => setPrerequisites(e.target.value)}
               />
+            </Field>
+            <Field>
+              <FieldLabel>Séquence</FieldLabel>
+              <Select value={sequenceId} onValueChange={setSequenceId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Transverse" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SEQ_NONE}>Transverse</SelectItem>
+                  {sequences.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Field>
               <FieldLabel>Statut</FieldLabel>

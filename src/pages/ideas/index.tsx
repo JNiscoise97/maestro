@@ -273,7 +273,7 @@ function IdeaCard({ idea, sequenceName, onClick }: { idea: Idea; sequenceName?: 
       </div>
 
       {idea.description && (
-        <p className="text-xs text-muted-foreground line-clamp-2">{idea.description}</p>
+        <p className="text-xs text-muted-foreground">{idea.description}</p>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -294,7 +294,7 @@ function IdeaCard({ idea, sequenceName, onClick }: { idea: Idea; sequenceName?: 
       </div>
 
       {idea.notes && (
-        <p className="text-xs text-muted-foreground/70 italic line-clamp-1 border-t border-border/50 pt-2">
+        <p className="text-xs text-muted-foreground/70 italic border-t border-border/50 pt-2">
           {idea.notes}
         </p>
       )}

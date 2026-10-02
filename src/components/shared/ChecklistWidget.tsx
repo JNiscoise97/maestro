@@ -1,4 +1,5 @@
-﻿import type { ChecklistOwnerType, Guest, Person } from "@/types/domain"
+﻿import { useMemo, useState } from "react"
+import type { ChecklistItem, ChecklistOwnerType, Guest, Person } from "@/types/domain"
 import {
   useChecklistsForOwner,
   useChecklistItems,
@@ -17,8 +18,20 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ItemScheduleTrigger } from "@/components/missions/ItemScheduleDialog"
 import { ItemMessageTrigger } from "@/components/missions/ItemMessageDialog"
+import { ChecklistItemDialog } from "@/components/parametres/ChecklistItemDialog"
+import { useMilestones } from "@/hooks/queries/use-milestones"
+import { useItemSequenceProgress } from "@/hooks/use-item-sequence-progress"
+import {
+  ITEM_STATE_LABELS, ITEM_STATE_TEXT, NEXT_SEQ_STATUS, SEQ_STATUS_LABELS, dateState, formatDate, toIso,
+} from "@/lib/retroplanning"
+import { cn } from "@/lib/utils"
+import { SequenceDot } from "@/components/shared/SequenceName"
+import { ItemRetroPopover } from "@/components/missions/RetroEditors"
 
 const NONE = "__none__"
+
+/** Valeur de filtre « sans jalon » / « sans séquence ». */
+export const FILTER_NONE = "__none__"
 
 interface ChecklistWidgetProps {
   ownerType: ChecklistOwnerType
@@ -29,6 +42,12 @@ interface ChecklistWidgetProps {
   schedulable?: boolean
   /** Responsable hérité (mission → domaine → pôle) — affiché en placeholder quand l'item n'a pas d'assigné propre. */
   inheritedResponsable?: string
+  /** Affiche le rétroplanning sur chaque item (jalon, dates, état, criticité) + édition de l'item. */
+  showRetro?: boolean
+  /** Ne garde que les items de ce jalon (id) ou sans jalon (FILTER_NONE). */
+  filterMilestoneId?: string | null
+  /** Concentre l'affichage et la case des items sur cette séquence (id). */
+  filterSequenceId?: string | null
 }
 
 function SingleChecklist({
@@ -42,7 +61,15 @@ function SingleChecklist({
   guests,
   inheritedResponsable,
   logChange,
+  ownerType,
+  showRetro,
+  filterMilestoneId,
+  filterSequenceId,
 }: {
+  ownerType: ChecklistOwnerType
+  showRetro?: boolean
+  filterMilestoneId?: string | null
+  filterSequenceId?: string | null
   checklistId: string
   title: string | null
   showTitle: boolean
@@ -59,11 +86,42 @@ function SingleChecklist({
   const updateChecklist = useUpdateChecklist()
   const updateItem = useUpdateChecklistItem()
   const responsible = fiances.find((f) => f.id === responsiblePersonId)
+  const seqProgress = useItemSequenceProgress()
+  const { data: milestones = [] } = useMilestones()
+  const milestoneById = useMemo(() => new Map(milestones.map((m) => [m.id, m])), [milestones])
+  const [today] = useState(() => toIso(new Date()))
+  const isMission = ownerType === "mission"
 
   if (isLoading || !items) return <Skeleton className="h-20 rounded-xl" />
 
-  const doneCount = items.filter((item) => item.isDone).length
-  const progress = items.length > 0 ? Math.round((doneCount / items.length) * 100) : 0
+  const visibleItems = items.filter((item) =>
+    !filterMilestoneId
+    || (filterMilestoneId === FILTER_NONE ? !item.milestoneId : item.milestoneId === filterMilestoneId))
+
+  /** Séquences de l'item (mission) et séquence ciblée par le filtre, si l'item la porte. */
+  function sequencesOf(item: ChecklistItem) {
+    const all = isMission ? seqProgress.sequencesForItem(item) : []
+    const focused = filterSequenceId ? all.find((s) => s.id === filterSequenceId) : undefined
+    return { all, focused }
+  }
+  /** « Fait » au sens de l'affichage : pour la séquence filtrée si elle existe, sinon l'item. */
+  function isShownDone(item: ChecklistItem) {
+    const { focused } = sequencesOf(item)
+    return focused ? seqProgress.statusOf(item, focused.id) !== "todo" : item.isDone
+  }
+  function onCheck(item: ChecklistItem, checked: boolean) {
+    const { all, focused } = sequencesOf(item)
+    if (focused) {
+      seqProgress.setSequenceStatuses([{ item, sequenceId: focused.id, status: checked ? "done" : "todo" }])
+    } else if (all.length > 0) {
+      seqProgress.setItemAll(item, checked)
+    } else {
+      toggleItem.mutate({ itemId: item.id, isDone: checked })
+    }
+  }
+
+  const doneCount = visibleItems.filter(isShownDone).length
+  const progress = visibleItems.length > 0 ? Math.round((doneCount / visibleItems.length) * 100) : 0
 
   return (
     <div className="space-y-2">
@@ -97,12 +155,12 @@ function SingleChecklist({
           ) : null}
         </div>
         <span className="shrink-0 text-xs text-muted-foreground">
-          {doneCount} / {items.length}
+          {doneCount} / {visibleItems.length}
         </span>
       </div>
       <Progress value={progress} />
       <ul className="space-y-1.5">
-        {items.map((item) => {
+        {visibleItems.map((item) => {
           const assigneeGuest  = guests.find((g) => g.id === item.assigneeGuestId)
           const assigneePerson = fiances.find((f) => f.id === item.assigneePersonId)
           const assignee       = assigneeGuest ?? assigneePerson
@@ -112,18 +170,25 @@ function SingleChecklist({
             ? `person:${item.assigneePersonId}`
             : NONE
           return (
-            <li key={item.id} className="flex items-center gap-2">
+            <li key={item.id} className="flex items-start gap-2">
               <Checkbox
                 id={item.id}
-                checked={item.isDone}
-                onCheckedChange={(checked) => toggleItem.mutate({ itemId: item.id, isDone: checked === true })}
+                className="mt-0.5"
+                checked={isShownDone(item)}
+                onCheckedChange={(checked) => onCheck(item, checked === true)}
               />
-              <label
-                htmlFor={item.id}
-                className={item.isDone ? "flex-1 text-sm text-muted-foreground line-through" : "flex-1 text-sm text-foreground"}
-              >
-                {item.label}
-              </label>
+              <ItemBody
+                item={item}
+                done={isShownDone(item)}
+                showRetro={showRetro}
+                today={today}
+                milestone={item.milestoneId ? milestoneById.get(item.milestoneId) : undefined}
+                sequences={sequencesOf(item)}
+                statusOf={(seqId) => seqProgress.statusOf(item, seqId)}
+                onCycle={(seqId) => seqProgress.setSequenceStatuses([
+                  { item, sequenceId: seqId, status: NEXT_SEQ_STATUS[seqProgress.statusOf(item, seqId)] },
+                ])}
+              />
               {(guests.length > 0 || fiances.length > 0) && (
                 <Select
                   value={currentValue}
@@ -182,6 +247,7 @@ function SingleChecklist({
               )}
               {schedulable && <ItemScheduleTrigger item={item} />}
               <ItemMessageTrigger item={item} />
+              {showRetro && <ChecklistItemDialog item={item} checklistId={item.checklistId} />}
             </li>
           )
         })}
@@ -190,7 +256,109 @@ function SingleChecklist({
   )
 }
 
-export function ChecklistWidget({ ownerType, ownerId, allowAssignment = true, schedulable, inheritedResponsable }: ChecklistWidgetProps) {
+/** Libellé + rétroplanning + pastilles de séquences d'un item. */
+function ItemBody({ item, done, showRetro, today, milestone, sequences, statusOf, onCycle }: {
+  item: ChecklistItem
+  done: boolean
+  showRetro?: boolean
+  today: string
+  milestone?: { name: string; sortOrder: number; targetDate: string }
+  sequences: {
+    all: { id: string; name: string; color?: string | null; sortOrder?: number }[]
+    focused?: { id: string; name: string; color?: string | null; sortOrder?: number }
+  }
+  statusOf: (sequenceId: string) => "todo" | "done" | "na"
+  onCycle: (sequenceId: string) => void
+}) {
+  const { all, focused } = sequences
+  const state = done ? "done" : dateState(item, today)
+  const seqDone = all.filter((s) => statusOf(s.id) !== "todo").length
+  // Pastilles : la séquence filtrée seule, sinon toutes dès qu'il y en a plusieurs.
+  const chips = focused ? [focused] : all.length > 1 ? all : []
+  const hasRetro = showRetro && (milestone || item.targetDate || item.deadlineDate || item.criticality === "blocking")
+  return (
+    <div className="min-w-0 flex-1">
+      <label
+        htmlFor={item.id}
+        className={done ? "text-sm text-muted-foreground line-through" : "text-sm text-foreground"}
+      >
+        {item.label}
+      </label>
+      {showRetro && (
+        <ItemRetroPopover item={item}>
+          <button
+            type="button"
+            title="Modifier le jalon, les dates et la criticité"
+            className="-mx-1 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded px-1 text-left text-[11px] text-muted-foreground transition-colors hover:bg-muted/70"
+          >
+            {hasRetro ? (
+              <>
+                {milestone && (
+                  <span
+                    className="rounded bg-muted px-1.5 py-px font-semibold tabular-nums text-foreground"
+                    title={`${milestone.name} — ${formatDate(milestone.targetDate, { day: "numeric", month: "long", year: "numeric" })}`}
+                  >
+                    J{milestone.sortOrder}
+                  </span>
+                )}
+                {(milestone || item.targetDate || item.deadlineDate) && (
+                  <span className={cn("font-medium", ITEM_STATE_TEXT[state])}>
+                    {ITEM_STATE_LABELS[state]}
+                    {!done && all.length > 1 && !focused ? ` · ${seqDone}/${all.length}` : ""}
+                  </span>
+                )}
+                {(item.targetDate || item.deadlineDate) && (
+                  <span
+                    className="tabular-nums"
+                    title={item.idealStartDate ? `Début idéal : ${formatDate(item.idealStartDate)}` : undefined}
+                  >
+                    {item.targetDate ? `cible ${formatDate(item.targetDate)}` : ""}
+                    {item.targetDate && item.deadlineDate ? " · " : ""}
+                    {item.deadlineDate ? `limite ${formatDate(item.deadlineDate)}` : ""}
+                  </span>
+                )}
+                {!done && item.criticality === "blocking" && (
+                  <span className="rounded-full bg-bordeaux/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-bordeaux">
+                    Bloquant
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="text-muted-foreground/70 hover:text-foreground">+ Planifier (jalon, dates)</span>
+            )}
+          </button>
+        </ItemRetroPopover>
+      )}
+      {chips.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {chips.map((seq) => {
+            const st = statusOf(seq.id)
+            return (
+              <button key={seq.id} type="button" onClick={() => onCycle(seq.id)}
+                title={`${seq.name} — ${SEQ_STATUS_LABELS[st]} (clic : à faire → fait → non concernée)`}
+                aria-label={`${seq.name} : ${SEQ_STATUS_LABELS[st]}`}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors",
+                  st === "done" && "border-vert-vegetal bg-vert-vegetal/15 text-vert-vegetal",
+                  st === "na" && "border-dashed border-border text-muted-foreground/60 line-through",
+                  st === "todo" && "border-border bg-card text-foreground hover:border-lagon",
+                )}
+              >
+                {st === "done" ? <span aria-hidden>✓</span> : <SequenceDot sequence={seq} />}
+                {seq.name}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function ChecklistWidget({
+  ownerType, ownerId, allowAssignment = true, schedulable, inheritedResponsable,
+  showRetro, filterMilestoneId, filterSequenceId,
+}: ChecklistWidgetProps) {
   const { data: checklists, isLoading } = useChecklistsForOwner(ownerType, ownerId)
   const { data: people } = usePeople()
   const { data: guestsData } = useGuests()
@@ -226,6 +394,10 @@ export function ChecklistWidget({ ownerType, ownerId, allowAssignment = true, sc
           guests={assignableGuests}
           inheritedResponsable={inheritedResponsable}
           logChange={logChange}
+          ownerType={ownerType}
+          showRetro={showRetro}
+          filterMilestoneId={filterMilestoneId}
+          filterSequenceId={filterSequenceId}
         />
       ))}
     </div>

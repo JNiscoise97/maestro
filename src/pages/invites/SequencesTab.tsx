@@ -9,6 +9,7 @@ import { useEventSequences } from "@/hooks/queries/use-event-sequences"
 import { useGuestSequences, useAssignGuestToSequence, useUnassignGuestFromSequence } from "@/hooks/queries/use-guest-sequences"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { SequenceDot } from "@/components/shared/SequenceName"
 
 type StatusFilter = "all" | "main_list" | "secondary_list"
 type SideFilter   = "all" | "sarah" | "jordan"
@@ -302,7 +303,9 @@ export function SequencesTab() {
                   : "bg-background text-foreground border-border"
               }`}
             >
-              <span className="font-semibold leading-snug max-w-[140px]">{seq.name}</span>
+              <span className="font-semibold leading-snug max-w-[140px] inline-flex items-center gap-1.5">
+                <SequenceDot sequence={seq} />{seq.name}
+              </span>
               {date && <span className={`text-[10px] mt-0.5 ${active ? "text-primary-foreground/70" : "text-muted-foreground"}`}>{date}</span>}
               <span className={`text-[10px] font-medium mt-1 tabular-nums ${active ? "text-primary-foreground/80" : "text-primary"}`}>
                 {checked}/{total} invité{total > 1 ? "s" : ""}
@@ -515,7 +518,9 @@ function DesktopSeqHeader({ seq, visible, total, absent }: {
   const expected = total - absent
   return (
     <div className="flex flex-col items-center gap-0.5">
-      <span className="text-[11px] font-semibold leading-snug text-center">{seq.name}</span>
+      <span className="text-[11px] font-semibold leading-snug text-center inline-flex items-center gap-1">
+        <SequenceDot sequence={seq} className="size-1.5" />{seq.name}
+      </span>
       {date && <span className="text-[10px] text-muted-foreground font-normal">{date}</span>}
       <span className="text-[10px] font-medium text-primary tabular-nums">
         {visible}/{total} invité{total > 1 ? "s" : ""}

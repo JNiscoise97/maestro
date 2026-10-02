@@ -13,6 +13,7 @@ import { useAssignSeat, useTableAssignments, useTables, useUnassignSeat, useUpda
 import { useEventSequences } from "@/hooks/queries/use-event-sequences"
 import { SeatingPlanBoard } from "@/components/plan-table/SeatingPlanBoard"
 import { SeatingPlanCanvas } from "@/components/plan-table/SeatingPlanCanvas"
+import { SequenceDot } from "@/components/shared/SequenceName"
 
 type View = "placement" | "espace"
 
@@ -58,6 +59,7 @@ export function PlanTablePage() {
               variant={activeSequenceId === seq.id ? "default" : "outline"}
               onClick={() => setSelectedSequenceId(seq.id)}
             >
+              <SequenceDot sequence={seq} />
               {seq.name}
             </Button>
           ))}

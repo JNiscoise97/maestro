@@ -27,6 +27,7 @@ import { GuestTreeView } from "@/components/invites/GuestTreeView"
 import { useEventSequences } from "@/hooks/queries/use-event-sequences"
 import { useGuestSequences } from "@/hooks/queries/use-guest-sequences"
 import { useGuestCheckins, useCheckInForSequence, useUndoCheckinForSequence } from "@/hooks/queries/use-guest-checkins"
+import { SequenceDot } from "@/components/shared/SequenceName"
 
 const NO_FAMILY = "__no_family__"
 
@@ -180,6 +181,7 @@ export function AccueilPage() {
               variant={activeSequenceId === seq.id ? "default" : "outline"}
               onClick={() => setSelectedSequenceId(seq.id)}
             >
+              <SequenceDot sequence={seq} />
               {seq.name}
               {seq.startTime && <span className="ml-1.5 text-xs opacity-70">{seq.startTime.slice(0, 5)}</span>}
             </Button>

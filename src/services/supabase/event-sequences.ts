@@ -14,6 +14,7 @@ type SeqRow = {
   description: string | null
   sort_order: number
   created_at: string
+  color?: string | null
 }
 
 function toSeq(r: SeqRow): EventSequence {
@@ -27,6 +28,7 @@ function toSeq(r: SeqRow): EventSequence {
     description: r.description,
     sortOrder: r.sort_order,
     createdAt: r.created_at,
+    color: r.color ?? null,
   }
 }
 
@@ -48,6 +50,7 @@ export const eventSequencesService = {
     endTime?: string | null
     description?: string | null
     sortOrder: number
+    color?: string | null
   }): Promise<EventSequence> {
     const { data, error } = await db
       .from(tbl("event_sequences") as any)
@@ -59,6 +62,7 @@ export const eventSequencesService = {
         end_time: payload.endTime ?? null,
         description: payload.description ?? null,
         sort_order: payload.sortOrder,
+        ...(payload.color !== undefined ? { color: payload.color } : {}),
       })
       .select("*")
       .single()
@@ -74,6 +78,7 @@ export const eventSequencesService = {
     endTime: string | null
     description: string | null
     sortOrder: number
+    color: string | null
   }>): Promise<EventSequence> {
     const row: Partial<Record<string, unknown>> = {}
     if (patch.name !== undefined) row.name = patch.name
@@ -83,6 +88,7 @@ export const eventSequencesService = {
     if (patch.endTime !== undefined) row.end_time = patch.endTime
     if (patch.description !== undefined) row.description = patch.description
     if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
+    if (patch.color !== undefined) row.color = patch.color
     const { data, error } = await db
       .from(tbl("event_sequences") as any)
       .update(row)

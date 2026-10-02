@@ -14,6 +14,8 @@ import {
 } from "@/hooks/queries/use-checklists"
 import { useUpdateMission, useDeleteMission } from "@/hooks/queries/use-missions"
 import { useEventSequences } from "@/hooks/queries/use-event-sequences"
+import { SequenceName } from "@/components/shared/SequenceName"
+import { useMissionSequences, useSetMissionSequences } from "@/hooks/queries/use-mission-sequences"
 import type { Checklist, ChecklistItem, Mission, MissionSchedulingType, ProgressStatus } from "@/types/domain"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -28,6 +30,7 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { StatusBadge } from "@/components/shared/StatusBadge"
 import { PriorityBadge } from "@/components/shared/PriorityBadge"
@@ -219,8 +222,6 @@ const SCHEDULING_OPTIONS: { value: MissionSchedulingType; label: string; descrip
   { value: "en_continu", label: "En continu", description: "Se déroule tout au long de l'événement" },
 ]
 
-const SEQ_NONE = "__none__"
-
 export function MissionEditDialog({ mission }: { mission: Mission }) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState(mission.title)
@@ -232,18 +233,20 @@ export function MissionEditDialog({ mission }: { mission: Mission }) {
   const [scheduledStartTime, setScheduledStartTime] = useState(mission.scheduledStartTime ?? "")
   const [scheduledEndDate, setScheduledEndDate] = useState(mission.scheduledEndDate ?? "")
   const [scheduledEndTime, setScheduledEndTime] = useState(mission.scheduledEndTime ?? "")
-  const [sequenceId, setSequenceId] = useState(mission.sequenceId ?? SEQ_NONE)
+
+  const [selectedSequenceIds, setSelectedSequenceIds] = useState<string[]>([])
 
   const { data: allChecklists } = useAllChecklists()
   const { data: allItems } = useAllChecklistItems()
-  const { data: sequences = [] } = useEventSequences()
+  const { data: availableSequences } = useEventSequences()
+  const { data: currentSequenceIds } = useMissionSequences(mission.id, open)
   const updateMission = useUpdateMission()
   const deleteMission = useDeleteMission()
   const deleteChecklist = useDeleteChecklist()
   const deleteItem = useDeleteChecklistItem()
   const reorderItems = useReorderChecklistItems()
+  const setMissionSequences = useSetMissionSequences()
 
-  // Resync le formulaire à chaque ouverture (au cas où la mission a été modifiée entre-temps)
   useEffect(() => {
     if (!open) return
     setTitle(mission.title)
@@ -255,9 +258,12 @@ export function MissionEditDialog({ mission }: { mission: Mission }) {
     setScheduledStartTime(mission.scheduledStartTime ?? "")
     setScheduledEndDate(mission.scheduledEndDate ?? "")
     setScheduledEndTime(mission.scheduledEndTime ?? "")
-    setSequenceId(mission.sequenceId ?? SEQ_NONE)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+
+  useEffect(() => {
+    setSelectedSequenceIds(currentSequenceIds ?? [])
+  }, [currentSequenceIds])
 
   const missionChecklists = useMemo(
     () =>
@@ -294,10 +300,16 @@ export function MissionEditDialog({ mission }: { mission: Mission }) {
         scheduledStartTime: schedulingType === "planifiee" ? (scheduledStartTime || null) : null,
         scheduledEndDate:   schedulingType === "planifiee" ? (scheduledEndDate || null) : null,
         scheduledEndTime:   schedulingType === "planifiee" ? (scheduledEndTime || null) : null,
-        sequenceId: sequenceId === SEQ_NONE ? null : sequenceId,
       },
     })
+    await setMissionSequences.mutateAsync({ missionId: mission.id, sequenceIds: selectedSequenceIds }).catch(() => {})
     toast.success("Mission mise à jour.")
+  }
+
+  function toggleSequence(id: string) {
+    setSelectedSequenceIds((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    )
   }
 
   async function handleDeleteMission() {
@@ -353,20 +365,6 @@ export function MissionEditDialog({ mission }: { mission: Mission }) {
                 value={prerequisites}
                 onChange={(e) => setPrerequisites(e.target.value)}
               />
-            </Field>
-            <Field>
-              <FieldLabel>Séquence</FieldLabel>
-              <Select value={sequenceId} onValueChange={setSequenceId}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Transverse" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SEQ_NONE}>Transverse</SelectItem>
-                  {sequences.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </Field>
             <Field>
               <FieldLabel>Statut</FieldLabel>
@@ -456,6 +454,31 @@ export function MissionEditDialog({ mission }: { mission: Mission }) {
               </div>
             )}
           </FieldGroup>
+
+          {(availableSequences ?? []).length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-foreground">Séquences</p>
+              <div className="space-y-1.5">
+                {(availableSequences ?? []).map((seq) => (
+                  <label
+                    key={seq.id}
+                    className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm hover:bg-muted/60"
+                  >
+                    <Checkbox
+                      checked={selectedSequenceIds.includes(seq.id)}
+                      onCheckedChange={() => toggleSequence(seq.id)}
+                    />
+                    <SequenceName sequence={seq} />
+                    {seq.eventDate && (
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {new Date(seq.eventDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-between">
             <Button

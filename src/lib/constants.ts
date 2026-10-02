@@ -19,6 +19,7 @@
   Lightbulb,
   PiggyBank,
   Image,
+  Clapperboard,
   type LucideIcon,
 } from "lucide-react"
 
@@ -74,6 +75,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Équipe", path: "/referents", icon: Users, capability: "view:referents" },
   { label: "Planning", path: "/planning", icon: CalendarRange, capability: "view:planning" },
   { label: "Déroulé", path: "/deroule", icon: PartyPopper, capability: "view:deroule" },
+  { label: "Conducteur", path: "/conducteur", icon: Clapperboard, capability: "view:conducteur", visibleToRoles: ["admin"] },
   { label: "Messages", path: "/messages", icon: MessageSquare, capability: "view:messages" },
   { label: "Mes missions", path: "/mes-responsabilites", icon: ClipboardList, capability: "view:briefing" },
   { label: "Photos de groupe", path: "/photos-groupe", icon: Camera, capability: "view:photos-groupe" },

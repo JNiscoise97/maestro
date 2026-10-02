@@ -1,7 +1,7 @@
 ﻿import { useMemo, useState } from "react"
 import {
   ListChecks, LayoutGrid, FolderTree, CheckCircle2, TriangleAlert,
-  Clock, Ban, ArrowRight, Calendar, RefreshCw, UserPlus, History,
+  Clock, Ban, ArrowRight, Calendar, RefreshCw, UserPlus, History, Download,
 } from "lucide-react"
 
 import { toast } from "sonner"
@@ -17,7 +17,13 @@ import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { StatusBadge } from "@/components/shared/StatusBadge"
 import { Badge } from "@/components/ui/badge"
-import { ChecklistWidget } from "@/components/shared/ChecklistWidget"
+import { ChecklistWidget, FILTER_NONE } from "@/components/shared/ChecklistWidget"
+import { MissionSequenceProgress } from "@/components/missions/MissionSequenceProgress"
+import { MissionRetroPopover } from "@/components/missions/RetroEditors"
+import { SequenceName } from "@/components/shared/SequenceName"
+import { useEventSequences } from "@/hooks/queries/use-event-sequences"
+import { useAllMissionSequences } from "@/hooks/queries/use-mission-sequences"
+import { useItemSequenceProgress } from "@/hooks/use-item-sequence-progress"
 import { ChecklistItemCard } from "@/components/checklist-items/ChecklistItemCard"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useMissions, useUpdateMission } from "@/hooks/queries/use-missions"
@@ -33,6 +39,8 @@ import { useIdentity } from "@/context/IdentityContext"
 import { useResponsableEntries } from "@/hooks/use-responsable-entries"
 import { useAssigneeHistory } from "@/hooks/queries/use-assignee-history"
 import { MissionEditDialog } from "@/components/missions/MissionEditDialog"
+import { RetroplanningView } from "@/components/missions/RetroplanningView"
+import { useMilestones } from "@/hooks/queries/use-milestones"
 import { MissionResponsableSelect } from "@/components/missions/MissionResponsableSelect"
 import { DomaineResponsableSelect } from "@/components/shared/DomaineResponsableSelect"
 import { DOMAINE_PHASE_LABELS, DOMAINE_PHASE_ORDER } from "@/lib/constants"
@@ -68,10 +76,17 @@ function DomaineMissionsCard({
   domaine,
   missions,
   effectiveByMissionId,
+  itemsByMissionId,
+  filterMilestoneId,
+  filterSequenceId,
 }: {
   domaine: Domaine
   missions: Mission[]
   effectiveByMissionId?: Map<string, EffectiveResponsable | null>
+  /** Items par mission, pour l'avancement par séquence affiché en tête de mission. */
+  itemsByMissionId?: Map<string, ChecklistItem[]>
+  filterMilestoneId?: string | null
+  filterSequenceId?: string | null
 }) {
   const schedulable = SCHEDULABLE_PHASES.has(domaine.phase ?? "")
   return (
@@ -107,8 +122,14 @@ function DomaineMissionsCard({
                 {schedulable && (
                   <MissionResponsableSelect mission={mission} inheritedName={missionParentName} />
                 )}
+                <MissionRetroPopover items={itemsByMissionId?.get(mission.id) ?? []} />
                 <MissionEditDialog mission={mission} />
               </div>
+              <MissionSequenceProgress
+                missionId={mission.id}
+                items={itemsByMissionId?.get(mission.id) ?? []}
+                highlightSequenceId={filterSequenceId && filterSequenceId !== FILTER_NONE ? filterSequenceId : null}
+              />
               {mission.description ? <p className="text-xs text-muted-foreground">{mission.description}</p> : null}
               <ChecklistWidget
                 ownerType="mission"
@@ -116,14 +137,19 @@ function DomaineMissionsCard({
                 allowAssignment={false}
                 schedulable={schedulable}
                 inheritedResponsable={inheritedForItems}
+                showRetro
+                filterMilestoneId={filterMilestoneId}
+                filterSequenceId={filterSequenceId && filterSequenceId !== FILTER_NONE ? filterSequenceId : null}
               />
             </div>
           )
         })}
+        {!filterMilestoneId && !filterSequenceId && (
         <div className="space-y-1.5 rounded-xl border border-dashed border-border p-3">
           <p className="text-xs font-medium text-muted-foreground">Definition of Done du domaine</p>
           <ChecklistWidget ownerType="domaine" ownerId={domaine.id} allowAssignment={false} />
         </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -443,9 +469,187 @@ export function MissionsPage() {
 
   const isFiance = person?.role === "admin"
   const { data: assigneeHistory = [] } = useAssigneeHistory()
+  const { data: milestones = [] } = useMilestones()
   const [activeTab, setActiveTab] = useState(DASHBOARD_TAB)
-  const [fianceView, setFianceView] = useState<"pilotage" | "operationnelle">("pilotage")
+  const [fianceView, setFianceView] = useState<"pilotage" | "retroplanning" | "operationnelle">("pilotage")
   const [phaseFilter, setPhaseFilter] = useState<string | null>(null)
+  // Filtres rétroplanning de l'onglet pôle : jalon (id | FILTER_NONE) et séquence (id | FILTER_NONE).
+  const [milestoneFilter, setMilestoneFilter] = useState<string | null>(null)
+  const [sequenceFilter, setSequenceFilter] = useState<string | null>(null)
+  const { data: eventSequences = [] } = useEventSequences()
+  const { data: missionSequenceLinks = [] } = useAllMissionSequences()
+  const sequenceIdsByMission = useMemo(() => {
+    const map = new Map<string, Set<string>>()
+    for (const l of missionSequenceLinks) {
+      const set = map.get(l.missionId) ?? new Set<string>()
+      set.add(l.sequenceId)
+      map.set(l.missionId, set)
+    }
+    return map
+  }, [missionSequenceLinks])
+  const sortedSequences = useMemo(
+    () => [...eventSequences].sort((a, b) => a.sortOrder - b.sortOrder),
+    [eventSequences],
+  )
+
+  const seqProgress = useItemSequenceProgress()
+
+  /**
+   * Avancement « items × séquences », même calcul que le rétroplanning : chaque item
+   * compte une fois par séquence de sa mission (hors séquences non concernées), ou une
+   * fois s'il n'y a pas de séquence. Une carte mission × séquence est terminée quand
+   * tous ses items concernés sont faits.
+   */
+  function retroStats(missionList: Mission[]) {
+    let done = 0, total = 0, blocksDone = 0, blocksTotal = 0
+    for (const m of missionList) {
+      const items = itemsByMissionId.get(m.id) ?? []
+      if (items.length === 0) continue
+      const seqs = seqProgress.sequencesForMission(m.id)
+      const groups = seqs.length === 0
+        ? [items.map((i) => (i.isDone ? "done" : "todo"))]
+        : seqs.map((seq) => items.map((i) => seqProgress.statusOf(i, seq.id)))
+      for (const statuses of groups) {
+        const concerned = statuses.filter((st) => st !== "na")
+        if (concerned.length === 0) continue
+        const d = concerned.filter((st) => st === "done").length
+        done += d
+        total += concerned.length
+        blocksTotal++
+        if (d === concerned.length) blocksDone++
+      }
+    }
+    return { done, total, percent: total > 0 ? Math.round((done / total) * 100) : 0, blocksDone, blocksTotal }
+  }
+
+  /** Une mission reste affichée si elle correspond aux filtres jalon et séquence. */
+  function missionMatchesRetroFilters(mission: Mission): boolean {
+    if (sequenceFilter) {
+      const seqs = sequenceIdsByMission.get(mission.id)
+      if (sequenceFilter === FILTER_NONE ? (seqs?.size ?? 0) > 0 : !seqs?.has(sequenceFilter)) return false
+    }
+    if (milestoneFilter) {
+      const items = itemsByMissionId.get(mission.id) ?? []
+      const ok = items.some((i) => (milestoneFilter === FILTER_NONE ? !i.milestoneId : i.milestoneId === milestoneFilter))
+      if (!ok) return false
+    }
+    return true
+  }
+
+  function exportCSV() {
+    if (!visibleMissions || !domaines || !poles || !checklists || !checklistItems) return
+
+    const domaineById   = new Map(domaines.map((d) => [d.id, d]))
+    const poleById      = new Map(poles.map((p) => [p.id, p]))
+    const milestoneById = new Map(milestones.map((m) => [m.id, m]))
+
+    const PHASE_LABELS: Record<string, string> = {
+      avant: "Avant", installation: "Installation", jour_j: "Jour J",
+      desinstallation: "Désinstallation", apres: "Après",
+    }
+    const STATUS_LABELS: Record<string, string> = {
+      todo: "À faire", in_progress: "En cours", done: "Terminé", blocked: "Bloqué",
+    }
+    const PRIORITY_LABELS: Record<string, string> = {
+      low: "Basse", normal: "Normale", high: "Haute", urgent: "Urgente",
+    }
+
+    const rows: string[][] = []
+    const header = [
+      "Pôle", "Domaine", "Phase", "Mission", "Statut mission",
+      "Checklist", "Item", "Statut item", "Priorité", "Fait",
+      "Date début", "Heure début", "Date fin", "Heure fin",
+      "Code jalon", "Jalon", "Début idéal", "Date cible", "Date limite", "Criticité",
+    ]
+    rows.push(header)
+
+    const missionChecklists = new Map<string, typeof checklists>()
+    for (const cl of checklists) {
+      if (cl.ownerType !== "mission" || !cl.ownerId) continue
+      const list = missionChecklists.get(cl.ownerId) ?? []
+      list.push(cl)
+      missionChecklists.set(cl.ownerId, list)
+    }
+    const itemsByChecklist = new Map<string, typeof checklistItems>()
+    for (const item of checklistItems) {
+      const list = itemsByChecklist.get(item.checklistId) ?? []
+      list.push(item)
+      itemsByChecklist.set(item.checklistId, list)
+    }
+
+    for (const mission of visibleMissions) {
+      const domaine = mission.domaineId ? domaineById.get(mission.domaineId) : undefined
+      const pole    = domaine?.poleId ? poleById.get(domaine.poleId) : undefined
+      const mCls    = missionChecklists.get(mission.id) ?? []
+
+      if (mCls.length === 0) {
+        rows.push([
+          pole?.name ?? "",
+          domaine?.name ?? "",
+          domaine?.phase ? (PHASE_LABELS[domaine.phase] ?? domaine.phase) : "",
+          mission.title,
+          STATUS_LABELS[mission.status] ?? mission.status,
+          "", "", "", "", "", "", "", "", "",
+          "", "", "", "", "", "",
+        ])
+        continue
+      }
+
+      for (const cl of mCls) {
+        const items = (itemsByChecklist.get(cl.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder)
+        if (items.length === 0) {
+          rows.push([
+            pole?.name ?? "",
+            domaine?.name ?? "",
+            domaine?.phase ? (PHASE_LABELS[domaine.phase] ?? domaine.phase) : "",
+            mission.title,
+            STATUS_LABELS[mission.status] ?? mission.status,
+            cl.title ?? "",
+            "", "", "", "", "", "", "", "",
+            "", "", "", "", "", "",
+          ])
+          continue
+        }
+        for (const item of items) {
+          rows.push([
+            pole?.name ?? "",
+            domaine?.name ?? "",
+            domaine?.phase ? (PHASE_LABELS[domaine.phase] ?? domaine.phase) : "",
+            mission.title,
+            STATUS_LABELS[mission.status] ?? mission.status,
+            cl.title ?? "",
+            item.label,
+            STATUS_LABELS[item.status] ?? item.status,
+            PRIORITY_LABELS[item.priority] ?? item.priority,
+            item.isDone ? "Oui" : "Non",
+            item.estimatedStartDate ?? "",
+            item.estimatedStartTime ?? "",
+            item.estimatedEndDate ?? "",
+            item.estimatedEndTime ?? "",
+            ...(() => {
+              const ms = item.milestoneId ? milestoneById.get(item.milestoneId) : undefined
+              return ms
+                ? [`J${ms.sortOrder}`, ms.name, item.idealStartDate ?? "", item.targetDate ?? "",
+                   item.deadlineDate ?? "", item.criticality ?? ""]
+                : ["", "", "", "", "", ""]
+            })(),
+          ])
+        }
+      }
+    }
+
+    const csv = rows
+      .map((r) => r.map((cell) => `"${(cell ?? "").replace(/"/g, '""')}"`).join(";"))
+      .join("\n")
+    const bom = "﻿"
+    const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "missions_checklist.csv"
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   function switchTab(tab: string) {
     setActiveTab(tab)
@@ -505,16 +709,18 @@ export function MissionsPage() {
           <CardTitle className="font-heading text-base">Avancement par pôle</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {poleGroups.map(({ pole, stats }) => (
+          {poleGroups.map(({ pole, stats, domaineGroups }) => {
+            const rs = retroStats(domaineGroups.flatMap((g) => g.missions))
+            return (
             <div key={pole.id} className="flex items-center gap-3 rounded-xl border border-border px-3 py-2">
               <div className="flex-1 space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium text-foreground">{pole.name}</p>
-                  <span className="text-xs text-muted-foreground">
-                    {stats.done} / {stats.total} ({stats.percent}%)
+                  <span className="text-xs text-muted-foreground" title="Items × séquences, comme dans le rétroplanning">
+                    {rs.done} / {rs.total} ({rs.percent}%)
                   </span>
                 </div>
-                <Progress value={stats.percent} />
+                <Progress value={rs.percent} />
                 <p className="text-xs text-muted-foreground">
                   {stats.domaineCount} domaine{stats.domaineCount === 1 ? "" : "s"} ·{" "}
                   {stats.missionCount} mission{stats.missionCount === 1 ? "" : "s"}
@@ -525,7 +731,8 @@ export function MissionsPage() {
                 <ArrowRight className="size-3.5" />
               </Button>
             </div>
-          ))}
+            )
+          })}
         </CardContent>
       </Card>
 
@@ -695,7 +902,10 @@ export function MissionsPage() {
     </>
   )
 
+  const globalRetro = retroStats(poleGroups.flatMap((g) => g.domaineGroups.flatMap((d) => d.missions)))
+
   const poleTabsContents = poleGroups.map(({ pole, domaineGroups, stats }) => {
+    const rs = retroStats(domaineGroups.flatMap((g) => g.missions))
     const responsiblePerson = pole.responsiblePersonId
       ? (people ?? []).find((p) => p.id === pole.responsiblePersonId)
       : undefined
@@ -712,8 +922,12 @@ export function MissionsPage() {
               {stats.missionCount} mission{stats.missionCount === 1 ? "" : "s"}
             </span>
             <span aria-hidden>·</span>
-            <span>
-              {stats.done} / {stats.total} items terminés ({stats.percent}%)
+            <span title="Chaque item compte une fois par séquence de sa mission (hors séquences non concernées), comme dans le rétroplanning.">
+              Missions × séquences : {rs.blocksDone} / {rs.blocksTotal}
+            </span>
+            <span aria-hidden>·</span>
+            <span title="Chaque item compte une fois par séquence de sa mission (hors séquences non concernées), comme dans le rétroplanning.">
+              Items × séquences : {rs.done} / {rs.total} faits ({rs.percent}%)
             </span>
             {responsiblePerson && (
               <>
@@ -724,7 +938,7 @@ export function MissionsPage() {
               </>
             )}
           </div>
-          <Progress value={stats.percent} />
+          <Progress value={rs.percent} />
         </CardContent>
       </Card>
       {(() => {
@@ -733,7 +947,7 @@ export function MissionsPage() {
         for (const { domaine, missions: dm } of domaineGroups) {
           const phase = domaine.phase ?? "__none__"
           const items = dm.flatMap((m) => itemsByMissionId.get(m.id) ?? [])
-          const ds = itemStats(items)
+          const ds = retroStats(dm)
           const unscheduled = SCHEDULABLE.has(phase) ? items.filter((i) => !i.taskSchedulingType).length : 0
           const prev = byPhase.get(phase) ?? { done: 0, total: 0, unscheduled: 0 }
           byPhase.set(phase, { done: prev.done + ds.done, total: prev.total + ds.total, unscheduled: prev.unscheduled + unscheduled })
@@ -771,18 +985,63 @@ export function MissionsPage() {
           </Card>
         )
       })()}
-      {domaineGroups
-        .filter(({ domaine }) => phaseFilter === null || domaine.phase === phaseFilter)
-        .map(({ domaine, missions: domaineMissions }) => {
-          return (
-            <DomaineMissionsCard
-              key={domaine.id}
-              domaine={domaine}
-              missions={domaineMissions}
-              effectiveByMissionId={effectiveByMissionId}
-            />
-          )
-        })}
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">Jalon</p>
+          <Select value={milestoneFilter ?? "__all__"} onValueChange={(v) => setMilestoneFilter(v === "__all__" ? null : v)}>
+            <SelectTrigger size="sm" className="w-64">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Tous les jalons</SelectItem>
+              {milestones.map((m) => (
+                <SelectItem key={m.id} value={m.id}>J{m.sortOrder} · {m.name}</SelectItem>
+              ))}
+              <SelectItem value={FILTER_NONE}>Sans jalon</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">Séquence</p>
+          <Select value={sequenceFilter ?? "__all__"} onValueChange={(v) => setSequenceFilter(v === "__all__" ? null : v)}>
+            <SelectTrigger size="sm" className="w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Toutes les séquences</SelectItem>
+              {sortedSequences.map((seq) => (
+                <SelectItem key={seq.id} value={seq.id}><SequenceName sequence={seq} /></SelectItem>
+              ))}
+              <SelectItem value={FILTER_NONE}>Sans séquence</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {(milestoneFilter || sequenceFilter) && (
+          <Button variant="ghost" size="sm" onClick={() => { setMilestoneFilter(null); setSequenceFilter(null) }}>
+            Réinitialiser
+          </Button>
+        )}
+      </div>
+      {(() => {
+        const groups = domaineGroups
+          .filter(({ domaine }) => phaseFilter === null || domaine.phase === phaseFilter)
+          .map(({ domaine, missions: dm }) => ({ domaine, missions: dm.filter(missionMatchesRetroFilters) }))
+          .filter(({ missions: dm }) => dm.length > 0)
+        if (groups.length === 0) {
+          return <EmptyState icon={ListChecks} title="Aucune mission ne correspond à ces filtres" />
+        }
+        return groups.map(({ domaine, missions: domaineMissions }) => (
+          <DomaineMissionsCard
+            key={domaine.id}
+            domaine={domaine}
+            missions={domaineMissions}
+            effectiveByMissionId={effectiveByMissionId}
+            itemsByMissionId={itemsByMissionId}
+            filterMilestoneId={milestoneFilter}
+            filterSequenceId={sequenceFilter}
+          />
+        ))
+      })()}
     </TabsContent>
     )
   })
@@ -795,6 +1054,14 @@ export function MissionsPage() {
           myDomaineIds === null
             ? "Toutes les missions, regroupées par pôle et domaine, avec leurs checklists."
             : "Les missions qui vous ont été confiées, avec leurs checklists."
+        }
+        actions={
+          isFiance ? (
+            <Button variant="outline" size="sm" onClick={exportCSV} disabled={isLoading}>
+              <Download className="size-4" />
+              Exporter
+            </Button>
+          ) : undefined
         }
       />
 
@@ -819,6 +1086,13 @@ export function MissionsPage() {
                 onClick={() => setFianceView("pilotage")}
               >
                 Vue pilotage
+              </Button>
+              <Button
+                variant={fianceView === "retroplanning" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFianceView("retroplanning")}
+              >
+                Rétroplanning
               </Button>
               <Button
                 variant={fianceView === "operationnelle" ? "default" : "outline"}
@@ -847,7 +1121,7 @@ export function MissionsPage() {
                 accentClassName="bg-vert-vegetal/15 text-vert-vegetal"
               />
             </div>
-          ) : (
+          ) : isFiance && fianceView === "retroplanning" ? null : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard
                 icon={LayoutGrid}
@@ -864,22 +1138,26 @@ export function MissionsPage() {
               />
               <StatCard
                 icon={CheckCircle2}
-                label="Items terminés"
-                value={`${globalStats.done} / ${globalStats.total}`}
-                hint={`${globalStats.percent}% complété`}
+                label="Items × séquences faits"
+                value={`${globalRetro.done} / ${globalRetro.total}`}
+                hint={`${globalRetro.percent}% complété`}
                 accentClassName="bg-vert-vegetal/15 text-vert-vegetal"
               />
               <Card>
                 <CardContent className="space-y-2">
                   <p className="text-sm text-muted-foreground">Avancement global</p>
-                  <Progress value={globalStats.percent} />
-                  <p className="text-xs text-muted-foreground">{globalStats.percent}%</p>
+                  <Progress value={globalRetro.percent} />
+                  <p className="text-xs text-muted-foreground">
+                    {globalRetro.percent}% · missions × séquences : {globalRetro.blocksDone} / {globalRetro.blocksTotal}
+                  </p>
                 </CardContent>
               </Card>
             </div>
           )}
 
-          {isFiance && fianceView === "operationnelle" ? (
+          {isFiance && fianceView === "retroplanning" ? (
+            <RetroplanningView />
+          ) : isFiance && fianceView === "operationnelle" ? (
             myDomaineGroups.length === 0 ? (
               <EmptyState icon={ListChecks} title="Aucune mission ne vous a été confiée pour le moment" />
             ) : (
@@ -890,6 +1168,7 @@ export function MissionsPage() {
                     domaine={domaine}
                     missions={domaineMissions}
                     effectiveByMissionId={effectiveByMissionId}
+                    itemsByMissionId={itemsByMissionId}
                   />
                 ))}
               </div>

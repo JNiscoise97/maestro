@@ -18,6 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from "@/components/ui/command"
+import { SequenceName } from "@/components/shared/SequenceName"
 
 // ── Sélecteur de séquence ──────────────────────────────────────────────────────
 
@@ -47,7 +48,7 @@ function SequencePills({
                 : "bg-background text-foreground border-border"
             }`}
           >
-            <span className="font-semibold">{seq.name}</span>
+            <span className="font-semibold"><SequenceName sequence={seq} /></span>
             {date && (
               <span className={`text-[10px] mt-0.5 ${active ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
                 {date}

@@ -4,6 +4,10 @@ import { toast } from "sonner"
 
 import { useCreateChecklistItem, useUpdateChecklistItem } from "@/hooks/queries/use-checklists"
 import type { ChecklistItem, Priority, ProgressStatus } from "@/types/domain"
+import { RetroFields } from "@/components/missions/RetroFields"
+import {
+  retroDatesInvalid, retroPatch, retroValuesFromItem, type RetroValues,
+} from "@/lib/retroplanning-values"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -42,16 +46,31 @@ export function ChecklistItemDialog({ item, checklistId }: ChecklistItemDialogPr
   const [label, setLabel] = useState(item?.label ?? "")
   const [priority, setPriority] = useState<Priority>(item?.priority ?? "normal")
   const [status, setStatus] = useState<ProgressStatus>(item?.status ?? "todo")
+  const [retroValues, setRetroValues] = useState<RetroValues>(() => retroValuesFromItem(item))
   const createItem = useCreateChecklistItem()
   const updateItem = useUpdateChecklistItem()
 
+  /** À chaque ouverture, repartir des valeurs actuelles de l'item (modifiables ailleurs entre-temps). */
+  function handleOpenChange(next: boolean) {
+    if (next && item) {
+      setLabel(item.label)
+      setPriority(item.priority)
+      setStatus(item.status)
+      setRetroValues(retroValuesFromItem(item))
+    }
+    setOpen(next)
+  }
+
+  const retro = retroPatch(retroValues)
+  const datesInvalid = retroDatesInvalid(retroValues)
+
   async function handleSubmit() {
-    if (!label.trim()) return
+    if (!label.trim() || datesInvalid) return
     try {
       if (item) {
         await updateItem.mutateAsync({
           id: item.id,
-          patch: { label, priority, status, isDone: status === "done" },
+          patch: { label, priority, status, isDone: status === "done", ...retro },
         })
         toast.success("Item mis à jour.")
       } else {
@@ -63,6 +82,7 @@ export function ChecklistItemDialog({ item, checklistId }: ChecklistItemDialogPr
           sortOrder: 0,
           priority,
           status,
+          ...retro,
         })
         toast.success("Item créé.")
       }
@@ -74,7 +94,7 @@ export function ChecklistItemDialog({ item, checklistId }: ChecklistItemDialogPr
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <Tooltip>
         <TooltipTrigger asChild>
           <DialogTrigger asChild>
@@ -91,7 +111,7 @@ export function ChecklistItemDialog({ item, checklistId }: ChecklistItemDialogPr
         </TooltipTrigger>
         <TooltipContent>{item ? "Modifier l'item" : "Ajouter un item"}</TooltipContent>
       </Tooltip>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-heading">{item ? "Modifier l'item" : "Nouvel item"}</DialogTitle>
         </DialogHeader>
@@ -132,12 +152,17 @@ export function ChecklistItemDialog({ item, checklistId }: ChecklistItemDialogPr
               </Select>
             </Field>
           </div>
+
+          <div className="space-y-3 rounded-lg border border-border p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rétroplanning</p>
+            <RetroFields value={retroValues} onChange={setRetroValues} idPrefix={`item-${item?.id ?? "new"}`} />
+          </div>
         </FieldGroup>
         <DialogFooter className="mt-4">
           <Button variant="outline" onClick={() => setOpen(false)}>
             Annuler
           </Button>
-          <Button onClick={handleSubmit}>{item ? "Enregistrer" : "Créer"}</Button>
+          <Button onClick={handleSubmit} disabled={datesInvalid}>{item ? "Enregistrer" : "Créer"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

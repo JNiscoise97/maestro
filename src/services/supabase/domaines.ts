@@ -17,7 +17,6 @@ function toDomaine(row: {
   sort_order: number
   solicited_milestone: Domaine["solicitedMilestone"]
   preferred_contact_id: string | null
-  sequence_id?: string | null
 }): Domaine {
   return {
     id: row.id,
@@ -31,7 +30,6 @@ function toDomaine(row: {
     sortOrder: row.sort_order,
     solicitedMilestone: row.solicited_milestone,
     preferredContactId: row.preferred_contact_id,
-    sequenceId: row.sequence_id ?? null,
   }
 }
 
@@ -46,7 +44,6 @@ type DomaineRowPatch = Partial<{
   sort_order: number
   solicited_milestone: Domaine["solicitedMilestone"]
   preferred_contact_id: string | null
-  sequence_id: string | null
 }>
 
 function toRow(input: Partial<Domaine>): DomaineRowPatch {
@@ -61,7 +58,6 @@ function toRow(input: Partial<Domaine>): DomaineRowPatch {
   if (input.sortOrder !== undefined) row.sort_order = input.sortOrder
   if (input.solicitedMilestone !== undefined) row.solicited_milestone = input.solicitedMilestone
   if (input.preferredContactId !== undefined) row.preferred_contact_id = input.preferredContactId
-  if (input.sequenceId !== undefined) row.sequence_id = input.sequenceId ?? null
   return row
 }
 

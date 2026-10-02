@@ -37,6 +37,7 @@ export type Capability =
   | "view:ideas"
   | "view:budget"
   | "view:album"
+  | "view:conducteur"
 
 const FIANCE_CAPABILITIES: Capability[] = [
   "view:dashboard",
@@ -71,6 +72,7 @@ const FIANCE_CAPABILITIES: Capability[] = [
   "view:ideas",
   "view:budget",
   "view:album",
+  "view:conducteur",
 ]
 
 const REFERENT_CAPABILITIES: Capability[] = [

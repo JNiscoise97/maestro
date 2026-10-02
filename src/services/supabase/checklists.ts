@@ -38,6 +38,11 @@ function toChecklistItem(row: {
   task_scheduling_type: string | null
   task_phase: string | null
   ros_message_id?: string | null
+  milestone_id?: string | null
+  ideal_start_date?: string | null
+  target_date?: string | null
+  deadline_date?: string | null
+  criticality?: ChecklistItem["criticality"] | null
 }): ChecklistItem {
   return {
     id: row.id,
@@ -56,6 +61,11 @@ function toChecklistItem(row: {
     taskSchedulingType: (row.task_scheduling_type as ChecklistItem["taskSchedulingType"]) ?? null,
     taskPhase: row.task_phase,
     rosMessageId: row.ros_message_id ?? null,
+    milestoneId: row.milestone_id ?? null,
+    idealStartDate: row.ideal_start_date ?? null,
+    targetDate: row.target_date ?? null,
+    deadlineDate: row.deadline_date ?? null,
+    criticality: row.criticality ?? "normal",
   }
 }
 
@@ -75,6 +85,11 @@ type ChecklistItemRowPatch = Partial<{
   task_scheduling_type: string | null
   task_phase: string | null
   ros_message_id?: string | null
+  milestone_id?: string | null
+  ideal_start_date?: string | null
+  target_date?: string | null
+  deadline_date?: string | null
+  criticality?: ChecklistItem["criticality"]
 }>
 
 function toItemRow(input: Partial<ChecklistItem>): ChecklistItemRowPatch {
@@ -94,6 +109,11 @@ function toItemRow(input: Partial<ChecklistItem>): ChecklistItemRowPatch {
   if (input.taskSchedulingType !== undefined) row.task_scheduling_type = input.taskSchedulingType ?? null
   if (input.taskPhase !== undefined) row.task_phase = input.taskPhase ?? null
   if (input.rosMessageId !== undefined) row.ros_message_id = input.rosMessageId ?? null
+  if (input.milestoneId !== undefined) row.milestone_id = input.milestoneId ?? null
+  if (input.idealStartDate !== undefined) row.ideal_start_date = input.idealStartDate ?? null
+  if (input.targetDate !== undefined) row.target_date = input.targetDate ?? null
+  if (input.deadlineDate !== undefined) row.deadline_date = input.deadlineDate ?? null
+  if (input.criticality !== undefined) row.criticality = input.criticality
   return row
 }
 

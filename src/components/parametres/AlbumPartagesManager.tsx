@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { SequenceName } from "@/components/shared/SequenceName"
 
 const QK = ["album_partages"] as const
 
@@ -146,7 +147,7 @@ function CreateDialog() {
               <Select value={seqId} onValueChange={setSeqId}>
                 <SelectTrigger><SelectValue placeholder="Choisir une séquence…" /></SelectTrigger>
                 <SelectContent>
-                  {sequences.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  {sequences.map(s => <SelectItem key={s.id} value={s.id}><SequenceName sequence={s} /></SelectItem>)}
                 </SelectContent>
               </Select>
             </Field>
@@ -364,7 +365,7 @@ function PartageRow({ entry }: { entry: AlbumPartage }) {
   const toggle    = useTogglePartage()
   const deletePar = useDeletePartage()
   const { data: sequences = [] } = useEventSequences()
-  const seqName = sequences.find(s => s.id === entry.sequenceId)?.name ?? "—"
+  const seq = sequences.find(s => s.id === entry.sequenceId)
 
   return (
     <div>
@@ -379,7 +380,7 @@ function PartageRow({ entry }: { entry: AlbumPartage }) {
           </button>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-foreground">{entry.label}</p>
-            <p className="text-xs text-muted-foreground">{seqName}</p>
+            <p className="text-xs text-muted-foreground">{seq ? <SequenceName sequence={seq} /> : "—"}</p>
           </div>
           <Badge variant="outline" className={cn("shrink-0 text-[10px]", entry.active ? "border-vert-vegetal/40 text-vert-vegetal" : "text-muted-foreground")}>
             {entry.active ? "Actif" : "Inactif"}

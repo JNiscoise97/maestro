@@ -20,6 +20,7 @@ import { SyncFromFiancaillesButton } from "@/components/parametres/SyncFromFianc
 import { GuestCsvImport } from "@/components/parametres/GuestCsvImport"
 import { EquipmentManager } from "@/components/parametres/EquipmentManager"
 import { EventSequencesManager } from "@/components/parametres/EventSequencesManager"
+import { MilestonesManager } from "@/components/parametres/MilestonesManager"
 import { CortegeSettingsManager } from "@/components/parametres/CortegeSettingsManager"
 import { AccessCodesManager } from "@/components/parametres/AccessCodesManager"
 import { FilmManager } from "@/components/parametres/FilmManager"
@@ -38,6 +39,7 @@ import { cn } from "@/lib/utils"
 type Section =
   | "evenement"
   | "evenement-sequences"
+  | "evenement-jalons"
   | "invites-cortege"
   | "organisation"
   | "timing-messages-crud"
@@ -64,6 +66,7 @@ const NAV: NavGroup[] = [
     items: [
       { id: "evenement", label: "Configuration" },
       { id: "evenement-sequences", label: "Séquences" },
+      { id: "evenement-jalons", label: "Jalons du rétroplanning" },
     ],
   },
   {
@@ -174,6 +177,7 @@ function ContentPanel({ section }: { section: Section }) {
   switch (section) {
     case "evenement":              return <EventConfigForm />
     case "evenement-sequences":    return <EventSequencesManager />
+    case "evenement-jalons":       return <MilestonesManager />
     case "organisation":           return <ParametresTree />
     case "timing-missions":         return <MissionsManager />
     case "timing-taches":           return <TachesManager />

@@ -31,6 +31,7 @@ import { RsvpPage } from "@/pages/rsvp"
 import { RsvpInvitationPage } from "@/pages/rsvp/invitation"
 import { FilmPage } from "@/pages/film"
 import { GaleriePage } from "@/pages/galerie"
+import { ConducteurPage } from "@/pages/conducteur"
 
 export function AppRoutes() {
   return (
@@ -82,6 +83,14 @@ export function AppRoutes() {
             element={
               <RoleGuard capability="view:deroule">
                 <DeroulePage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="conducteur"
+            element={
+              <RoleGuard capability="view:conducteur">
+                <ConducteurPage />
               </RoleGuard>
             }
           />

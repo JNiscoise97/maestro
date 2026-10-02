@@ -9,6 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { sequenceColor, withAlpha } from "@/lib/sequence-colors"
+import { SequenceName } from "@/components/shared/SequenceName"
 
 // ── Constantes ─────────────────────────────────────────────────────────────────
 
@@ -212,7 +214,7 @@ function IdeaSheet({ idea, open, onClose }: IdeaSheetProps) {
                 <SelectContent>
                   <SelectItem value="__none__">— Toutes séquences</SelectItem>
                   {sequences.map(s => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    <SelectItem key={s.id} value={s.id}><SequenceName sequence={s} /></SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -258,7 +260,11 @@ function IdeaSheet({ idea, open, onClose }: IdeaSheetProps) {
 
 // ── Carte idée ─────────────────────────────────────────────────────────────────
 
-function IdeaCard({ idea, sequenceName, onClick }: { idea: Idea; sequenceName?: string; onClick: () => void }) {
+function IdeaCard({ idea, sequence, onClick }: {
+  idea: Idea
+  sequence?: { name: string; color?: string | null; sortOrder?: number }
+  onClick: () => void
+}) {
   return (
     <button
       type="button"
@@ -286,9 +292,10 @@ function IdeaCard({ idea, sequenceName, onClick }: { idea: Idea; sequenceName?: 
             {idea.category}
           </span>
         )}
-        {sequenceName && (
-          <span className="rounded-full px-2 py-0.5 text-[10px] bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-400">
-            {sequenceName}
+        {sequence && (
+          <span className="rounded-full px-2 py-0.5 text-[10px] text-foreground"
+            style={{ backgroundColor: withAlpha(sequenceColor(sequence), 0.14) }}>
+            <SequenceName sequence={sequence} dotClassName="size-1.5" />
           </span>
         )}
       </div>
@@ -314,7 +321,7 @@ export function IdeasPage() {
   const [seqFilter, setSeqFilter] = useState<string | "all">("all")
   const [sheetIdea, setSheetIdea] = useState<Idea | null | undefined>(undefined)
 
-  const seqMap = new Map(sequences.map(s => [s.id, s.name]))
+  const seqMap = new Map(sequences.map(s => [s.id, s]))
 
   const filtered = ideas
     .filter((i) => statusFilter === "all" || i.status === statusFilter)
@@ -384,7 +391,7 @@ export function IdeasPage() {
                       : "bg-muted text-muted-foreground hover:bg-muted/60"
                   }`}
                 >
-                  {s.name}
+                  <SequenceName sequence={s} />
                 </button>
               ))}
             </div>
@@ -434,7 +441,7 @@ export function IdeasPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((idea) => (
-            <IdeaCard key={idea.id} idea={idea} sequenceName={idea.sequenceId ? seqMap.get(idea.sequenceId) : undefined} onClick={() => setSheetIdea(idea)} />
+            <IdeaCard key={idea.id} idea={idea} sequence={idea.sequenceId ? seqMap.get(idea.sequenceId) : undefined} onClick={() => setSheetIdea(idea)} />
           ))}
         </div>
       )}

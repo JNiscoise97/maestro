@@ -28,6 +28,8 @@ import {
 } from "@/hooks/queries/use-budget"
 import type { BudgetQuote } from "@/services/supabase/budget"
 import type { BudgetItem } from "@/services/supabase/budget"
+import { sequenceColor, withAlpha } from "@/lib/sequence-colors"
+import { SequenceName } from "@/components/shared/SequenceName"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -605,7 +607,7 @@ function ItemEditSheet({
   defaultCategory?: string
   defaultParentId?: string | null
   categories: string[]
-  sequences: { id: string; name: string }[]
+  sequences: { id: string; name: string; color?: string | null; sortOrder?: number }[]
   onClose: () => void
 }) {
   const create  = useCreateBudgetItem()
@@ -736,7 +738,7 @@ function ItemEditSheet({
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NONE}>—</SelectItem>
-                    {sequences.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    {sequences.map((s) => <SelectItem key={s.id} value={s.id}><SequenceName sequence={s} /></SelectItem>)}
                   </SelectContent>
                 </Select>
               )}
@@ -902,7 +904,7 @@ function ImportCsvDialog({
   onClose,
 }: {
   open: boolean
-  sequences: { id: string; name: string }[]
+  sequences: { id: string; name: string; color?: string | null; sortOrder?: number }[]
   onClose: () => void
 }) {
   const importItems = useImportBudgetItems()
@@ -996,7 +998,7 @@ function ImportCsvDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NONE}>— Aucune (global) —</SelectItem>
-                    {sequences.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    {sequences.map((s) => <SelectItem key={s.id} value={s.id}><SequenceName sequence={s} /></SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -1124,7 +1126,7 @@ function CategorySection({
   category: string
   items: BudgetItem[]
   childrenMap: Map<string, BudgetItem[]>
-  sequences: { id: string; name: string }[]
+  sequences: { id: string; name: string; color?: string | null; sortOrder?: number }[]
   quoteStatus: Record<string, boolean>
   visibleCols: Set<ColKey>
   onEdit: (item: BudgetItem) => void
@@ -1210,7 +1212,7 @@ function CategorySection({
 
   const totalEstim  = items.reduce((s, i) => s + rollupEstim(i), 0)
   const totalReel   = items.reduce((s, i) => s + rollupReel(i), 0)
-  const seqById     = useMemo(() => new Map(sequences.map((s) => [s.id, s.name])), [sequences])
+  const seqById     = useMemo(() => new Map(sequences.map((s) => [s.id, s])), [sequences])
   const parentIds   = useMemo(() => sortedItems.filter((i) => (childrenMap.get(i.id)?.length ?? 0) > 0).map((i) => i.id), [sortedItems, childrenMap])
   const hasKidsInCat = parentIds.length > 0
 
@@ -1328,7 +1330,12 @@ function CategorySection({
                           </td>
                         )}
                         <td className="px-3 py-2.5">
-                          {it.sequenceId ? <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs whitespace-nowrap">{seqById.get(it.sequenceId) ?? "—"}</span> : "—"}
+                          {it.sequenceId && seqById.get(it.sequenceId) ? (
+                            <span className="rounded-full px-2 py-0.5 text-xs whitespace-nowrap text-foreground"
+                              style={{ backgroundColor: withAlpha(sequenceColor(seqById.get(it.sequenceId)!), 0.14) }}>
+                              <SequenceName sequence={seqById.get(it.sequenceId)!} />
+                            </span>
+                          ) : "—"}
                         </td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">

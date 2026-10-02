@@ -30,6 +30,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { SequenceName } from "@/components/shared/SequenceName"
 
 // ── Compteur (+/-) ────────────────────────────────────────────────────────────
 
@@ -540,7 +541,7 @@ function SequenceEditor({
                     )
                   }}
                 >
-                  {seq.name}
+                  <SequenceName sequence={seq} />
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -622,7 +623,7 @@ export function CortegeSettingsManager() {
                   : "bg-background text-muted-foreground border-border hover:border-foreground/30"
               }`}
             >
-              {seq.name}
+              <SequenceName sequence={seq} />
             </button>
           )
         })}

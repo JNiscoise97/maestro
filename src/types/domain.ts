@@ -46,7 +46,6 @@ export interface Pole {
   id: string
   name: string
   sortOrder: number
-  sequenceId?: string | null
   /** Responsable global de tout le pôle — uniquement un fiancé, voir 0042_poles_responsible_person.sql. */
   responsiblePersonId?: string | null
 }
@@ -65,7 +64,6 @@ export interface Domaine {
   sortOrder: number
   solicitedMilestone?: PlanningMilestone | null
   preferredContactId?: string | null
-  sequenceId?: string | null
 }
 
 /** Un responsable de domaine est soit un fiancé (`personId`), soit un invité de confiance qui en devient "référent" (`guestId`) — jamais les deux. */
@@ -95,7 +93,6 @@ export interface Mission {
   scheduledEndDate?: string | null
   scheduledEndTime?: string | null
   sortOrder: number
-  sequenceId?: string | null
   /** Responsable explicite : fiancé (personId) ou personne de confiance (guestId) — au plus un des deux. Sans affectation, hérite du domaine puis du pôle. */
   responsiblePersonId?: string | null
   responsibleGuestId?: string | null
@@ -142,6 +139,34 @@ export interface ChecklistItem {
   taskSchedulingType?: TaskSchedulingType | null
   taskPhase?: string | null
   rosMessageId?: string | null
+  /** Rétroplanning : jalon de préparation auquel l'item est rattaché. */
+  milestoneId?: string | null
+  /** Date à partir de laquelle il est idéal de commencer. */
+  idealStartDate?: string | null
+  /** Date cible de réalisation. */
+  targetDate?: string | null
+  /** Date limite au-delà de laquelle le jalon est compromis. */
+  deadlineDate?: string | null
+  criticality?: Criticality
+}
+
+export type Criticality = "low" | "normal" | "high" | "blocking"
+
+/** Avancement d'un item pour une séquence donnée ('na' = séquence non concernée). */
+export type ItemSequenceStatusValue = "todo" | "done" | "na"
+export interface ItemSequenceStatus {
+  itemId: string
+  sequenceId: string
+  status: ItemSequenceStatusValue
+}
+
+/** Jalon maître du rétroplanning (J1…J12). */
+export interface Milestone {
+  id: string
+  name: string
+  description?: string | null
+  targetDate: string
+  sortOrder: number
 }
 
 export type PlanningMilestone = "j_moins_30" | "j_moins_15" | "j_moins_7" | "j_moins_1" | "jour_j" | "j_plus_1"
@@ -389,11 +414,27 @@ export interface Prestataire {
 export interface EventSequence {
   id: string
   name: string
+  /** Couleur #RRGGBB réutilisée partout où la séquence apparaît (null : couleur de repli). */
+  color?: string | null
   eventDate?: string | null
   startTime?: string | null
   endDate?: string | null
   endTime?: string | null
   description?: string | null
+  sortOrder: number
+  createdAt: string
+}
+
+export interface SequenceStep {
+  id: string
+  sequenceId: string
+  title: string
+  description?: string | null
+  startDate?: string | null
+  startTime?: string | null
+  endDate?: string | null
+  endTime?: string | null
+  responsiblePersonId?: string | null
   sortOrder: number
   createdAt: string
 }

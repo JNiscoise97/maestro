@@ -18,6 +18,8 @@ import { useRunOfShow } from "@/hooks/queries/use-run-of-show"
 import { useEventSequences } from "@/hooks/queries/use-event-sequences"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
+import { SEQUENCE_PALETTE, sequenceColor, withAlpha } from "@/lib/sequence-colors"
+import { SequenceName } from "@/components/shared/SequenceName"
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -450,7 +452,13 @@ export function CalendarView({ dateRange, phaseFilter, granularity = "1h", messa
         <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-medium text-rose-600 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-400">
           Programme
         </span>
-        <span className="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2.5 py-1 text-[11px] font-medium text-fuchsia-600 dark:border-fuchsia-800 dark:bg-fuchsia-950 dark:text-fuchsia-400">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-foreground"
+          title="Chaque séquence a sa couleur (Paramètres › Séquences)">
+          <span aria-hidden className="inline-flex -space-x-0.5">
+            {SEQUENCE_PALETTE.slice(0, 3).map((c) => (
+              <span key={c} className="size-2 rounded-full ring-1 ring-card" style={{ backgroundColor: c }} />
+            ))}
+          </span>
           Séquence
         </span>
       </div>
@@ -676,8 +684,10 @@ function TimedBlock({ ev, cellH, guestMap, personMap }: { ev: TimedEvent; cellH:
   const compact = height < 38
 
   let blockCls: string
+  // Séquence : sa couleur propre (Paramètres › Séquences).
+  const seqColor = ev.kind === "sequence" ? sequenceColor(ev.raw as EventSequence) : null
   if (ev.kind === "sequence") {
-    blockCls = "border-2 border-fuchsia-400 dark:border-fuchsia-600 bg-fuchsia-50 dark:bg-fuchsia-950/70 text-fuchsia-800 dark:text-fuchsia-200 font-semibold shadow-sm"
+    blockCls = "border-2 text-foreground font-semibold shadow-sm"
   } else if (ev.kind === "task") {
     blockCls = "border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"
   } else if (ev.kind === "jalon") {
@@ -695,7 +705,10 @@ function TimedBlock({ ev, cellH, guestMap, personMap }: { ev: TimedEvent; cellH:
       <PopoverTrigger asChild>
         <button
           className={`absolute inset-x-1 z-[4] overflow-hidden rounded px-1.5 text-left transition-opacity hover:opacity-90 ${blockCls}`}
-          style={{ top, height, paddingTop: compact ? 2 : 4, paddingBottom: compact ? 2 : 4 }}
+          style={{
+            top, height, paddingTop: compact ? 2 : 4, paddingBottom: compact ? 2 : 4,
+            ...(seqColor ? { borderColor: seqColor, backgroundColor: withAlpha(seqColor, 0.16) } : {}),
+          }}
         >
           {compact ? (
             <div className="flex items-center gap-1 text-[10px] leading-none">
@@ -728,7 +741,7 @@ function TimedDetail({ ev, guestMap, personMap }: { ev: TimedEvent; guestMap: Ma
     const endMin = ev.startMin + ev.duration
     return (
       <div className="space-y-1.5">
-        <p className="font-semibold text-fuchsia-700 dark:text-fuchsia-300">{seq.name}</p>
+        <p className="font-semibold text-foreground"><SequenceName sequence={seq} dotClassName="size-2.5" /></p>
         <p className="text-xs text-muted-foreground">
           {minToLabel(ev.startMin)}{seq.endTime ? ` – ${minToLabel(endMin)}` : ""} · {fmtDuration(ev.duration)}
         </p>

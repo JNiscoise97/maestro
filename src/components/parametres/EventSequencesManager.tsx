@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { GripVertical, Plus, Trash2 } from "lucide-react"
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core"
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
@@ -13,6 +13,8 @@ import {
   useReorderEventSequences,
 } from "@/hooks/queries/use-event-sequences"
 import { Button } from "@/components/ui/button"
+import { SEQUENCE_PALETTE, sequenceColor } from "@/lib/sequence-colors"
+import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 
 // ── Ligne tri ──────────────────────────────────────────────────────────────────
@@ -20,12 +22,14 @@ import { Skeleton } from "@/components/ui/skeleton"
 interface RowProps {
   seq: EventSequence
   onDelete: (id: string) => void
-  onPatch: (id: string, patch: Partial<Pick<EventSequence, "name" | "eventDate" | "startTime" | "endDate" | "endTime" | "description">>) => void
+  onPatch: (id: string, patch: Partial<Pick<EventSequence, "name" | "eventDate" | "startTime" | "endDate" | "endTime" | "description" | "color">>) => void
 }
 
 function SequenceRow({ seq, onDelete, onPatch }: RowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: seq.id })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
+  // Le sélecteur libre émet en continu pendant le glisser : on n'enregistre qu'une fois stabilisé.
+  const colorTimer = useRef<number | undefined>(undefined)
 
   return (
     <div
@@ -39,6 +43,12 @@ function SequenceRow({ seq, onDelete, onPatch }: RowProps) {
 
       <div className="flex-1 space-y-2">
         {/* Ligne 1 : Nom */}
+        <div className="flex items-center gap-2">
+        <span
+          aria-hidden
+          className="size-3.5 shrink-0 rounded-full"
+          style={{ backgroundColor: sequenceColor(seq) }}
+        />
         <input
           className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-ring"
           defaultValue={seq.name}
@@ -49,6 +59,38 @@ function SequenceRow({ seq, onDelete, onPatch }: RowProps) {
           }}
           onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur() }}
         />
+        </div>
+        {/* Couleur : réutilisée partout où le nom de la séquence apparaît */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <p className="text-[10px] font-medium text-muted-foreground px-0.5 mr-1">Couleur</p>
+          {SEQUENCE_PALETTE.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => onPatch(seq.id, { color: c })}
+              aria-label={`Couleur ${c}`}
+              aria-pressed={sequenceColor(seq) === c}
+              className={cn(
+                "size-5 rounded-full border-2 transition-transform hover:scale-110",
+                sequenceColor(seq) === c ? "border-foreground" : "border-transparent",
+              )}
+              style={{ backgroundColor: c }}
+            />
+          ))}
+          <label className="relative inline-flex size-5 cursor-pointer items-center justify-center rounded-full border border-dashed border-border text-[10px] text-muted-foreground" title="Autre couleur">
+            +
+            <input
+              type="color"
+              className="absolute inset-0 cursor-pointer opacity-0"
+              defaultValue={sequenceColor(seq)}
+              onChange={(e) => {
+                const v = e.target.value
+                window.clearTimeout(colorTimer.current)
+                colorTimer.current = window.setTimeout(() => onPatch(seq.id, { color: v }), 400)
+              }}
+            />
+          </label>
+        </div>
         {/* Ligne 2 : Date début · Heure début → Date fin · Heure fin */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="space-y-0.5">
@@ -134,7 +176,7 @@ export function EventSequencesManager() {
     reorder.mutate(next)
   }
 
-  function handlePatch(id: string, patch: Partial<Pick<EventSequence, "name" | "eventDate" | "startTime" | "endDate" | "endTime" | "description">>) {
+  function handlePatch(id: string, patch: Partial<Pick<EventSequence, "name" | "eventDate" | "startTime" | "endDate" | "endTime" | "description" | "color">>) {
     update.mutate({ id, patch })
   }
 
@@ -147,6 +189,8 @@ export function EventSequencesManager() {
     await create.mutateAsync({
       name: "Nouvelle séquence",
       sortOrder: sorted.length,
+      // Première couleur de la palette pas encore prise.
+      color: SEQUENCE_PALETTE.find((c) => !sorted.some((s) => sequenceColor(s) === c)) ?? SEQUENCE_PALETTE[0],
     })
     setItems([])
   }
@@ -162,7 +206,7 @@ export function EventSequencesManager() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Définissez les moments de votre événement. Les invités pourront être assignés à chaque séquence, et le pointage / plan de table sera scopé.
+        Définissez les moments de votre événement. Les invités pourront être assignés à chaque séquence, et le pointage / plan de table sera scopé. La couleur de chaque séquence est reprise partout où elle apparaît.
       </p>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

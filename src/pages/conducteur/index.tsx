@@ -349,7 +349,7 @@ export function ConducteurPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Conducteur" subtitle="Déroulé détaillé par séquence" />
+        <PageHeader title="Conducteur" description="Déroulé détaillé par séquence" />
         <p className="text-sm text-muted-foreground">Chargement…</p>
       </div>
     )
@@ -358,7 +358,7 @@ export function ConducteurPage() {
   if (sorted.length === 0) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Conducteur" subtitle="Déroulé détaillé par séquence" />
+        <PageHeader title="Conducteur" description="Déroulé détaillé par séquence" />
         <p className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
           Aucune séquence. Créez des séquences dans le Déroulé pour construire le conducteur.
         </p>
@@ -368,7 +368,7 @@ export function ConducteurPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Conducteur" subtitle="Déroulé détaillé par séquence" />
+      <PageHeader title="Conducteur" description="Déroulé détaillé par séquence" />
 
       <div className="flex flex-wrap gap-2">
         {sorted.map((seq) => (

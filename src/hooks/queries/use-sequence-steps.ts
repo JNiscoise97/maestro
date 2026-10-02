@@ -26,7 +26,7 @@ export function useCreateSequenceStep() {
 export function useUpdateSequenceStep() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, sequenceId, patch }: { id: string; sequenceId: string; patch: Parameters<typeof sequenceStepsService.update>[1] }) =>
+    mutationFn: ({ id, patch }: { id: string; sequenceId: string; patch: Parameters<typeof sequenceStepsService.update>[1] }) =>
       sequenceStepsService.update(id, patch),
     onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: key(vars.sequenceId) }),
   })
@@ -35,7 +35,7 @@ export function useUpdateSequenceStep() {
 export function useDeleteSequenceStep() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, sequenceId }: { id: string; sequenceId: string }) =>
+    mutationFn: ({ id }: { id: string; sequenceId: string }) =>
       sequenceStepsService.delete(id),
     onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: key(vars.sequenceId) }),
   })
@@ -44,7 +44,7 @@ export function useDeleteSequenceStep() {
 export function useReorderSequenceSteps() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ sequenceId, steps }: { sequenceId: string; steps: SequenceStep[] }) =>
+    mutationFn: ({ steps }: { sequenceId: string; steps: SequenceStep[] }) =>
       sequenceStepsService.reorder(steps.map((s) => ({ id: s.id, sortOrder: s.sortOrder }))),
     onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: key(vars.sequenceId) }),
   })

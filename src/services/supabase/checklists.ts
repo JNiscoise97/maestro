@@ -184,6 +184,8 @@ export const checklistsSupabaseService: ChecklistsService = {
       const { data, error } = await db
         .from(tbl("checklist_items") as any)
         .select("*")
+        // Ordre stable : sans lui, les pages peuvent se chevaucher ou sauter des lignes.
+        .order("id")
         .range(from, from + PAGE - 1)
       if (error) throw error
       all.push(...(data ?? []).map(toChecklistItem))

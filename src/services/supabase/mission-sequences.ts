@@ -12,6 +12,8 @@ export const missionSequencesService = {
       const { data, error } = await db
         .from(tbl("mission_sequences"))
         .select("mission_id,sequence_id")
+        .order("mission_id")
+        .order("sequence_id")
         .range(from, from + PAGE - 1)
       if (error) throw error
       all.push(...(data ?? []).map((r: any) => ({ missionId: r.mission_id as string, sequenceId: r.sequence_id as string })))

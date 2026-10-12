@@ -50,13 +50,22 @@ function fromPartageRow(r: any): AlbumPartage {
 
 export const albumService = {
   async listPhotos(sequenceId: string): Promise<AlbumPhoto[]> {
-    const { data, error } = await db
-      .from(tbl("album_photos"))
-      .select("*")
-      .eq("sequence_id", sequenceId)
-      .order("sort_order", { ascending: true })
-    if (error) throw error
-    return (data ?? []).map(fromPhotoRow)
+    // Pagination : Supabase plafonne chaque réponse à 1 000 lignes sans erreur.
+    const PAGE = 1000
+    const rows: Parameters<typeof fromPhotoRow>[0][] = []
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await db
+        .from(tbl("album_photos"))
+        .select("*")
+        .eq("sequence_id", sequenceId)
+        .order("sort_order", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, from + PAGE - 1)
+      if (error) throw error
+      rows.push(...(data ?? []))
+      if ((data?.length ?? 0) < PAGE) break
+    }
+    return rows.map(fromPhotoRow)
   },
 
   async insertPhoto(

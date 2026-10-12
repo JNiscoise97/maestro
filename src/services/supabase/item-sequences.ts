@@ -18,6 +18,8 @@ export const itemSequencesService = {
       const { data, error } = await db
         .from(tbl("checklist_item_sequences"))
         .select("item_id,sequence_id,status")
+        .order("item_id")
+        .order("sequence_id")
         .range(from, from + PAGE - 1)
       if (error) throw error
       all.push(...((data ?? []) as Row[]).map(toDomain))

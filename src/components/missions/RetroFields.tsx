@@ -24,11 +24,12 @@ export function RetroFields({ value, onChange, bulk = false, idPrefix = "retro" 
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
-        <Field>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]">
+        <Field className="min-w-0">
           <FieldLabel>Jalon</FieldLabel>
           <Select value={value.milestoneId} onValueChange={setMilestone}>
-            <SelectTrigger className="w-full">
+            {/* Libellé de jalon long : tronqué dans le champ, complet dans la liste. */}
+            <SelectTrigger className="w-full min-w-0 [&_[data-slot=select-value]]:min-w-0 [&_[data-slot=select-value]]:overflow-hidden">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -42,10 +43,10 @@ export function RetroFields({ value, onChange, bulk = false, idPrefix = "retro" 
             </SelectContent>
           </Select>
         </Field>
-        <Field>
+        <Field className="min-w-0">
           <FieldLabel>Criticité</FieldLabel>
           <Select value={value.criticality} onValueChange={(v) => set({ criticality: v as RetroValues["criticality"] })}>
-            <SelectTrigger className="w-full sm:w-36">
+            <SelectTrigger className="w-full min-w-0">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -57,18 +58,18 @@ export function RetroFields({ value, onChange, bulk = false, idPrefix = "retro" 
           </Select>
         </Field>
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        <Field>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <Field className="min-w-0">
           <FieldLabel htmlFor={`${idPrefix}-ideal`}>Début idéal</FieldLabel>
           <Input id={`${idPrefix}-ideal`} type="date" value={value.idealStartDate}
             onChange={(e) => set({ idealStartDate: e.target.value })} />
         </Field>
-        <Field>
+        <Field className="min-w-0">
           <FieldLabel htmlFor={`${idPrefix}-target`}>Date cible</FieldLabel>
           <Input id={`${idPrefix}-target`} type="date" value={value.targetDate}
             onChange={(e) => set({ targetDate: e.target.value })} />
         </Field>
-        <Field>
+        <Field className="min-w-0">
           <FieldLabel htmlFor={`${idPrefix}-deadline`}>Date limite</FieldLabel>
           <Input id={`${idPrefix}-deadline`} type="date" value={value.deadlineDate}
             onChange={(e) => set({ deadlineDate: e.target.value })} />

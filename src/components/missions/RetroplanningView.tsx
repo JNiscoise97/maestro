@@ -17,6 +17,7 @@ import {
 import { sequenceColor, withAlpha } from "@/lib/sequence-colors"
 import { SequenceDot } from "@/components/shared/SequenceName"
 import type { ChecklistItem, ItemSequenceStatusValue, Milestone } from "@/types/domain"
+import { formatWeeks } from "@/lib/date"
 
 const WEDDING_DATE = new Date("2027-06-25")
 const OPEN_KEY = "sj_retro_open_v2"
@@ -339,6 +340,9 @@ export function RetroplanningView() {
             {daysLeft > 0 ? daysLeft : "🎉"}
           </p>
           <p className="text-xs text-muted-foreground">jours</p>
+          {daysLeft > 0 && (
+            <p className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">{formatWeeks(daysLeft)}</p>
+          )}
         </div>
       </div>
 

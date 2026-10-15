@@ -16,3 +16,12 @@ export function getEventPhase(now: Date, eventDate: Date): EventPhase {
   if (daysUntilEvent === -1) return "j+1"
   return "post"
 }
+
+/** Compte à rebours en semaines : « 36 semaines et 4 jours », « 1 semaine », « moins d'une semaine ». */
+export function formatWeeks(days: number): string {
+  if (days < 7) return "moins d'une semaine"
+  const weeks = Math.floor(days / 7)
+  const rest = days % 7
+  const w = `${weeks} semaine${weeks > 1 ? "s" : ""}`
+  return rest === 0 ? w : `${w} et ${rest} jour${rest > 1 ? "s" : ""}`
+}

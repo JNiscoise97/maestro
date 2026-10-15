@@ -13,6 +13,7 @@ import { useIdentity } from "@/context/IdentityContext"
 import { useEventConfig } from "@/context/EventConfigContext"
 import { useDashboardSummary } from "@/hooks/queries/use-dashboard"
 import { MILESTONE_LABELS } from "@/lib/constants"
+import { formatWeeks } from "@/lib/date"
 
 export function DashboardPage() {
   const { person } = useIdentity()
@@ -43,6 +44,7 @@ export function DashboardPage() {
               icon={CalendarClock}
               label="Jours avant les fiançailles"
               value={daysUntilEvent >= 0 ? daysUntilEvent : "Passé"}
+              hint={daysUntilEvent > 0 ? `soit ${formatWeeks(daysUntilEvent)}` : undefined}
               accentClassName="bg-bordeaux/10 text-bordeaux"
             />
             <StatCard

@@ -52,3 +52,11 @@ export function isComplete(statuses: ItemSequenceStatusValue[]): boolean {
 export function formatDate(iso: string, opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" }) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("fr-FR", opts)
 }
+
+/** Pastille de criticité (fond + texte), de la plus discrète à la plus visible. */
+export const CRITICALITY_BADGE: Record<NonNullable<ChecklistItem["criticality"]>, string> = {
+  low: "bg-muted text-muted-foreground",
+  normal: "bg-lagon/10 text-lagon",
+  high: "bg-corail/15 text-corail",
+  blocking: "bg-bordeaux/10 text-bordeaux",
+}

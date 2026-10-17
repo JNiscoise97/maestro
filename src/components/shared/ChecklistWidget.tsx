@@ -22,7 +22,7 @@ import { ChecklistItemDialog } from "@/components/parametres/ChecklistItemDialog
 import { useMilestones } from "@/hooks/queries/use-milestones"
 import { useItemSequenceProgress } from "@/hooks/use-item-sequence-progress"
 import {
-  ITEM_STATE_LABELS, ITEM_STATE_TEXT, NEXT_SEQ_STATUS, SEQ_STATUS_LABELS, dateState, formatDate, toIso,
+  CRITICALITY_BADGE, CRITICALITY_LABELS, ITEM_STATE_LABELS, ITEM_STATE_TEXT, NEXT_SEQ_STATUS, SEQ_STATUS_LABELS, dateState, formatDate, toIso,
 } from "@/lib/retroplanning"
 import { cn } from "@/lib/utils"
 import { SequenceDot } from "@/components/shared/SequenceName"
@@ -275,7 +275,7 @@ function ItemBody({ item, done, showRetro, today, milestone, sequences, statusOf
   const seqDone = all.filter((s) => statusOf(s.id) !== "todo").length
   // Pastilles : la séquence filtrée seule, sinon toutes dès qu'il y en a plusieurs.
   const chips = focused ? [focused] : all.length > 1 ? all : []
-  const hasRetro = showRetro && (milestone || item.targetDate || item.criticality === "blocking")
+  const hasRetro = showRetro && (milestone || item.targetDate || item.criticality)
   return (
     <div className="min-w-0 flex-1">
       <label
@@ -317,9 +317,15 @@ function ItemBody({ item, done, showRetro, today, milestone, sequences, statusOf
                     {milestone ? `limite ${formatDate(milestone.targetDate)}` : ""}
                   </span>
                 )}
-                {!done && item.criticality === "blocking" && (
-                  <span className="rounded-full bg-bordeaux/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-bordeaux">
-                    Bloquant
+                {item.criticality && (
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide",
+                      done ? "bg-muted text-muted-foreground" : CRITICALITY_BADGE[item.criticality],
+                    )}
+                    title={`Criticité : ${CRITICALITY_LABELS[item.criticality]}`}
+                  >
+                    {CRITICALITY_LABELS[item.criticality]}
                   </span>
                 )}
               </>

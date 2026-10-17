@@ -56,7 +56,7 @@ export function RetroFields({ value, onChange, bulk = false, idPrefix = "retro" 
           </Select>
         </Field>
       </div>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2">
         <Field className="min-w-0">
           <FieldLabel htmlFor={`${idPrefix}-ideal`}>Début idéal <span className="font-normal text-muted-foreground">(facultatif)</span></FieldLabel>
           <Input id={`${idPrefix}-ideal`} type="date" value={value.idealStartDate}

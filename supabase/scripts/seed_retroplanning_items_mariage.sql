@@ -3,8 +3,8 @@
 -- (source : missions_checklist_retroplanning_v1.csv, lignes avec code jalon).
 --   · milestone_id     ← jalon J1..J12 (milestones.sort_order)
 --   · ideal_start_date ← « Début idéal »  (requiert migration 0142)
---   · target_date      ← « Date cible »
---   · deadline_date    ← « Date limite »
+--   · target_date      ← « Date cible », ramenée au plus tard à l'échéance du jalon
+--   (« Date limite » ignorée : la date limite d'un item est l'échéance de son jalon, migration 0146)
 --   · criticality      ← « Criticité »
 -- Correspondance par (pôle, titre de mission, libellé d'item).
 -- Les items sans jalon (Jour J, Après…) ne sont pas modifiés.
@@ -1603,9 +1603,8 @@ begin
 
   update public._20270628_checklist_items i
   set milestone_id     = ms.id,
-      ideal_start_date = r.ideal_start,
-      target_date      = r.target,
-      deadline_date    = r.deadline,
+      ideal_start_date = case when r.ideal_start is null then null else least(r.ideal_start, r.target, ms.target_date) end,
+      target_date      = least(r.target, ms.target_date),
       criticality      = r.criticality
   from _retro r
   join public._20270628_poles p       on p.name = r.pole

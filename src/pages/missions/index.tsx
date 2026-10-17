@@ -630,7 +630,7 @@ export function MissionsPage() {
               const ms = item.milestoneId ? milestoneById.get(item.milestoneId) : undefined
               return ms
                 ? [`J${ms.sortOrder}`, ms.name, item.idealStartDate ?? "", item.targetDate ?? "",
-                   item.deadlineDate ?? "", item.criticality ?? ""]
+                   ms.targetDate, item.criticality ?? ""]
                 : ["", "", "", "", "", ""]
             })(),
           ])

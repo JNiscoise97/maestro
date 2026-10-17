@@ -41,7 +41,6 @@ function toChecklistItem(row: {
   milestone_id?: string | null
   ideal_start_date?: string | null
   target_date?: string | null
-  deadline_date?: string | null
   criticality?: ChecklistItem["criticality"] | null
 }): ChecklistItem {
   return {
@@ -64,7 +63,6 @@ function toChecklistItem(row: {
     milestoneId: row.milestone_id ?? null,
     idealStartDate: row.ideal_start_date ?? null,
     targetDate: row.target_date ?? null,
-    deadlineDate: row.deadline_date ?? null,
     criticality: row.criticality ?? "normal",
   }
 }
@@ -88,7 +86,6 @@ type ChecklistItemRowPatch = Partial<{
   milestone_id?: string | null
   ideal_start_date?: string | null
   target_date?: string | null
-  deadline_date?: string | null
   criticality?: ChecklistItem["criticality"]
 }>
 
@@ -112,7 +109,6 @@ function toItemRow(input: Partial<ChecklistItem>): ChecklistItemRowPatch {
   if (input.milestoneId !== undefined) row.milestone_id = input.milestoneId ?? null
   if (input.idealStartDate !== undefined) row.ideal_start_date = input.idealStartDate ?? null
   if (input.targetDate !== undefined) row.target_date = input.targetDate ?? null
-  if (input.deadlineDate !== undefined) row.deadline_date = input.deadlineDate ?? null
   if (input.criticality !== undefined) row.criticality = input.criticality
   return row
 }

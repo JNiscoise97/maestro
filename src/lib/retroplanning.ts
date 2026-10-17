@@ -33,9 +33,12 @@ export function toIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 
-/** État daté d'un item encore à faire (ignore la case « fait »). */
-export function dateState(item: ChecklistItem, today: string): ItemState {
-  if (item.deadlineDate && today > item.deadlineDate) return "late"
+/**
+ * État daté d'un item encore à faire (ignore la case « fait »).
+ * La date limite est l'échéance du jalon de l'item (aucune limite sans jalon).
+ */
+export function dateState(item: ChecklistItem, today: string, milestoneDate?: string | null): ItemState {
+  if (milestoneDate && today > milestoneDate) return "late"
   if (item.targetDate && today > item.targetDate) return "behind"
   if (item.idealStartDate && today >= item.idealStartDate) return "now"
   return "upcoming"

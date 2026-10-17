@@ -271,11 +271,11 @@ function ItemBody({ item, done, showRetro, today, milestone, sequences, statusOf
   onCycle: (sequenceId: string) => void
 }) {
   const { all, focused } = sequences
-  const state = done ? "done" : dateState(item, today)
+  const state = done ? "done" : dateState(item, today, milestone?.targetDate)
   const seqDone = all.filter((s) => statusOf(s.id) !== "todo").length
   // Pastilles : la séquence filtrée seule, sinon toutes dès qu'il y en a plusieurs.
   const chips = focused ? [focused] : all.length > 1 ? all : []
-  const hasRetro = showRetro && (milestone || item.targetDate || item.deadlineDate || item.criticality === "blocking")
+  const hasRetro = showRetro && (milestone || item.targetDate || item.criticality === "blocking")
   return (
     <div className="min-w-0 flex-1">
       <label
@@ -301,20 +301,20 @@ function ItemBody({ item, done, showRetro, today, milestone, sequences, statusOf
                     J{milestone.sortOrder}
                   </span>
                 )}
-                {(milestone || item.targetDate || item.deadlineDate) && (
+                {(milestone || item.targetDate) && (
                   <span className={cn("font-medium", ITEM_STATE_TEXT[state])}>
                     {ITEM_STATE_LABELS[state]}
                     {!done && all.length > 1 && !focused ? ` · ${seqDone}/${all.length}` : ""}
                   </span>
                 )}
-                {(item.targetDate || item.deadlineDate) && (
+                {(item.targetDate || milestone) && (
                   <span
                     className="tabular-nums"
                     title={item.idealStartDate ? `Début idéal : ${formatDate(item.idealStartDate)}` : undefined}
                   >
                     {item.targetDate ? `cible ${formatDate(item.targetDate)}` : ""}
-                    {item.targetDate && item.deadlineDate ? " · " : ""}
-                    {item.deadlineDate ? `limite ${formatDate(item.deadlineDate)}` : ""}
+                    {item.targetDate && milestone ? " · " : ""}
+                    {milestone ? `limite ${formatDate(milestone.targetDate)}` : ""}
                   </span>
                 )}
                 {!done && item.criticality === "blocking" && (

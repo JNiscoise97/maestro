@@ -7,8 +7,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useUpdateChecklistItem } from "@/hooks/queries/use-checklists"
 import { RetroFields } from "@/components/missions/RetroFields"
 import {
-  EMPTY_BULK_VALUES, retroBulkPatch, retroDatesInvalid, retroPatch, retroValuesFromItem, type RetroValues,
+  EMPTY_BULK_VALUES, retroBulkPatch, retroDatesError, retroPatch, retroValuesFromItem, type RetroValues,
 } from "@/lib/retroplanning-values"
+import { useMilestones } from "@/hooks/queries/use-milestones"
 import { cn } from "@/lib/utils"
 import type { ChecklistItem } from "@/types/domain"
 
@@ -20,7 +21,8 @@ export function ItemRetroPopover({ item, children }: { item: ChecklistItem; chil
   const [open, setOpen] = useState(false)
   const [values, setValues] = useState<RetroValues>(() => retroValuesFromItem(item))
   const update = useUpdateChecklistItem()
-  const invalid = retroDatesInvalid(values)
+  const { data: milestones = [] } = useMilestones()
+  const invalid = !!retroDatesError(values, milestones.find((m) => m.id === values.milestoneId)?.targetDate)
 
   function handleOpenChange(next: boolean) {
     if (next) setValues(retroValuesFromItem(item))
@@ -71,7 +73,14 @@ export function MissionRetroPopover({ items }: { items: ChecklistItem[] }) {
   const targets = scope === "all" ? items : unplanned
   const patch = retroBulkPatch(values)
   const empty = Object.keys(patch).length === 0
-  const invalid = retroDatesInvalid(values)
+  const { data: milestones = [] } = useMilestones()
+  // Chaque item est contrôlé avec ses dates résultantes et l'échéance de son jalon résultant.
+  const msDate = new Map(milestones.map((m) => [m.id, m.targetDate]))
+  const conflicts = empty ? 0 : targets.filter((i) => {
+    const next = { ...i, ...patch }
+    return retroDatesError(next, next.milestoneId ? msDate.get(next.milestoneId) : null) !== null
+  }).length
+  const invalid = conflicts > 0
 
   function handleOpenChange(next: boolean) {
     if (next) {
@@ -127,6 +136,12 @@ export function MissionRetroPopover({ items }: { items: ChecklistItem[] }) {
           ))}
         </div>
         <RetroFields value={values} onChange={setValues} bulk idPrefix="bulk" />
+        {conflicts > 0 && (
+          <p className="text-xs text-bordeaux">
+            {conflicts} item{conflicts > 1 ? "s auraient" : " aurait"} des dates incohérentes
+            (début idéal ≤ cible ≤ échéance du jalon).
+          </p>
+        )}
         <div className="flex items-center justify-end gap-2">
           <Button variant="outline" size="sm" onClick={() => setOpen(false)}>Annuler</Button>
           <Button size="sm" onClick={apply} disabled={empty || invalid || targets.length === 0 || saving}>

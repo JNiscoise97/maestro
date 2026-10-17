@@ -53,6 +53,8 @@ type RetroItem = ChecklistItem & {
   domaineName: string
   poleName: string
   poleOrder: number
+  /** Date limite de l'item = échéance de son jalon. */
+  milestoneDate: string | null
   /** Séquences de la mission, avec l'avancement de l'item pour chacune. */
   sequences: RetroSequence[]
 }
@@ -191,6 +193,7 @@ export function RetroplanningView() {
       seqIdsByMission.set(ms.missionId, list)
     }
     const statusByKey = new Map(seqStatuses.map((r) => [`${r.itemId}:${r.sequenceId}`, r.status]))
+    const milestoneDateById = new Map(milestones.map((m) => [m.id, m.targetDate]))
     const map = new Map<string, RetroRow[]>()
     for (const raw of items) {
       if (!raw.milestoneId) continue
@@ -206,6 +209,7 @@ export function RetroplanningView() {
         domaineName: domaine?.name ?? "",
         poleName: pole?.name ?? "Sans pôle",
         poleOrder: pole?.sortOrder ?? 999,
+        milestoneDate: milestoneDateById.get(raw.milestoneId) ?? null,
         sequences: (mission ? seqIdsByMission.get(mission.id) ?? [] : [])
           .map((id) => seqById.get(id))
           .filter((seq) => seq !== undefined)
@@ -219,7 +223,7 @@ export function RetroplanningView() {
             status: statusByKey.get(`${raw.id}:${seq.id}`) ?? (raw.isDone ? "done" : "todo"),
           })),
       }
-      const st = dateState(item, today)
+      const st = dateState(item, today, item.milestoneDate)
       const list = map.get(raw.milestoneId) ?? []
       if (item.sequences.length === 0) {
         const status = item.isDone ? "done" : "todo"
@@ -235,7 +239,7 @@ export function RetroplanningView() {
       map.set(raw.milestoneId, list)
     }
     return map
-  }, [items, checklists, missions, domaines, poles, sequences, missionSequences, seqStatuses, today])
+  }, [items, checklists, missions, domaines, poles, sequences, missionSequences, seqStatuses, milestones, today])
 
   // Application du filtre de séquence : tout le reste (statuts, totaux, cartes) en découle.
   const rowsByMilestone = useMemo(() => {
@@ -711,16 +715,16 @@ function RetroItemRow({ row, onToggle }: { row: RetroRow; onToggle: () => void }
         )}>
           {na ? "Non concerné" : ITEM_STATE_LABELS[st]}
         </span>
-        {(item.targetDate || item.deadlineDate) && (
+        {(item.targetDate || item.milestoneDate) && (
           <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap"
             title={[
               item.idealStartDate && `Début idéal : ${formatDate(item.idealStartDate)}`,
               item.targetDate && `Cible : ${formatDate(item.targetDate)}`,
-              item.deadlineDate && `Limite : ${formatDate(item.deadlineDate)}`,
+              item.milestoneDate && `Limite (échéance du jalon) : ${formatDate(item.milestoneDate)}`,
             ].filter(Boolean).join(" · ")}
           >
             {item.targetDate ? `cible ${formatDate(item.targetDate)}` : ""}
-            {item.deadlineDate ? ` · limite ${formatDate(item.deadlineDate)}` : ""}
+            {item.milestoneDate ? `${item.targetDate ? " · " : ""}limite ${formatDate(item.milestoneDate)}` : ""}
           </span>
         )}
         {row.status === "todo" && item.criticality === "blocking" && (

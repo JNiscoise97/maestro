@@ -6,8 +6,9 @@ import { useCreateChecklistItem, useUpdateChecklistItem } from "@/hooks/queries/
 import type { ChecklistItem, Priority, ProgressStatus } from "@/types/domain"
 import { RetroFields } from "@/components/missions/RetroFields"
 import {
-  retroDatesInvalid, retroPatch, retroValuesFromItem, type RetroValues,
+  retroDatesError, retroPatch, retroValuesFromItem, type RetroValues,
 } from "@/lib/retroplanning-values"
+import { useMilestones } from "@/hooks/queries/use-milestones"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -62,7 +63,8 @@ export function ChecklistItemDialog({ item, checklistId }: ChecklistItemDialogPr
   }
 
   const retro = retroPatch(retroValues)
-  const datesInvalid = retroDatesInvalid(retroValues)
+  const { data: milestones = [] } = useMilestones()
+  const datesInvalid = !!retroDatesError(retroValues, milestones.find((m) => m.id === retroValues.milestoneId)?.targetDate)
 
   async function handleSubmit() {
     if (!label.trim() || datesInvalid) return

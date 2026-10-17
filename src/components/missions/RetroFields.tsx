@@ -1,7 +1,7 @@
 import { useMilestones } from "@/hooks/queries/use-milestones"
 import { CRITICALITY_LABELS, formatDate } from "@/lib/retroplanning"
 import type { Criticality } from "@/types/domain"
-import { RETRO_KEEP, RETRO_NONE, retroDatesInvalid, type RetroValues } from "@/lib/retroplanning-values"
+import { RETRO_KEEP, RETRO_NONE, retroDatesError, type RetroValues } from "@/lib/retroplanning-values"
 import { Input } from "@/components/ui/input"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -16,18 +16,16 @@ export function RetroFields({ value, onChange, bulk = false, idPrefix = "retro" 
   const { data: milestones = [] } = useMilestones()
   const set = (patch: Partial<RetroValues>) => onChange({ ...value, ...patch })
 
-  function setMilestone(id: string) {
-    const m = milestones.find((x) => x.id === id)
-    // Sans date limite, on propose l'échéance du jalon comme date limite.
-    set({ milestoneId: id, ...(m && !value.deadlineDate ? { deadlineDate: m.targetDate } : {}) })
-  }
+  // Date limite = échéance du jalon choisi (inconnue en lot si le jalon n'est pas modifié).
+  const milestone = milestones.find((m) => m.id === value.milestoneId)
+  const error = retroDatesError(value, milestone?.targetDate)
 
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]">
         <Field className="min-w-0">
           <FieldLabel>Jalon</FieldLabel>
-          <Select value={value.milestoneId} onValueChange={setMilestone}>
+          <Select value={value.milestoneId} onValueChange={(id) => set({ milestoneId: id })}>
             {/* Libellé de jalon long : tronqué dans le champ, complet dans la liste. */}
             <SelectTrigger className="w-full min-w-0 [&_[data-slot=select-value]]:min-w-0 [&_[data-slot=select-value]]:overflow-hidden">
               <SelectValue />
@@ -60,7 +58,7 @@ export function RetroFields({ value, onChange, bulk = false, idPrefix = "retro" 
       </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <Field className="min-w-0">
-          <FieldLabel htmlFor={`${idPrefix}-ideal`}>Début idéal</FieldLabel>
+          <FieldLabel htmlFor={`${idPrefix}-ideal`}>Début idéal <span className="font-normal text-muted-foreground">(facultatif)</span></FieldLabel>
           <Input id={`${idPrefix}-ideal`} type="date" value={value.idealStartDate}
             onChange={(e) => set({ idealStartDate: e.target.value })} />
         </Field>
@@ -71,17 +69,24 @@ export function RetroFields({ value, onChange, bulk = false, idPrefix = "retro" 
         </Field>
         <Field className="min-w-0">
           <FieldLabel htmlFor={`${idPrefix}-deadline`}>Date limite</FieldLabel>
-          <Input id={`${idPrefix}-deadline`} type="date" value={value.deadlineDate}
-            onChange={(e) => set({ deadlineDate: e.target.value })} />
+          {/* Lecture seule : c'est l'échéance du jalon. */}
+          <p id={`${idPrefix}-deadline`}
+            className="flex h-8 items-center rounded-lg border border-dashed border-input px-2.5 text-sm text-muted-foreground"
+            title="La date limite est l'échéance du jalon"
+          >
+            {milestone
+              ? formatDate(milestone.targetDate, { day: "numeric", month: "short", year: "numeric" })
+              : value.milestoneId === RETRO_KEEP ? "Selon le jalon" : "Aucune (sans jalon)"}
+          </p>
         </Field>
       </div>
-      {retroDatesInvalid(value) ? (
-        <p className="text-xs text-bordeaux">Les dates doivent se suivre : début idéal ≤ date cible ≤ date limite.</p>
+      {error ? (
+        <p className="text-xs text-bordeaux">{error}</p>
       ) : (
         <p className="text-[11px] text-muted-foreground">
           {bulk
             ? "Seuls les champs renseignés sont appliqués ; les dates laissées vides ne changent pas."
-            : "Date cible dépassée → « À rattraper » · date limite dépassée → « En retard »."}
+            : "Date limite = échéance du jalon. Cible dépassée → « À rattraper » · limite dépassée → « En retard »."}
         </p>
       )}
     </div>

@@ -145,8 +145,6 @@ export interface ChecklistItem {
   idealStartDate?: string | null
   /** Date cible de réalisation. */
   targetDate?: string | null
-  /** Date limite au-delà de laquelle le jalon est compromis. */
-  deadlineDate?: string | null
   criticality?: Criticality
 }
 

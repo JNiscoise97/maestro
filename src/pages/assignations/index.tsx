@@ -19,7 +19,8 @@ import { useAllMissionAcceptances } from "@/hooks/queries/use-mission-acceptance
 import { usePeople } from "@/hooks/queries/use-people"
 import { useGuests } from "@/hooks/queries/use-guests"
 import { useIdentity } from "@/context/IdentityContext"
-import { DOMAINE_PHASE_LABELS, DOMAINE_PHASE_ORDER } from "@/lib/constants"
+import { DOMAINE_PHASE_LABELS } from "@/lib/constants"
+import { compareDomaines } from "@/lib/ordering"
 
 const NO_POLE = "__no_pole__"
 
@@ -89,12 +90,7 @@ export function AssignationsPage() {
       .map(({ pole, id, name }) => {
         const poleDomaines = domaines
           .filter((d) => (id === NO_POLE ? !d.poleId : d.poleId === id))
-          .sort((a, b) => {
-            const phaseDiff =
-              DOMAINE_PHASE_ORDER.indexOf(a.phase ?? DOMAINE_PHASE_ORDER[0]) -
-              DOMAINE_PHASE_ORDER.indexOf(b.phase ?? DOMAINE_PHASE_ORDER[0])
-            return phaseDiff !== 0 ? phaseDiff : a.sortOrder - b.sortOrder
-          })
+          .sort(compareDomaines)
           .map((domaine) => ({
             domaine,
             missions: missions

@@ -2,11 +2,12 @@ import { useState } from "react"
 import { Check, ChevronRight, ListChecks, X } from "lucide-react"
 
 import type { DomainePhase, Mission } from "@/types/domain"
-import { DOMAINE_PHASE_LABELS, DOMAINE_PHASE_ORDER } from "@/lib/constants"
+import { DOMAINE_PHASE_LABELS } from "@/lib/constants"
 import { usePoles } from "@/hooks/queries/use-poles"
 import { useDomaines } from "@/hooks/queries/use-domaines"
 import { useAllChecklists, useAllChecklistItems } from "@/hooks/queries/use-checklists"
 import { cn } from "@/lib/utils"
+import { compareChecklistItems, compareDomaines, compareMissions } from "@/lib/ordering"
 
 type Level = "pole" | "domaine" | "mission" | "item"
 
@@ -97,17 +98,11 @@ export function MissionPicker({ value, onChange, missions }: Props) {
 
   const domainesForPole = domaines
     .filter((d) => d.phase !== "avant" && (poleId ? d.poleId === poleId : !d.poleId) && missions.some((m) => m.domaineId === d.id && isPickable(m)))
-    .sort((a, b) => {
-      const pi = DOMAINE_PHASE_ORDER.indexOf(a.phase as DomainePhase)
-      const qi = DOMAINE_PHASE_ORDER.indexOf(b.phase as DomainePhase)
-      const phaseA = pi === -1 ? 99 : pi
-      const phaseB = qi === -1 ? 99 : qi
-      return phaseA !== phaseB ? phaseA - phaseB : a.sortOrder - b.sortOrder
-    })
+    .sort(compareDomaines)
 
   const missionsForDomaine = missions
     .filter((m) => m.domaineId === domaineId && m.schedulingType !== "en_continu")
-    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .sort(compareMissions)
 
   const currentDomaine = domaines.find((d) => d.id === domaineId)
 
@@ -116,7 +111,7 @@ export function MissionPicker({ value, onChange, missions }: Props) {
   )
   const missionItems = items
     .filter((i) => missionChecklists.some((c) => c.id === i.checklistId))
-    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .sort(compareChecklistItems)
 
   // ── Rendu par niveau ──
   const list = (() => {

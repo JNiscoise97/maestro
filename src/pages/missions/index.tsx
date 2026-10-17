@@ -46,6 +46,7 @@ import { DomaineResponsableSelect } from "@/components/shared/DomaineResponsable
 import { DOMAINE_PHASE_LABELS, DOMAINE_PHASE_ORDER } from "@/lib/constants"
 import { myMissionIds, resolveEffectiveMissionResponsable, type EffectiveResponsable } from "@/lib/responsible"
 import { cn } from "@/lib/utils"
+import { compareChecklistItems, compareDomaines, compareMissions } from "@/lib/ordering"
 
 const NO_POLE = "__no_pole__"
 const DASHBOARD_TAB = "__dashboard__"
@@ -314,15 +315,10 @@ export function MissionsPage() {
     }
     return domaines
       .filter((d) => mineByDomaine.has(d.id))
-      .sort((a, b) => {
-        const phaseDiff =
-          DOMAINE_PHASE_ORDER.indexOf(a.phase ?? DOMAINE_PHASE_ORDER[0]) -
-          DOMAINE_PHASE_ORDER.indexOf(b.phase ?? DOMAINE_PHASE_ORDER[0])
-        return phaseDiff !== 0 ? phaseDiff : a.sortOrder - b.sortOrder
-      })
+      .sort(compareDomaines)
       .map((domaine) => ({
         domaine,
-        missions: (mineByDomaine.get(domaine.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder),
+        missions: (mineByDomaine.get(domaine.id) ?? []).sort(compareMissions),
       }))
   }, [missions, domaines, myMissions])
 
@@ -340,15 +336,10 @@ export function MissionsPage() {
       .map((pole) => {
         const poleDomaines = domaines
           .filter((d) => (pole.id === NO_POLE ? !d.poleId : d.poleId === pole.id))
-          .sort((a, b) => {
-            const phaseDiff =
-              DOMAINE_PHASE_ORDER.indexOf(a.phase ?? DOMAINE_PHASE_ORDER[0]) -
-              DOMAINE_PHASE_ORDER.indexOf(b.phase ?? DOMAINE_PHASE_ORDER[0])
-            return phaseDiff !== 0 ? phaseDiff : a.sortOrder - b.sortOrder
-          })
+          .sort(compareDomaines)
           .map((domaine) => ({
             domaine,
-            missions: visibleMissions.filter((m) => m.domaineId === domaine.id).sort((a, b) => a.sortOrder - b.sortOrder),
+            missions: visibleMissions.filter((m) => m.domaineId === domaine.id).sort(compareMissions),
           }))
           .filter((group) => group.missions.length > 0)
 
@@ -605,7 +596,7 @@ export function MissionsPage() {
       }
 
       for (const cl of mCls) {
-        const items = (itemsByChecklist.get(cl.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder)
+        const items = (itemsByChecklist.get(cl.id) ?? []).sort(compareChecklistItems)
         if (items.length === 0) {
           rows.push([
             pole?.name ?? "",

@@ -63,7 +63,7 @@ function toRow(input: Partial<Domaine>): DomaineRowPatch {
 
 export const domainesSupabaseService: DomainesService = {
   async list() {
-    const { data, error } = await db.from(tbl("domaines") as any).select("*").order("sort_order")
+    const { data, error } = await db.from(tbl("domaines") as any).select("*").order("sort_order").order("name").order("id")
     if (error) throw error
     return (data ?? []).map(toDomaine)
   },

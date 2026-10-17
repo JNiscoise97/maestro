@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { compareChecklistItems, compareMissions } from "@/lib/ordering"
 
 // ── Types internes ─────────────────────────────────────────────────────────────
 
@@ -293,7 +294,7 @@ export function DomaineQuickEditDialog({ domaine, missions, checklists, items }:
   function buildOrigMissions(): OrigMission[] {
     return missions
       .filter((m) => m.domaineId === domaine.id)
-      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .sort(compareMissions)
       .map((m) => ({
         id: m.id,
         title: m.title,
@@ -305,7 +306,7 @@ export function DomaineQuickEditDialog({ domaine, missions, checklists, items }:
             title: cl.title ?? null,
             items: items
               .filter((i) => i.checklistId === cl.id)
-              .sort((a, b) => a.sortOrder - b.sortOrder)
+              .sort(compareChecklistItems)
               .map((i) => ({ id: i.id, label: i.label, sortOrder: i.sortOrder })),
           })),
       }))

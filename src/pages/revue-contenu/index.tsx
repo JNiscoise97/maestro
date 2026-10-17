@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { compareChecklistItems } from "@/lib/ordering"
 
 const NO_POLE = "__no_pole__"
 
@@ -68,7 +69,7 @@ interface DraftDomaine {
 
 function toDraftItems(items: ChecklistItem[]): DraftItem[] {
   return items
-    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .sort(compareChecklistItems)
     .map((i) => ({ id: i.id, label: i.label, priority: i.priority, isNew: false, removed: false, sortOrder: i.sortOrder }))
 }
 

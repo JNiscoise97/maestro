@@ -36,6 +36,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge"
 import { PriorityBadge } from "@/components/shared/PriorityBadge"
 import { ChecklistDialog } from "@/components/parametres/ChecklistDialog"
 import { ChecklistItemDialog } from "@/components/parametres/ChecklistItemDialog"
+import { compareChecklistItems } from "@/lib/ordering"
 
 const STATUS_OPTIONS: { value: ProgressStatus; label: string }[] = [
   { value: "todo", label: "À faire" },
@@ -282,7 +283,7 @@ export function MissionEditDialog({ mission }: { mission: Mission }) {
       list.push(item)
       map.set(item.checklistId, list)
     }
-    for (const list of map.values()) list.sort((a, b) => a.sortOrder - b.sortOrder)
+    for (const list of map.values()) list.sort(compareChecklistItems)
     return map
   }, [allItems, missionChecklists])
 

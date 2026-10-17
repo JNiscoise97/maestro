@@ -1,8 +1,10 @@
 import { useState } from "react"
-import { Pencil, Plus } from "lucide-react"
+import { Pencil, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
-import { useChecklistItems, useCreateChecklistItem, useUpdateChecklistItem } from "@/hooks/queries/use-checklists"
+import {
+  useChecklistItems, useCreateChecklistItem, useDeleteChecklistItem, useUpdateChecklistItem,
+} from "@/hooks/queries/use-checklists"
 import type { ChecklistItem, Priority, ProgressStatus } from "@/types/domain"
 import { RetroFields } from "@/components/missions/RetroFields"
 import {
@@ -50,12 +52,16 @@ export function ChecklistItemDialog({ item, checklistId }: ChecklistItemDialogPr
   const [retroValues, setRetroValues] = useState<RetroValues>(() => retroValuesFromItem(item))
   const createItem = useCreateChecklistItem()
   const updateItem = useUpdateChecklistItem()
+  const deleteItem = useDeleteChecklistItem()
+  // Suppression en deux temps : le premier clic demande confirmation.
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   // Création : l'item se range après les items existants de la checklist.
   const { data: siblings = [] } = useChecklistItems(item ? undefined : checklistId)
   const nextSortOrder = siblings.reduce((max, i) => Math.max(max, i.sortOrder), -1) + 1
 
   /** À chaque ouverture, repartir des valeurs actuelles de l'item (modifiables ailleurs entre-temps). */
   function handleOpenChange(next: boolean) {
+    if (next) setConfirmingDelete(false)
     if (next && item) {
       setLabel(item.label)
       setPriority(item.priority)
@@ -95,6 +101,18 @@ export function ChecklistItemDialog({ item, checklistId }: ChecklistItemDialogPr
     } catch (err) {
       console.error("[ChecklistItemDialog] handleSubmit:", err)
       toast.error("Erreur lors de l'enregistrement.")
+    }
+  }
+
+  async function handleDelete() {
+    if (!item) return
+    try {
+      await deleteItem.mutateAsync(item.id)
+      toast.success("Item supprimé.")
+      setOpen(false)
+    } catch (err) {
+      console.error("[ChecklistItemDialog] handleDelete:", err)
+      toast.error("Erreur lors de la suppression.")
     }
   }
 
@@ -163,12 +181,40 @@ export function ChecklistItemDialog({ item, checklistId }: ChecklistItemDialogPr
             <RetroFields value={retroValues} onChange={setRetroValues} idPrefix={`item-${item?.id ?? "new"}`} />
           </div>
         </FieldGroup>
-        <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Annuler
-          </Button>
-          <Button onClick={handleSubmit} disabled={datesInvalid}>{item ? "Enregistrer" : "Créer"}</Button>
-        </DialogFooter>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {item && (
+            <>
+              {confirmingDelete ? (
+                <div className="flex items-center gap-1.5">
+                  <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleteItem.isPending}>
+                    <Trash2 className="size-3.5" />
+                    Confirmer la suppression
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)}>
+                    Non
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-bordeaux hover:bg-bordeaux/10 hover:text-bordeaux"
+                  onClick={() => setConfirmingDelete(true)}
+                >
+                  <Trash2 className="size-3.5" />
+                  Supprimer
+                </Button>
+              )}
+              <div aria-hidden className="h-6 w-px bg-border" />
+            </>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Annuler
+            </Button>
+            <Button onClick={handleSubmit} disabled={datesInvalid}>{item ? "Enregistrer" : "Créer"}</Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   )

@@ -47,6 +47,7 @@ import { DomaineQuickEditDialog } from "@/components/parametres/DomaineQuickEdit
 import { StatusBadge } from "@/components/shared/StatusBadge"
 import { PriorityBadge } from "@/components/shared/PriorityBadge"
 import { DomaineResponsableSelect } from "@/components/shared/DomaineResponsableSelect"
+import { compareChecklistItems, compareDomaines, compareMissions } from "@/lib/ordering"
 
 const NO_POLE = "__no_pole__"
 const NONE = "__none__"
@@ -279,7 +280,7 @@ export function ParametresTree() {
       list.push(d)
       map.set(key, list)
     }
-    for (const list of map.values()) list.sort((a, b) => a.sortOrder - b.sortOrder)
+    for (const list of map.values()) list.sort(compareDomaines)
     return map
   }, [domaines])
 
@@ -301,7 +302,7 @@ export function ParametresTree() {
       list.push(m)
       map.set(m.domaineId, list)
     }
-    for (const list of map.values()) list.sort((a, b) => a.sortOrder - b.sortOrder)
+    for (const list of map.values()) list.sort(compareMissions)
     return map
   }, [missions])
 
@@ -324,7 +325,7 @@ export function ParametresTree() {
       list.push(i)
       map.set(i.checklistId, list)
     }
-    for (const list of map.values()) list.sort((a, b) => a.sortOrder - b.sortOrder)
+    for (const list of map.values()) list.sort(compareChecklistItems)
     return map
   }, [items])
 

@@ -15,6 +15,7 @@ import {
   ITEM_STATE_LABELS, ITEM_STATE_ORDER, dateState, formatDate, toIso, type ItemState,
 } from "@/lib/retroplanning"
 import { sequenceColor, withAlpha } from "@/lib/sequence-colors"
+import { compareChecklistItems } from "@/lib/ordering"
 import { SequenceDot } from "@/components/shared/SequenceName"
 import type { ChecklistItem, ItemSequenceStatusValue, Milestone } from "@/types/domain"
 import { formatWeeks } from "@/lib/date"
@@ -556,7 +557,7 @@ function MilestoneCard({ milestone: m, rows, status: s, isOpen, showDone, onTogg
       b.visible.sort((a, c) =>
         ITEM_STATE_ORDER[a.state] - ITEM_STATE_ORDER[c.state]
         || (a.item.targetDate ?? "").localeCompare(c.item.targetDate ?? "")
-        || a.item.sortOrder - c.item.sortOrder)
+        || compareChecklistItems(a.item, c.item))
       const p = byPole.get(b.poleName) ?? { order: b.poleOrder, blocks: [] }
       p.blocks.push(b)
       byPole.set(b.poleName, p)

@@ -44,7 +44,7 @@ import { useMilestones } from "@/hooks/queries/use-milestones"
 import { MissionResponsableSelect } from "@/components/missions/MissionResponsableSelect"
 import { DomaineResponsableSelect } from "@/components/shared/DomaineResponsableSelect"
 import { DOMAINE_PHASE_LABELS, DOMAINE_PHASE_ORDER } from "@/lib/constants"
-import { resolveEffectiveMissionResponsable, type EffectiveResponsable } from "@/lib/responsible"
+import { myMissionIds, resolveEffectiveMissionResponsable, type EffectiveResponsable } from "@/lib/responsible"
 import { cn } from "@/lib/utils"
 
 const NO_POLE = "__no_pole__"
@@ -297,11 +297,23 @@ export function MissionsPage() {
     return map
   }, [checklists, checklistItems])
 
+  // Missions du fiancé connecté : responsable propre de la mission, sinon du domaine, sinon du pôle.
+  const myMissions = useMemo(() => {
+    if (!missions || !domaines || !poles || !checklists || !person) return new Set<string>()
+    return myMissionIds(person.id, { missions, domaines, domaineResponsables, poles, checklists })
+  }, [missions, domaines, domaineResponsables, poles, checklists, person])
+
   const myDomaineGroups = useMemo(() => {
-    if (!missions || !domaines || !person) return []
-    const myResponsableDomaineIds = entries.find((e) => e.identity.id === person.id)?.domaineIds ?? []
+    if (!missions || !domaines) return []
+    const mineByDomaine = new Map<string, Mission[]>()
+    for (const m of missions) {
+      if (!myMissions.has(m.id) || !m.domaineId) continue
+      const list = mineByDomaine.get(m.domaineId) ?? []
+      list.push(m)
+      mineByDomaine.set(m.domaineId, list)
+    }
     return domaines
-      .filter((d) => myResponsableDomaineIds.includes(d.id))
+      .filter((d) => mineByDomaine.has(d.id))
       .sort((a, b) => {
         const phaseDiff =
           DOMAINE_PHASE_ORDER.indexOf(a.phase ?? DOMAINE_PHASE_ORDER[0]) -
@@ -310,15 +322,10 @@ export function MissionsPage() {
       })
       .map((domaine) => ({
         domaine,
-        missions: missions.filter((m) => m.domaineId === domaine.id).sort((a, b) => a.sortOrder - b.sortOrder),
+        missions: (mineByDomaine.get(domaine.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder),
       }))
-  }, [missions, domaines, entries, person])
+  }, [missions, domaines, myMissions])
 
-  const myOperationalStats = useMemo(() => {
-    const myMissions = myDomaineGroups.flatMap((g) => g.missions)
-    const myItems = myMissions.flatMap((m) => itemsByMissionId.get(m.id) ?? [])
-    return { missionCount: myMissions.length, ...itemStats(myItems) }
-  }, [myDomaineGroups, itemsByMissionId])
 
   const poleGroups = useMemo(() => {
     if (!visibleMissions || !domaines || !poles) return []
@@ -472,6 +479,8 @@ export function MissionsPage() {
   const { data: milestones = [] } = useMilestones()
   const [activeTab, setActiveTab] = useState(DASHBOARD_TAB)
   const [fianceView, setFianceView] = useState<"pilotage" | "retroplanning" | "operationnelle">("pilotage")
+  // Rétroplanning restreint aux missions du fiancé connecté.
+  const [retroMineOnly, setRetroMineOnly] = useState(false)
   const [phaseFilter, setPhaseFilter] = useState<string | null>(null)
   // Filtres rétroplanning de l'onglet pôle : jalon (id | FILTER_NONE) et séquence (id | FILTER_NONE).
   const [milestoneFilter, setMilestoneFilter] = useState<string | null>(null)
@@ -903,6 +912,8 @@ export function MissionsPage() {
   )
 
   const globalRetro = retroStats(poleGroups.flatMap((g) => g.domaineGroups.flatMap((d) => d.missions)))
+  const myMissionList = myDomaineGroups.flatMap((g) => g.missions)
+  const myRetro = retroStats(myMissionList)
 
   const poleTabsContents = poleGroups.map(({ pole, domaineGroups, stats }) => {
     const rs = retroStats(domaineGroups.flatMap((g) => g.missions))
@@ -1109,17 +1120,40 @@ export function MissionsPage() {
               <StatCard
                 icon={FolderTree}
                 label="Missions assignées"
-                value={myOperationalStats.missionCount}
-                hint="Missions des domaines dont vous êtes responsable"
+                value={myMissionList.length}
+                hint="Dont vous êtes responsable (mission, domaine ou pôle)"
                 accentClassName="bg-bordeaux/10 text-bordeaux"
               />
               <StatCard
                 icon={CheckCircle2}
-                label="Items"
-                value={`${myOperationalStats.done} / ${myOperationalStats.total}`}
-                hint={`${myOperationalStats.percent}% complété`}
+                label="Items × séquences faits"
+                value={`${myRetro.done} / ${myRetro.total}`}
+                hint={`${myRetro.percent}% complété`}
                 accentClassName="bg-vert-vegetal/15 text-vert-vegetal"
               />
+              <Card>
+                <CardContent className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Mon avancement</p>
+                  <Progress value={myRetro.percent} />
+                  <p className="text-xs text-muted-foreground">
+                    {myRetro.percent}% · missions × séquences : {myRetro.blocksDone} / {myRetro.blocksTotal}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Mes échéances</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    disabled={myMissionList.length === 0}
+                    onClick={() => { setRetroMineOnly(true); setFianceView("retroplanning") }}
+                  >
+                    Voir mon rétroplanning
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           ) : isFiance && fianceView === "retroplanning" ? null : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1156,7 +1190,11 @@ export function MissionsPage() {
           )}
 
           {isFiance && fianceView === "retroplanning" ? (
-            <RetroplanningView />
+            <RetroplanningView
+              myMissionIds={myMissions}
+              mineOnly={retroMineOnly}
+              onMineOnlyChange={setRetroMineOnly}
+            />
           ) : isFiance && fianceView === "operationnelle" ? (
             myDomaineGroups.length === 0 ? (
               <EmptyState icon={ListChecks} title="Aucune mission ne vous a été confiée pour le moment" />

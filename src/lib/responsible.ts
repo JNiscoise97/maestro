@@ -1,4 +1,4 @@
-import type { ChecklistItem, Domaine, DomaineResponsable, Guest, Mission, Person, Pole } from "@/types/domain"
+import type { Checklist, ChecklistItem, Domaine, DomaineResponsable, Guest, Mission, Person, Pole } from "@/types/domain"
 
 export type ResponsableSource = "item" | "mission" | "domaine" | "pole"
 
@@ -85,4 +85,51 @@ export function resolveEffectiveItemResponsable(
   // 2. Remonte via la mission
   if (!mission) return null
   return resolveEffectiveMissionResponsable(mission, domaine, domaineResponsables, poles, people, guests)
+}
+
+/**
+ * Missions dont un fiancé est responsable, avec la même cascade que le responsable effectif :
+ *   1. responsable propre de la mission ;
+ *   2. sinon responsable du domaine (principal ou secondaire) ;
+ *   3. sinon responsable du pôle (si le domaine n'a aucun responsable).
+ * S'y ajoutent les missions dont une checklist lui a été déléguée.
+ */
+export function myMissionIds(
+  personId: string,
+  data: {
+    missions: Mission[]
+    domaines: Domaine[]
+    domaineResponsables: DomaineResponsable[]
+    poles: Pole[]
+    checklists: Checklist[]
+  },
+): Set<string> {
+  const domaineById = new Map(data.domaines.map((d) => [d.id, d]))
+  const poleById = new Map(data.poles.map((p) => [p.id, p]))
+  const respsByDomaine = new Map<string, DomaineResponsable[]>()
+  for (const r of data.domaineResponsables) {
+    const list = respsByDomaine.get(r.domaineId) ?? []
+    list.push(r)
+    respsByDomaine.set(r.domaineId, list)
+  }
+  const mine = new Set<string>()
+  for (const m of data.missions) {
+    if (m.responsiblePersonId || m.responsibleGuestId) {
+      if (m.responsiblePersonId === personId) mine.add(m.id)
+      continue
+    }
+    const domaine = m.domaineId ? domaineById.get(m.domaineId) : undefined
+    if (!domaine) continue
+    const resps = respsByDomaine.get(domaine.id) ?? []
+    if (resps.length > 0) {
+      if (resps.some((r) => r.personId === personId)) mine.add(m.id)
+      continue
+    }
+    const pole = domaine.poleId ? poleById.get(domaine.poleId) : undefined
+    if (pole?.responsiblePersonId === personId) mine.add(m.id)
+  }
+  for (const c of data.checklists) {
+    if (c.ownerType === "mission" && c.ownerId && c.responsiblePersonId === personId) mine.add(c.ownerId)
+  }
+  return mine
 }

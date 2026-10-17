@@ -155,7 +155,12 @@ function loadFilter(): string {
   try { return localStorage.getItem(FILTER_KEY) || ALL } catch { return ALL }
 }
 
-export function RetroplanningView() {
+export function RetroplanningView({ myMissionIds, mineOnly = false, onMineOnlyChange }: {
+  /** Missions de la personne connectée ; sans cette liste, le filtre « Mes missions » n'est pas proposé. */
+  myMissionIds?: Set<string>
+  mineOnly?: boolean
+  onMineOnlyChange?: (mineOnly: boolean) => void
+} = {}) {
   const { data: milestones = [], isLoading: msLoading } = useMilestones()
   const { data: items = [], isLoading: itemsLoading } = useAllChecklistItems()
   const { data: checklists = [] } = useAllChecklists()
@@ -242,14 +247,17 @@ export function RetroplanningView() {
   }, [items, checklists, missions, domaines, poles, sequences, missionSequences, seqStatuses, milestones, today])
 
   // Application du filtre de séquence : tout le reste (statuts, totaux, cartes) en découle.
+  const restrictToMine = mineOnly && !!myMissionIds
   const rowsByMilestone = useMemo(() => {
-    if (seqFilter === ALL) return allRowsByMilestone
+    if (seqFilter === ALL && !restrictToMine) return allRowsByMilestone
     const map = new Map<string, RetroRow[]>()
     for (const [id, rows] of allRowsByMilestone) {
-      map.set(id, rows.filter((r) => (seqFilter === NONE ? r.sequenceId === null : r.sequenceId === seqFilter)))
+      map.set(id, rows.filter((r) =>
+        (!restrictToMine || myMissionIds.has(r.item.missionId))
+        && (seqFilter === ALL || (seqFilter === NONE ? r.sequenceId === null : r.sequenceId === seqFilter))))
     }
     return map
-  }, [allRowsByMilestone, seqFilter])
+  }, [allRowsByMilestone, seqFilter, restrictToMine, myMissionIds])
 
   const statusById = useMemo(
     () => new Map(milestones.map((m) => [m.id, milestoneStatus(rowsByMilestone.get(m.id) ?? [])])),
@@ -309,9 +317,10 @@ export function RetroplanningView() {
   const lateCount = milestones.filter((m) => statusById.get(m.id) === "late").length
   const behindCount = milestones.filter((m) => statusById.get(m.id) === "behind").length
   const totals = computeTotals([...rowsByMilestone.values()].flat())
-  const filterLabel = seqFilter === ALL
+  const seqLabel = seqFilter === ALL
     ? null
     : seqFilter === NONE ? "Missions sans séquence" : sequences.find((s) => s.id === seqFilter)?.name ?? null
+  const filterLabel = [restrictToMine ? "Mes missions" : null, seqLabel].filter(Boolean).join(" · ") || null
 
   return (
     <div className="space-y-4">
@@ -425,8 +434,28 @@ export function RetroplanningView() {
         </div>
       </div>
 
-      {/* Filtre par séquence */}
+      {/* Filtres : périmètre (toutes / mes missions) puis séquence */}
       <div className="space-y-2">
+        {myMissionIds && onMineOnlyChange && (
+          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Périmètre">
+            {([
+              { value: false, label: "Toutes les missions" },
+              { value: true, label: `Mes missions (${myMissionIds.size})` },
+            ]).map((opt) => (
+              <button key={opt.label} type="button" role="radio" aria-checked={mineOnly === opt.value}
+                onClick={() => onMineOnlyChange(opt.value)}
+                className={cn(
+                  "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                  mineOnly === opt.value
+                    ? "border-bordeaux bg-bordeaux text-white"
+                    : "border-border bg-card text-foreground hover:border-foreground/30",
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrer par séquence">
           {[
             { value: ALL, label: "Toutes les séquences", color: null as string | null },

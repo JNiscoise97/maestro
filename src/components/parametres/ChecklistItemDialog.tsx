@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Pencil, Plus } from "lucide-react"
 import { toast } from "sonner"
 
-import { useCreateChecklistItem, useUpdateChecklistItem } from "@/hooks/queries/use-checklists"
+import { useChecklistItems, useCreateChecklistItem, useUpdateChecklistItem } from "@/hooks/queries/use-checklists"
 import type { ChecklistItem, Priority, ProgressStatus } from "@/types/domain"
 import { RetroFields } from "@/components/missions/RetroFields"
 import {
@@ -50,6 +50,9 @@ export function ChecklistItemDialog({ item, checklistId }: ChecklistItemDialogPr
   const [retroValues, setRetroValues] = useState<RetroValues>(() => retroValuesFromItem(item))
   const createItem = useCreateChecklistItem()
   const updateItem = useUpdateChecklistItem()
+  // Création : l'item se range après les items existants de la checklist.
+  const { data: siblings = [] } = useChecklistItems(item ? undefined : checklistId)
+  const nextSortOrder = siblings.reduce((max, i) => Math.max(max, i.sortOrder), -1) + 1
 
   /** À chaque ouverture, repartir des valeurs actuelles de l'item (modifiables ailleurs entre-temps). */
   function handleOpenChange(next: boolean) {
@@ -81,7 +84,7 @@ export function ChecklistItemDialog({ item, checklistId }: ChecklistItemDialogPr
           checklistId,
           label,
           isDone: status === "done",
-          sortOrder: 0,
+          sortOrder: nextSortOrder,
           priority,
           status,
           ...retro,

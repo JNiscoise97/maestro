@@ -169,7 +169,11 @@ export const checklistsSupabaseService: ChecklistsService = {
       .from(tbl("checklist_items") as any)
       .select("*")
       .eq("checklist_id", checklistId)
+      // Ordre stable : à rang égal, date cible puis libellé (sinon les items s'échangent après chaque mise à jour).
       .order("sort_order")
+      .order("target_date", { nullsFirst: false })
+      .order("label")
+      .order("id")
     if (error) throw error
     return (data ?? []).map(toChecklistItem)
   },

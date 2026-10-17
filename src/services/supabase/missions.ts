@@ -41,7 +41,9 @@ function toMission(row: {
 
 export const missionsSupabaseService: MissionsService = {
   async list() {
+    // Ordre stable : sans départage, deux missions de même rang s'échangent après chaque mise à jour.
     const { data, error } = await db.from(tbl("missions") as any).select("*")
+      .order("sort_order").order("title").order("id")
     if (error) throw error
     return (data ?? []).map(toMission)
   },

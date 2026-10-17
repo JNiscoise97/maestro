@@ -38,6 +38,8 @@ interface DraftItem {
   priority: Priority
   isNew: boolean
   removed: boolean
+  /** Rang en base (items existants uniquement). */
+  sortOrder?: number
 }
 
 interface DraftChecklist {
@@ -67,7 +69,7 @@ interface DraftDomaine {
 function toDraftItems(items: ChecklistItem[]): DraftItem[] {
   return items
     .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((i) => ({ id: i.id, label: i.label, priority: i.priority, isNew: false, removed: false }))
+    .map((i) => ({ id: i.id, label: i.label, priority: i.priority, isNew: false, removed: false, sortOrder: i.sortOrder }))
 }
 
 function buildDraft(domaines: Domaine[], missions: Mission[], checklists: Checklist[], items: ChecklistItem[]): DraftDomaine[] {
@@ -353,12 +355,16 @@ export function RevueContenuPage() {
         const created = await createChecklist.mutateAsync({ ownerType, ownerId, title: null })
         checklistId = created.id
       }
+      // Les nouveaux items se rangent après les existants, dans l'ordre de saisie.
+      let nextSortOrder = checklist.items
+        .filter((i) => !i.isNew)
+        .reduce((max, i) => Math.max(max, i.sortOrder ?? -1), -1) + 1
       for (const item of toCreate) {
         await createItem.mutateAsync({
           checklistId,
           label: item.label,
           isDone: false,
-          sortOrder: 0,
+          sortOrder: nextSortOrder++,
           priority: item.priority,
           status: "todo",
         })

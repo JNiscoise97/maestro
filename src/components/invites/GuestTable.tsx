@@ -10,11 +10,15 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { RsvpBadge } from "@/components/invites/RsvpBadge"
+import { PROSPECT_LISTS, guestList } from "@/lib/prospect"
+import { cn } from "@/lib/utils"
 import { useUpdateGuest, usePairGuests, useUnpairGuest } from "@/hooks/queries/use-guests"
 
 interface GuestTableProps {
   guests: Guest[]
   groupsById: Map<string, GuestGroup>
+  /** Affiche la colonne « Liste » (utile quand plusieurs listes sont mélangées). */
+  showList?: boolean
 }
 
 function ageLabel(guest: Guest) {
@@ -22,7 +26,7 @@ function ageLabel(guest: Guest) {
   return guest.ageRange ?? "—"
 }
 
-export function GuestTable({ guests, groupsById }: GuestTableProps) {
+export function GuestTable({ guests, groupsById, showList = false }: GuestTableProps) {
   const navigate = useNavigate()
   const updateGuest = useUpdateGuest()
   const pairGuests = usePairGuests()
@@ -109,6 +113,7 @@ export function GuestTable({ guests, groupsById }: GuestTableProps) {
             </TableHead>
             <TableHead className="w-56">Invité</TableHead>
             <TableHead className="w-40">Famille</TableHead>
+            {showList && <TableHead className="w-32">Liste</TableHead>}
             <TableHead className="w-20">Âge</TableHead>
             <TableHead className="w-32">Présence</TableHead>
           </TableRow>
@@ -163,6 +168,18 @@ export function GuestTable({ guests, groupsById }: GuestTableProps) {
               <TableCell className="truncate text-sm text-muted-foreground">
                 {guest.groupId ? (groupsById.get(guest.groupId) ? groupLabel(groupsById.get(guest.groupId)!, allGroupsList) : "—") : "—"}
               </TableCell>
+              {showList && (
+                <TableCell>
+                  {(() => {
+                    const list = PROSPECT_LISTS.find((l) => l.value === guestList(guest))
+                    return list ? (
+                      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap", list.color)}>
+                        {list.label}
+                      </span>
+                    ) : null
+                  })()}
+                </TableCell>
+              )}
               <TableCell className="truncate text-sm text-muted-foreground">{ageLabel(guest)}</TableCell>
               <TableCell>
                 <RsvpBadge status={guest.rsvpStatus} />

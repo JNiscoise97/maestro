@@ -2,8 +2,9 @@ import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Armchair, ArrowUpDown, GitBranch, LayoutList, Network, X } from "lucide-react"
 
-import type { Guest, GuestGroup, RsvpStatus } from "@/types/domain"
+import type { Guest, GuestGroup, ProspectStatus, RsvpStatus } from "@/types/domain"
 import { groupLabel } from "@/lib/groups"
+import { cn } from "@/lib/utils"
 import { PageHeader } from "@/components/shared/PageHeader"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -27,8 +28,10 @@ import { PapeterieTab } from "@/pages/invites/PapeterieTab"
 import { SequencesTab } from "@/pages/invites/SequencesTab"
 import { CortegeTab } from "@/pages/invites/CortegeTab"
 import { GuestExportDialog } from "@/components/invites/GuestExportDialog"
+import { PROSPECT_LISTS, guestList } from "@/lib/prospect"
 
 const ALL_GROUPS = "all"
+const ALL_LISTS = "all"
 
 // ── Vue arbre par groupe ──────────────────────────────────────────────────────
 
@@ -233,8 +236,17 @@ function guestAgeValue(guest: Guest): number {
 export function InvitesList() {
   const { data: allGuests, isLoading: guestsLoading } = useGuests()
   const { data: groups, isLoading: groupsLoading } = useGuestGroups()
-  // Liste = invités confirmés (main_list ou sans prospect_status = historiques)
-  const guests = allGuests?.filter((g) => !g.prospectStatus || g.prospectStatus === "main_list")
+  // Filtre par liste (Liste A par défaut ; sans prospect_status = historiques = Liste A).
+  const [listFilter, setListFilter] = useState<ProspectStatus | typeof ALL_LISTS>("main_list")
+  const guests = useMemo(
+    () => allGuests?.filter((g) => listFilter === ALL_LISTS || guestList(g) === listFilter),
+    [allGuests, listFilter],
+  )
+  const listCounts = useMemo(() => {
+    const counts = new Map<string, number>([[ALL_LISTS, allGuests?.length ?? 0]])
+    for (const g of allGuests ?? []) counts.set(guestList(g), (counts.get(guestList(g)) ?? 0) + 1)
+    return counts
+  }, [allGuests])
   const [search, setSearch] = useState("")
   const [groupFilter, setGroupFilter] = useState(ALL_GROUPS)
   const [sortBy, setSortBy] = useState<SortKey>("family")
@@ -308,10 +320,36 @@ export function InvitesList() {
 
       {isLoading ? (
         <Skeleton className="h-64 rounded-2xl" />
-      ) : !guests || guests.length === 0 ? (
+      ) : !allGuests || allGuests.length === 0 ? (
         <EmptyState icon={Armchair} title="Aucun invité pour l'instant" />
       ) : (
         <div className="space-y-4">
+          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Filtrer par liste">
+            {[{ value: ALL_LISTS, label: "Tous", color: "" }, ...PROSPECT_LISTS].map((opt) => {
+              const active = listFilter === opt.value
+              const count = listCounts.get(opt.value) ?? 0
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setListFilter(opt.value as ProspectStatus | typeof ALL_LISTS)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors",
+                    active
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-foreground hover:border-foreground/30",
+                  )}
+                >
+                  {opt.label}
+                  <span className={cn("tabular-nums text-xs", active ? "text-primary-foreground/80" : "text-muted-foreground")}>
+                    {count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <Input
@@ -387,7 +425,7 @@ export function InvitesList() {
           ) : view === "tree" ? (
             <GuestGroupTree guests={filteredGuests} groups={groups ?? []} />
           ) : (
-            <GuestTable guests={sortedGuests} groupsById={groupsById} />
+            <GuestTable guests={sortedGuests} groupsById={groupsById} showList={listFilter === ALL_LISTS} />
           )}
         </div>
       )}

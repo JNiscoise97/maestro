@@ -5,6 +5,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Heart, Monitor, Moon, Search, Sma
 import { useColorMode } from "@/features/gallery/colorMode"
 import { themeVars, type ColorMode } from "@/features/gallery/theme"
 import { ALBUMS, HOME_SELECTION, PHOTOS, WELCOME_TEXT, type ProtoPhoto } from "./data"
+import { JustifiedGrid } from "../JustifiedGrid"
 import { ProtoViewer } from "./Viewer"
 
 /**
@@ -450,16 +451,16 @@ function ProtoCategory({ title, photos, favorites, empty = "Aucune photo pour l'
       {list.length === 0 ? (
         <p className="px-6 py-10 text-sm" style={{ color: "var(--p-muted)" }}>{empty}</p>
       ) : (
-        <div className="columns-2 gap-1 px-1 @2xl:columns-3 @2xl:gap-2 @2xl:px-2 @5xl:columns-4">
-          {list.slice(0, shown).map((p, i) => (
-            <button key={p.id} type="button" onClick={() => onOpen(list, i)} className="relative mb-1 block w-full break-inside-avoid @2xl:mb-2">
+        <div className="px-1 @2xl:px-2">
+          <JustifiedGrid items={list.slice(0, shown)} render={(p, i) => (
+            <button type="button" onClick={() => onOpen(list, i)} className="block size-full">
               <img src={p.thumb} alt={p.code} loading="lazy" width={p.width} height={p.height}
-                className="h-auto w-full" style={{ aspectRatio: `${p.width} / ${p.height}`, background: "var(--p-line)" }} />
+                className="size-full object-cover" style={{ background: "var(--p-line)" }} />
               {favorites.has(p.id) && (
                 <Heart className="absolute right-2 top-2 size-4 drop-shadow" style={{ color: "var(--p-accent-2)" }} fill="currentColor" />
               )}
             </button>
-          ))}
+          )} />
         </div>
       )}
       {shown < list.length && <div ref={sentinel} className="h-10" />}

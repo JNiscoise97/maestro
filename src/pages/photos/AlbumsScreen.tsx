@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { ArrowLeft, Heart, Search } from "lucide-react"
 
-import { logEvent, useFavorites, useSignedUrls } from "@/features/gallery/api"
+import { logEvent, useFavorites, useSignedUrls, useSignedUrlsByChunks } from "@/features/gallery/api"
 import type { GalleryAlbum, GalleryPhoto } from "@/features/gallery/types"
 import { Img } from "./HomeScreen"
+import { JustifiedGrid } from "./JustifiedGrid"
 
 const PAGE = 24
 
@@ -137,6 +138,9 @@ function PagedGrid({ list, favorites, onOpen }: { list: GalleryPhoto[]; favorite
   const [pages, setPages] = useState(1)
   const sentinel = useRef<HTMLDivElement>(null)
   const more = pages * PAGE < list.length
+  const shown = list.slice(0, pages * PAGE)
+  // Miniatures signées page par page : la page suivante ne recharge pas les précédentes.
+  const urls = useSignedUrlsByChunks(shown.map((p) => p.thumb_path), PAGE)
 
   // Chargement automatique au défilement (IMG-03), sans bouton de pagination.
   useEffect(() => {
@@ -150,36 +154,16 @@ function PagedGrid({ list, favorites, onOpen }: { list: GalleryPhoto[]; favorite
   }, [more, pages])
 
   return (
-    <>
-      <div className="columns-2 gap-1 px-1 sm:columns-3 sm:gap-2 sm:px-2 lg:columns-4 xl:columns-5">
-        {Array.from({ length: pages }, (_, p) => (
-          <GridPage key={p} photos={list.slice(p * PAGE, (p + 1) * PAGE)} offset={p * PAGE} favorites={favorites} onOpen={onOpen} />
-        ))}
-      </div>
-      {more && <div ref={sentinel} className="h-10" />}
-    </>
-  )
-}
-
-/** Une page de miniatures : ses URL signées sont demandées en un seul appel. */
-function GridPage({ photos, offset, favorites, onOpen }: {
-  photos: GalleryPhoto[]
-  offset: number
-  favorites: Set<string>
-  onOpen: (i: number) => void
-}) {
-  const { data: urls } = useSignedUrls(photos.map((p) => p.thumb_path))
-  return (
-    <>
-      {photos.map((p, i) => (
-        <button key={p.id} type="button" onClick={() => onOpen(offset + i)} aria-label={`Ouvrir ${p.code}`}
-          className="relative mb-1 block w-full break-inside-avoid sm:mb-2">
-          <Img src={urls?.get(p.thumb_path)} photo={p} />
+    <div className="px-1 sm:px-2">
+      <JustifiedGrid items={shown} render={(p, i) => (
+        <button type="button" onClick={() => onOpen(i)} aria-label={`Ouvrir ${p.code}`} className="block size-full">
+          <Img src={urls.get(p.thumb_path)} photo={p} className="size-full object-cover" />
           {favorites.has(p.id) && (
             <Heart className="absolute right-2 top-2 size-4 drop-shadow" style={{ color: "var(--p-accent-2, #fff)" }} fill="currentColor" />
           )}
         </button>
-      ))}
-    </>
+      )} />
+      {more && <div ref={sentinel} className="h-10" />}
+    </div>
   )
 }

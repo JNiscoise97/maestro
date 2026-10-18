@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { callGalleryFunction, deviceId, galleryClient, gt, GALLERY_BUCKET } from "./client"
 import type {
@@ -70,9 +70,9 @@ export function usePhotos(enabled = true) {
  * URL signées des fichiers privés (miniatures, versions de consultation), valables 1 h.
  * Le stockage refuse la signature si la photo n'est pas visible ou si le compte n'y a pas droit.
  */
-export function useSignedUrls(paths: string[]) {
+function signedUrlsQuery(paths: string[]) {
   const sorted = [...new Set(paths)].sort()
-  return useQuery({
+  return {
     queryKey: ["gal", "signed", sorted.join("|")],
     enabled: sorted.length > 0,
     staleTime: 45 * 60 * 1000,
@@ -91,7 +91,24 @@ export function useSignedUrls(paths: string[]) {
       }
       return map
     },
-  })
+  }
+}
+
+export function useSignedUrls(paths: string[]) {
+  return useQuery(signedUrlsQuery(paths))
+}
+
+/**
+ * URL signées demandées par paquets fixes (ex. une page de 24 miniatures) : charger la page suivante
+ * ne re-signe pas les précédentes, et les images déjà affichées gardent leur adresse (pas de rechargement).
+ */
+export function useSignedUrlsByChunks(paths: string[], size = 24): Map<string, string> {
+  const chunks: string[][] = []
+  for (let i = 0; i < paths.length; i += size) chunks.push(paths.slice(i, i + size))
+  const results = useQueries({ queries: chunks.map((c) => signedUrlsQuery(c)) })
+  const merged = new Map<string, string>()
+  for (const r of results) r.data?.forEach((url, path) => merged.set(path, url))
+  return merged
 }
 
 export function useFavorites(enabled = true) {

@@ -1,12 +1,13 @@
 import { useState } from "react"
 
 import { callGalleryFunction, galleryClient } from "@/features/gallery/client"
+import { useResetZoomOn } from "@/features/gallery/zoom"
 import type { ColorMode } from "@/features/gallery/theme"
 import { Masthead, ModeToggle } from "./GalleryChrome"
 
 type Step = "email" | "name" | "code" | "pending"
 
-const input = "w-full border-b bg-transparent py-2 text-sm outline-none focus:border-[var(--p-accent)]"
+const input = "w-full border-b bg-transparent py-2 text-base outline-none sm:text-sm focus:border-[var(--p-accent)]"
 const primary = "w-full py-3 text-xs uppercase tracking-[0.2em] text-white disabled:opacity-40"
 
 /**
@@ -15,6 +16,8 @@ const primary = "w-full py-3 text-xs uppercase tracking-[0.2em] text-white disab
  */
 export function LoginScreen({ mode, onToggleMode }: { mode: ColorMode; onToggleMode: () => void }) {
   const [step, setStep] = useState<Step>("email")
+  // Retour au zoom normal à chaque étape (e-mail → nom → code), après la saisie au clavier.
+  useResetZoomOn(step)
   const [email, setEmail] = useState("")
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")

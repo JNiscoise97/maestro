@@ -180,7 +180,7 @@ export function ProtoViewer({ photos, index, onIndex, onClose, favorites, onTogg
                 setDraft("")
               }}>
                 <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Écrire un commentaire…"
-                  className="min-w-0 flex-1 rounded-lg border bg-transparent px-3 py-2 text-sm outline-none"
+                  className="min-w-0 flex-1 rounded-lg border bg-transparent px-3 py-2 text-base outline-none @2xl:text-sm"
                   style={{ borderColor: "var(--p-line)" }} />
                 <button type="submit" className="rounded-lg px-3 py-2 text-sm text-white" style={{ background: "var(--p-accent)" }}>Publier</button>
               </form>

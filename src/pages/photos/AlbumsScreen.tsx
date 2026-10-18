@@ -49,7 +49,7 @@ export function CategoriesScreen({ photos, albums, onOpen }: {
         <label className="flex items-center gap-2 border-b text-xs" style={{ borderColor: "var(--p-line)" }}>
           <Search className="size-3.5" style={{ color: "var(--p-muted)" }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher SJ-0042" aria-label="Rechercher une photo par numéro"
-            className="w-32 bg-transparent py-1 outline-none" />
+            className="w-36 bg-transparent py-1 text-base outline-none sm:text-xs" />
         </label>
       </div>
 

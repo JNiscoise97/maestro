@@ -1,11 +1,12 @@
 import { lazy, Suspense, useEffect, useState } from "react"
-import { Route, Routes } from "react-router-dom"
+import { Route, Routes, useLocation } from "react-router-dom"
 
 import { GalleryAuthProvider, useGalleryAuth } from "@/context/GalleryAuthContext"
 import { useAlbums, useConsentStatus, useGallerySettings, usePhotos } from "@/features/gallery/api"
 import { galleryClient } from "@/features/gallery/client"
 import { useColorMode } from "@/features/gallery/colorMode"
 import { themeStyle } from "@/features/gallery/theme"
+import { useResetZoomOn } from "@/features/gallery/zoom"
 import type { ColorMode } from "@/features/gallery/theme"
 import type { GalleryPhoto, GallerySettings } from "@/features/gallery/types"
 import { CategoriesScreen, CategoryScreen } from "./AlbumsScreen"
@@ -42,6 +43,10 @@ function GalleryGate() {
   const modeProps = { mode, onToggleMode: toggleMode }
   // Figé au montage : l'ouverture se réévalue à chaque visite.
   const [now] = useState(() => Date.now())
+
+  // Retour au zoom normal à chaque changement d'écran : connexion → règles → accueil, et entre pages.
+  const location = useLocation()
+  useResetZoomOn([!!session, member?.status ?? "", consent?.accepted ?? "", location.pathname].join("|"))
 
   let content: React.ReactNode
   if (!galleryClient) content = <Notice title="Galerie indisponible">Configuration Supabase manquante.</Notice>

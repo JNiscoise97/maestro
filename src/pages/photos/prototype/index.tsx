@@ -185,7 +185,7 @@ function ModeToggle({ mode, onToggle, className = "" }: { mode: ColorMode; onTog
 }
 
 const btnPrimary = "w-full py-3 text-xs uppercase tracking-[0.2em] text-white disabled:opacity-40"
-const field = "w-full border-b bg-transparent py-2 text-sm outline-none"
+const field = "w-full border-b bg-transparent py-2 text-base outline-none @2xl:text-sm"
 
 // ── Connexion (e-mail ou nom / prénom → code → engagement) ───────────────────
 
@@ -370,7 +370,7 @@ function ProtoCategories({ favorites, onCategory, onFavorites, onOpen }: {
         <label className="flex items-center gap-2 border-b text-xs" style={{ borderColor: "var(--p-line)" }}>
           <Search className="size-3.5" style={{ color: "var(--p-muted)" }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher SJ-0042" aria-label="Rechercher une photo par numéro"
-            className="w-32 bg-transparent py-1 outline-none" />
+            className="w-36 bg-transparent py-1 text-base outline-none @2xl:text-xs" />
         </label>
       </div>
 

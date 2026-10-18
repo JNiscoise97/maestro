@@ -193,7 +193,7 @@ function CommentsPanel({ photo, memberId, enabled }: { photo: GalleryPhoto; memb
             {editing?.id === c.id ? (
               <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (editing.body.trim()) edit.mutate({ id: c.id, body: editing.body.trim() }, { onSuccess: () => setEditing(null) }) }}>
                 <input value={editing.body} onChange={(e) => setEditing({ ...editing, body: e.target.value })} maxLength={2000}
-                  className="min-w-0 flex-1 rounded border bg-transparent px-2 py-1" style={{ borderColor: "var(--p-line)" }} />
+                  className="min-w-0 flex-1 rounded border bg-transparent px-2 py-1 text-base sm:text-sm" style={{ borderColor: "var(--p-line)" }} />
                 <button type="submit" className="text-xs underline">OK</button>
                 <button type="button" className="text-xs underline" onClick={() => setEditing(null)}>Annuler</button>
               </form>
@@ -210,7 +210,7 @@ function CommentsPanel({ photo, memberId, enabled }: { photo: GalleryPhoto; memb
           add.mutate(draft.trim(), { onSuccess: () => setDraft(""), onError: () => toast.error("Commentaire non publié.") })
         }}>
           <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Écrire un commentaire…" maxLength={2000}
-            className="min-w-0 flex-1 rounded-lg border bg-transparent px-3 py-2 text-sm outline-none" style={{ borderColor: "var(--p-line)" }} />
+            className="min-w-0 flex-1 rounded-lg border bg-transparent px-3 py-2 text-base outline-none sm:text-sm" style={{ borderColor: "var(--p-line)" }} />
           <button type="submit" disabled={add.isPending} className="rounded-lg px-3 py-2 text-sm text-white" style={{ background: "var(--p-accent)" }}>Publier</button>
         </form>
       ) : (

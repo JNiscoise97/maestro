@@ -1,0 +1,88 @@
+<!--
+  Modèle Supabase Auth — « Magic Link » (et, par sécurité, « Confirm signup »).
+  Objet : Votre code d'accès — Sarah & Jordan
+  Variables Supabase : {{ .Token }} (code à 6 chiffres), {{ .Email }}.
+  Volontairement sans {{ .ConfirmationURL }} : la connexion se fait uniquement par code,
+  aucun lien cliquable ne donne accès à la galerie (CDCF ACC-01/03).
+  HTML en tableaux et styles en ligne : compatible Gmail, Outlook, Apple Mail.
+-->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <title>Votre code d'accès — Sarah &amp; Jordan</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f4efe6;">
+  <!-- Aperçu affiché dans la liste des e-mails -->
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:#f4efe6;">
+    Votre code de connexion à la galerie privée, valable 15 minutes.
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4efe6;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+               style="max-width:480px; background-color:#fbf8f2; border:1px solid #e6dccb;">
+          <tr>
+            <td style="height:4px; background-color:#7a1f2b; font-size:0; line-height:0;">&nbsp;</td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:40px 32px 8px 32px;">
+              <p style="margin:0; font-family:Arial, Helvetica, sans-serif; font-size:11px; letter-spacing:4px; text-transform:uppercase; color:#7a1f2b;">
+                Fiançailles &middot; 25 juillet 2026
+              </p>
+              <h1 style="margin:14px 0 0 0; font-family:Georgia, 'Times New Roman', serif; font-size:34px; font-weight:normal; font-style:italic; color:#2b2420;">
+                Sarah &amp; Jordan
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 32px 0 32px; font-family:Arial, Helvetica, sans-serif; font-size:15px; line-height:24px; color:#4a403a;">
+              Bonjour,<br><br>
+              Nous sommes heureux de partager avec vous quelques-uns de nos plus beaux souvenirs.&nbsp;
+            </td>
+          </tr><tr>
+            <td style="padding:24px 32px 0 32px; font-family:Arial, Helvetica, sans-serif; font-size:15px; line-height:24px; color:#4a403a;">
+                Voici votre code personnel pour accéder
+                à notre galerie privée :
+            </td>
+            </tr>
+          <tr>
+            <td align="center" style="padding:28px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center" style="padding:18px 28px; background-color:#ffffff; border:1px solid #d9c9b0;">
+                    <span style="font-family:'Courier New', Courier, monospace; font-size:34px; font-weight:bold; letter-spacing:10px; color:#2b2420;">{{ .Token }}</span>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:14px 0 0 0; font-family:Arial, Helvetica, sans-serif; font-size:13px; color:#8a7f76;">
+                Valable 15 minutes, utilisable une seule fois.
+              </p>
+              <p style="margin:14px 0 0 0; font-family:Arial, Helvetica, sans-serif; font-size:13px; color:#8a7f76;">
+              À très bientôt dans nos souvenirs ♡ 
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px 32px 32px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:22px; color:#4a403a;">
+              Saisissez ce code sur la page de connexion. Ne le transmettez à personne&nbsp;: il est
+              personnel et donne accès à des photos privées.
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 32px 32px 32px; border-top:1px solid #e6dccb; font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:18px; color:#8a7f76;">
+              Vous n'avez pas demandé ce code&nbsp;? Ignorez simplement cet e-mail&nbsp;: personne ne pourra
+              se connecter sans lui.<br><br>
+              Message envoyé à {{ .Email }} &middot; merci de ne pas y répondre.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

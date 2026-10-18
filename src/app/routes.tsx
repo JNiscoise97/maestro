@@ -31,6 +31,8 @@ import { RsvpPage } from "@/pages/rsvp"
 import { RsvpInvitationPage } from "@/pages/rsvp/invitation"
 import { FilmPage } from "@/pages/film"
 import { GaleriePage } from "@/pages/galerie"
+import { GaleriePrototypePage } from "@/pages/photos/prototype"
+import { GalleryPage } from "@/pages/photos"
 import { ConducteurPage } from "@/pages/conducteur"
 
 export function AppRoutes() {
@@ -40,6 +42,8 @@ export function AppRoutes() {
       <Route path="/rsvp/invitation" element={<RsvpInvitationPage />} />
       <Route path="/film" element={<FilmPage />} />
       <Route path="/galerie" element={<GaleriePage />} />
+      <Route path="/photos/prototype" element={<GaleriePrototypePage />} />
+      <Route path="/photos/*" element={<GalleryPage />} />
       <Route path="/connexion" element={<LoginPage />} />
 
       <Route element={<ProtectedLayout />}>

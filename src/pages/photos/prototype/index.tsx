@@ -158,16 +158,16 @@ function ProtoNav({ screen, onNavigate, mode, onToggleMode }: {
 }) {
   const item = (s: Screen, label: React.ReactNode, active: boolean) => (
     <button type="button" onClick={() => onNavigate(s)}
-      className="flex items-center gap-1 border-b pb-0.5 transition-opacity"
+      className="flex items-center gap-1 whitespace-nowrap border-b pb-0.5 transition-opacity"
       style={{ borderColor: active ? "var(--p-accent)" : "transparent", opacity: active ? 1 : 0.65 }}>
       {label}
     </button>
   )
   return (
-    <nav className="sticky top-0 z-30 flex items-center gap-4 px-4 py-3 text-[11px] uppercase tracking-[0.18em] backdrop-blur"
+    <nav className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 text-[11px] uppercase tracking-[0.12em] backdrop-blur @2xl:gap-6 @2xl:tracking-[0.18em]"
       style={{ background: "color-mix(in srgb, var(--p-bg) 85%, transparent)", borderBottom: "1px solid var(--p-line)" }}>
       {item("accueil", "Accueil", screen === "accueil")}
-      {item("categories", "Toutes les photos", screen === "categories" || screen === "categorie")}
+      {item("categories", <><span className="@2xl:hidden">Photos</span><span className="hidden @2xl:inline">Toutes les photos</span></>, screen === "categories" || screen === "categorie")}
       {item("favoris", <><span aria-hidden className="text-[12px] tracking-normal">❤️</span> Favoris</>, screen === "favoris")}
       <ModeToggle mode={mode} onToggle={onToggleMode} className="ml-auto" />
     </nav>

@@ -23,23 +23,27 @@ export function Masthead({ compact = false }: { compact?: boolean }) {
 export function GalleryNav({ mode, onToggleMode }: { mode: ColorMode; onToggleMode: () => void }) {
   const { member, signOut } = useGalleryAuth()
   const link = ({ isActive }: { isActive: boolean }) =>
-    `border-b pb-0.5 transition-colors ${isActive ? "border-[var(--p-accent)]" : "border-transparent opacity-70 hover:opacity-100"}`
+    `whitespace-nowrap border-b pb-0.5 transition-opacity ${isActive ? "border-[var(--p-accent)]" : "border-transparent opacity-60 hover:opacity-100"}`
   return (
-    <nav className="sticky top-0 z-30 flex items-center gap-4 px-4 py-3 text-xs uppercase tracking-[0.18em] backdrop-blur"
+    <nav className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 text-[11px] uppercase tracking-[0.12em] backdrop-blur sm:gap-6 sm:px-6 sm:text-xs sm:tracking-[0.18em]"
       style={{ background: "color-mix(in srgb, var(--p-bg) 88%, transparent)", borderBottom: "1px solid var(--p-line)" }}>
       <NavLink to="/photos" end className={link}>Accueil</NavLink>
-      <NavLink to="/photos/albums" className={link}>Toutes les photos</NavLink>
-      <NavLink to="/photos/favoris" className={({ isActive }) => `${link({ isActive })} flex items-center gap-1`}>
-        <span aria-hidden className="text-[12px] tracking-normal">❤️</span> Favoris
+      <NavLink to="/photos/albums" className={link}>
+        {/* Libellé court sur mobile pour tenir sur une ligne. */}
+        <span className="sm:hidden">Photos</span><span className="hidden sm:inline">Toutes les photos</span>
       </NavLink>
-      <div className="ml-auto flex items-center gap-3">
+      <NavLink to="/photos/favoris" className={({ isActive }) => `${link({ isActive })} flex items-center gap-1`}>
+        <span aria-hidden className="text-[11px] tracking-normal">❤️</span> Favoris
+      </NavLink>
+      <div className="ml-auto flex items-center gap-2.5 sm:gap-4">
         <ModeToggle mode={mode} onToggle={onToggleMode} />
         {member?.role === "admin" && (
-          <NavLink to="/photos/admin" className={link} title="Administration">
+          <NavLink to="/photos/admin" className={({ isActive }) => (isActive ? "opacity-100" : "opacity-60 hover:opacity-100")}
+            title="Administration" aria-label="Administration">
             <Settings className="size-4" />
           </NavLink>
         )}
-        <button type="button" onClick={() => void signOut()} title="Se déconnecter" aria-label="Se déconnecter" className="opacity-70 hover:opacity-100">
+        <button type="button" onClick={() => void signOut()} title="Se déconnecter" aria-label="Se déconnecter" className="opacity-60 hover:opacity-100">
           <LogOut className="size-4" />
         </button>
       </div>
@@ -50,7 +54,7 @@ export function GalleryNav({ mode, onToggleMode }: { mode: ColorMode; onToggleMo
 /** Bascule clair / sombre de la galerie. */
 export function ModeToggle({ mode, onToggle, className = "" }: { mode: ColorMode; onToggle: () => void; className?: string }) {
   return (
-    <button type="button" onClick={onToggle} className={`opacity-70 transition-opacity hover:opacity-100 ${className}`}
+    <button type="button" onClick={onToggle} className={`opacity-60 transition-opacity hover:opacity-100 ${className}`}
       aria-label={mode === "dark" ? "Passer en mode clair" : "Passer en mode sombre"} title={mode === "dark" ? "Mode clair" : "Mode sombre"}>
       {mode === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
     </button>

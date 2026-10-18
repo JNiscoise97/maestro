@@ -83,7 +83,11 @@ export function useSignedUrls(paths: string[]) {
         const chunk = sorted.slice(i, i + 100)
         const { data, error } = await galleryClient!.storage.from(GALLERY_BUCKET).createSignedUrls(chunk, 3600)
         if (error) throw error
-        for (const row of data ?? []) if (row.signedUrl && row.path) map.set(row.path, row.signedUrl)
+        for (const row of data ?? []) {
+          if (row.signedUrl && row.path) map.set(row.path, row.signedUrl)
+          // Refus du stockage : réponse 200, mais une erreur par fichier.
+          else console.warn("[galerie] fichier refusé :", row.path, row.error)
+        }
       }
       return map
     },

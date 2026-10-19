@@ -14,7 +14,12 @@ const primary = "w-full py-3 text-xs uppercase tracking-[0.2em] text-white disab
  * Identification (CDCF ACC-01..03) : e-mail → (prénom/nom si inconnu) → code à 6 chiffres.
  * Aucun compte n'est créé par le navigateur (shouldCreateUser: false) : c'est gallery-identify qui décide.
  */
-export function LoginScreen({ mode, onToggleMode }: { mode: ColorMode; onToggleMode: () => void }) {
+export function LoginScreen({ mode, onToggleMode, compact = false }: {
+  mode: ColorMode
+  onToggleMode: () => void
+  /** Encart (Paramètres) : hauteur réduite, sans bascule clair / sombre. */
+  compact?: boolean
+}) {
   const [step, setStep] = useState<Step>("email")
   // Retour au zoom normal à chaque étape (e-mail → nom → code), après la saisie au clavier.
   useResetZoomOn(step)
@@ -67,8 +72,8 @@ export function LoginScreen({ mode, onToggleMode }: { mode: ColorMode; onToggleM
   }
 
   return (
-    <div className="relative flex min-h-svh flex-col items-center justify-center px-6 py-10">
-      <ModeToggle mode={mode} onToggle={onToggleMode} className="absolute right-4 top-4" />
+    <div className={`relative flex flex-col items-center justify-center px-6 py-10 ${compact ? "min-h-[26rem]" : "min-h-svh"}`}>
+      {!compact && <ModeToggle mode={mode} onToggle={onToggleMode} className="absolute right-4 top-4" />}
       <div className="w-full max-w-sm space-y-6">
         <Masthead compact />
 

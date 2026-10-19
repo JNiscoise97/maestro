@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react"
-import { Link } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
 import { EyeOff, ImageIcon, RotateCcw, Star, Trash2, Upload } from "lucide-react"
 import { toast } from "sonner"
 
+import { useAdminNav } from "@/context/GalleryAdminNavContext"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,6 +21,7 @@ const STATUS_LABELS: Record<GalleryPhotoStatus, string> = { visible: "Visible", 
  */
 export function PhotosAdmin() {
   const qc = useQueryClient()
+  const nav = useAdminNav()
   const { data: photos = [] } = usePhotos()
   const { data: albums = [] } = useAlbums()
   const [albumId, setAlbumId] = useState<string>("")
@@ -58,7 +59,7 @@ export function PhotosAdmin() {
         <CardHeader className="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="text-base">Photos ({list.length})</CardTitle>
-            <Button size="sm" asChild><Link to="/photos/admin/upload"><Upload className="size-3.5" /> Importer des photos</Link></Button>
+            <Button size="sm" onClick={() => nav.go("upload")}><Upload className="size-3.5" /> Importer des photos</Button>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {(Object.keys(STATUS_LABELS) as GalleryPhotoStatus[]).map((s) => (

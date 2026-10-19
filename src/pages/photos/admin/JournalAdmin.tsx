@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
-import { useSearchParams } from "react-router-dom"
 
+import { useAdminNav } from "@/context/GalleryAdminNavContext"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -21,7 +21,7 @@ const EVENT_GROUPS: { value: string; label: string }[] = [
 
 /** Journal d'activité filtrable par personne, période, photo et type (CDCF ADM-02). */
 export function JournalAdmin() {
-  const [params] = useSearchParams()
+  const { params } = useAdminNav()
   const [memberId, setMemberId] = useState(params.get("membre") ?? "")
   const [photoCode, setPhotoCode] = useState("")
   const [event, setEvent] = useState("")

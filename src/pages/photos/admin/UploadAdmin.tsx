@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Link } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
 import { CheckCircle2, CircleAlert, Copy, ImagePlus, Pause, Play, RotateCcw, Trash2, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { useAdminNav } from "@/context/GalleryAdminNavContext"
 import { KEYS, useAlbums, usePhotos } from "@/features/gallery/api"
 import { importOne, type ImportStage } from "@/features/gallery/import"
 import { cn } from "@/lib/utils"
@@ -46,6 +46,7 @@ const BUSY: ItemStatus[] = ["analyse", "generation", "envoi", "enregistrement"]
  */
 export function UploadAdmin() {
   const qc = useQueryClient()
+  const nav = useAdminNav()
   const { data: albums = [] } = useAlbums()
   const { data: photos = [] } = usePhotos()
   const [albumId, setAlbumId] = useState("")
@@ -215,7 +216,7 @@ export function UploadAdmin() {
               <span className="text-bordeaux">{count(["error"])} erreur(s)</span>
               <span>{pending} en attente</span>
               {!running && finished > 0 && pending === 0 && (
-                <Link to="/photos/admin/photos" className="ml-auto underline">Voir les photos et choisir les couvertures →</Link>
+                <button type="button" onClick={() => nav.go("photos")} className="ml-auto underline">Voir les photos et choisir les couvertures →</button>
               )}
             </p>
           </CardHeader>

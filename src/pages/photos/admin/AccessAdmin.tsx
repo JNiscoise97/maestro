@@ -1,5 +1,4 @@
 import { useState } from "react"
-import { Link } from "react-router-dom"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -11,6 +10,7 @@ import {
   useAdminUpdate, useMembers,
 } from "@/features/gallery/api"
 import { GalleryError } from "@/features/gallery/client"
+import { useAdminNav } from "@/context/GalleryAdminNavContext"
 import { memberName } from "./format"
 
 const LINKED_LABELS: Record<string, string> = {
@@ -25,6 +25,7 @@ export function AccessAdmin() {
   const { data: requests = [] } = useAccessRequests()
   const { data: members = [] } = useMembers()
   const action = useAdminAction()
+  const nav = useAdminNav()
   const update = useAdminUpdate("members")
   const [filter, setFilter] = useState("")
   const pending = requests.filter((r) => r.status === "pending")
@@ -100,7 +101,7 @@ export function AccessAdmin() {
                     </Badge>
                   </td>
                   <td className="space-x-1 whitespace-nowrap text-right">
-                    <Button size="xs" variant="ghost" asChild><Link to={`/photos/admin/journal?membre=${m.id}`}>Historique</Link></Button>
+                    <Button size="xs" variant="ghost" onClick={() => nav.go("journal", { membre: m.id })}>Historique</Button>
                     <Button size="xs" variant="ghost" onClick={async () => {
                       try { await revokeSessions(m.id); toast.success("Sessions révoquées.") } catch { toast.error("Révocation impossible.") }
                     }}>Révoquer les sessions</Button>

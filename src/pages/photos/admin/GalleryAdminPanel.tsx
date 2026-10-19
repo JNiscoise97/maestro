@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import { ExternalLink, LogOut } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -15,13 +16,25 @@ import { GalleryAdminEmbedded } from "./index"
  */
 export function GalleryAdminPanel() {
   return (
+    <GalleryAdminGate>
+      <GalleryAdminEmbedded />
+    </GalleryAdminGate>
+  )
+}
+
+/**
+ * Connexion admin de la galerie, réutilisable hors de /photos (Paramètres, page Album) :
+ * affiche `children` seulement pour un administrateur actif de la galerie.
+ */
+export function GalleryAdminGate({ children }: { children: ReactNode }) {
+  return (
     <GalleryAuthProvider>
-      <PanelGate />
+      <PanelGate>{children}</PanelGate>
     </GalleryAuthProvider>
   )
 }
 
-function PanelGate() {
+function PanelGate({ children }: { children: ReactNode }) {
   const { session, member, loading, signOut } = useGalleryAuth()
 
   if (loading) return <p className="text-sm text-muted-foreground">Connexion à la galerie…</p>
@@ -67,7 +80,7 @@ function PanelGate() {
           <Button size="sm" variant="ghost" onClick={() => void signOut()}><LogOut className="size-3.5" /> Se déconnecter</Button>
         </span>
       </div>
-      <GalleryAdminEmbedded />
+      {children}
     </div>
   )
 }

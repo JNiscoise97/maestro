@@ -1,7 +1,8 @@
 // gallery-admin — actions d'administration qui exigent la clé service (CDCF ACC-06, ADM-05).
 //
 // Entrée : { action, ... } avec un jeton d'administrateur actif dans l'en-tête Authorization.
-//   approve_request { requestId }              → crée le compte et prévient le demandeur
+//   approve_request { requestId, guestId? }    → crée le compte (lié à l'invité choisi, ou à aucun si
+//                                                guestId = null) et prévient le demandeur
 //   reject_request  { requestId }              → refuse (le demandeur est prévenu, sans détail)
 //   create_member   { email, firstName, lastName, role? } → ouverture manuelle d'un compte
 //   delete_member   { memberId }               → supprime le compte (et l'utilisateur Auth)
@@ -120,7 +121,14 @@ Deno.serve(async (req) => {
     case "approve_request": {
       const { data: request } = await db.from(t("access_requests")).select("*").eq("id", body.requestId).maybeSingle()
       if (!request || request.status !== "pending") return json({ error: "not_pending" }, 409)
-      const id = await createAccount(db, request.email, request.first_name, request.last_name, "guest", request.matched_guest_id)
+      // Invité choisi par l'admin (guestId, ou null = nouvelle personne hors liste) ; sinon l'invité suggéré.
+      const raw = body as Record<string, unknown>
+      const guestId = "guestId" in raw ? ((raw.guestId as string | null) || null) : request.matched_guest_id
+      if (guestId) {
+        const { count } = await db.from(t("members")).select("id", { count: "exact", head: true }).eq("guest_id", guestId)
+        if ((count ?? 0) > 0) return json({ error: "guest_taken" }, 409)
+      }
+      const id = await createAccount(db, request.email, request.first_name, request.last_name, "guest", guestId)
       if (!id) return json({ error: "server" }, 500)
       await db.from(t("access_requests"))
         .update({ status: "approved", decided_at: new Date().toISOString(), decided_by: admin.id })

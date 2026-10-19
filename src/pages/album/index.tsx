@@ -12,6 +12,8 @@ import { Progress } from "@/components/ui/progress"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { supabase } from "@/supabase/client"
+import { GalleryAdminGate } from "@/pages/photos/admin/GalleryAdminPanel"
+import { GalleryAccessKanban } from "./GalleryAccessKanban"
 
 // ── Types / constants ─────────────────────────────────────────────────────────
 
@@ -30,7 +32,46 @@ const RATINGS = [
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+type AlbumView = "selection" | "acces"
+
 export function AlbumPage() {
+  const [view, setView] = useState<AlbumView>(() => {
+    try { return (localStorage.getItem("sj-album-vue") as AlbumView) || "acces" } catch { return "selection" }
+  })
+  const changeView = (v: AlbumView) => {
+    setView(v)
+    try { localStorage.setItem("sj-album-vue", v) } catch { /* stockage indisponible */ }
+  }
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-56px)]">
+      <div className="flex gap-1.5 px-4 pt-3" role="tablist" aria-label="Vue de l'album">
+        {([
+          { id: "acces", label: "Accès à la galerie" },
+          { id: "selection", label: "Sélection des photos" },
+        ] as const).map((t) => (
+          <button key={t.id} type="button" role="tab" aria-selected={view === t.id} onClick={() => changeView(t.id)}
+            className={cn("rounded-full border px-3 py-1 text-sm transition-colors",
+              view === t.id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card hover:border-foreground/30")}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {view === "acces" ? (
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <GalleryAdminGate>
+            <GalleryAccessKanban />
+          </GalleryAdminGate>
+        </div>
+      ) : (
+        <AlbumSelection />
+      )}
+    </div>
+  )
+}
+
+/** Vue historique de l'album : sélection et votes des fiancés sur les photos. */
+function AlbumSelection() {
   const { data: sequences = [] } = useEventSequences()
   const [seqId, setSeqId] = useState<string | null>(null)
 
@@ -39,7 +80,7 @@ export function AlbumPage() {
   }, [sequences, seqId])
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)]">
+    <div className="flex min-h-0 flex-1 flex-col">
       {sequences.length > 1 && (
         <div className="px-4 pt-3 pb-0">
           <select

@@ -10,6 +10,8 @@ import {
   useAdminUpdate, useMembers,
 } from "@/features/gallery/api"
 import { GalleryError } from "@/features/gallery/client"
+import { useFiancaillesGuests } from "@/features/gallery/guests"
+import type { AccessRequest } from "@/features/gallery/types"
 import { useAdminNav } from "@/context/GalleryAdminNavContext"
 import { memberName } from "./format"
 
@@ -29,10 +31,14 @@ export function AccessAdmin() {
   const update = useAdminUpdate("members")
   const [filter, setFilter] = useState("")
   const pending = requests.filter((r) => r.status === "pending")
+  // Invités déjà liés à un compte : on ne peut pas les lier une seconde fois.
+  const takenGuestIds = new Set(members.map((m) => m.guest_id).filter((id): id is string => !!id))
 
   async function run(body: Record<string, unknown>, ok: string) {
     try { await action.mutateAsync(body); toast.success(ok) } catch (err) {
-      toast.error(err instanceof GalleryError ? `Échec (${err.code}).` : "Action impossible.")
+      toast.error(err instanceof GalleryError
+        ? err.code === "guest_taken" ? "Cet invité est déjà lié à un autre compte." : `Échec (${err.code}).`
+        : "Action impossible.")
     }
   }
 
@@ -47,17 +53,11 @@ export function AccessAdmin() {
           {pending.length === 0 ? <p className="text-sm text-muted-foreground">Aucune demande.</p> : (
             <ul className="divide-y divide-border">
               {pending.map((r) => (
-                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                  <span>
-                    <b>{r.first_name} {r.last_name}</b> · {r.email}
-                    <span className="ml-2 text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString("fr-FR")}</span>
-                    {r.matched_guest_id && <Badge className="ml-2 bg-vert-vegetal/15 text-vert-vegetal">Correspond à un invité</Badge>}
-                  </span>
-                  <span className="flex gap-2">
-                    <Button size="sm" disabled={action.isPending} onClick={() => run({ action: "approve_request", requestId: r.id }, "Accès ouvert, la personne est prévenue.")}>Autoriser</Button>
-                    <Button size="sm" variant="outline" disabled={action.isPending} onClick={() => run({ action: "reject_request", requestId: r.id }, "Demande refusée.")}>Refuser</Button>
-                  </span>
-                </li>
+                <PendingRequest key={r.id} request={r} busy={action.isPending}
+                  takenGuestIds={takenGuestIds}
+                  onApprove={(guestId) => run({ action: "approve_request", requestId: r.id, guestId },
+                    guestId ? "Accès ouvert et lié à l'invité, la personne est prévenue." : "Accès ouvert (nouvelle personne), la personne est prévenue.")}
+                  onReject={() => run({ action: "reject_request", requestId: r.id }, "Demande refusée.")} />
               ))}
             </ul>
           )}
@@ -125,6 +125,51 @@ export function AccessAdmin() {
     </div>
   )
 }
+
+/**
+ * Demande d'accès en attente : l'admin choisit l'invité de la liste correspondant (suggestion
+ * pré-sélectionnée si le nom correspond) ou « nouvelle personne » (hors liste), puis autorise ou refuse.
+ * Liée à un invité, la personne passe dans la colonne « Accès » du kanban de la page Album à la place
+ * de cet invité ; sinon une nouvelle carte y est ajoutée.
+ */
+function PendingRequest({ request: r, busy, takenGuestIds, onApprove, onReject }: {
+  request: AccessRequest
+  busy: boolean
+  takenGuestIds: Set<string>
+  onApprove: (guestId: string | null) => void
+  onReject: () => void
+}) {
+  const { data: guests = [] } = useFiancaillesGuests()
+  const [choice, setChoice] = useState<string>(r.matched_guest_id ?? NEW_PERSON)
+  const free = guests.filter((g) => !takenGuestIds.has(g.id) || g.id === r.matched_guest_id)
+  return (
+    <li className="space-y-2 py-3 text-sm">
+      <div>
+        <b>{r.first_name} {r.last_name}</b> · {r.email}
+        <span className="ml-2 text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString("fr-FR")}</span>
+        {r.matched_guest_id && <Badge className="ml-2 bg-vert-vegetal/15 text-vert-vegetal">Correspond à un invité</Badge>}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex min-w-0 flex-1 items-center gap-2 text-xs text-muted-foreground">
+          Lier à
+          <select className="min-w-0 flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
+            value={choice} onChange={(e) => setChoice(e.target.value)}>
+            <option value={NEW_PERSON}>— Nouvelle personne (pas dans la liste des invités) —</option>
+            {free.map((g) => (
+              <option key={g.id} value={g.id}>
+                {(g.last_name ?? "").toUpperCase()} {g.first_name}{g.id === r.matched_guest_id ? "  ✓ suggéré" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button size="sm" disabled={busy} onClick={() => onApprove(choice === NEW_PERSON ? null : choice)}>Autoriser</Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={onReject}>Refuser</Button>
+      </div>
+    </li>
+  )
+}
+
+const NEW_PERSON = "__nouvelle_personne__"
 
 function AddMember({ onAdd, busy }: { onAdd: (b: { email: string; firstName: string; lastName: string }) => void; busy: boolean }) {
   const [email, setEmail] = useState("")

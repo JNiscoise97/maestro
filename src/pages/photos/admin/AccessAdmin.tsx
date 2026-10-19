@@ -10,7 +10,7 @@ import {
   useAdminUpdate, useMembers,
 } from "@/features/gallery/api"
 import { GalleryError } from "@/features/gallery/client"
-import { useFiancaillesGuests } from "@/features/gallery/guests"
+import { useFiancaillesGuests, type FiancaillesGuest } from "@/features/gallery/guests"
 import type { AccessRequest } from "@/features/gallery/types"
 import { useAdminNav } from "@/context/GalleryAdminNavContext"
 import { memberName } from "./format"
@@ -155,10 +155,15 @@ function PendingRequest({ request: r, busy, takenGuestIds, onApprove, onReject }
           <select className="min-w-0 flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
             value={choice} onChange={(e) => setChoice(e.target.value)}>
             <option value={NEW_PERSON}>— Nouvelle personne (pas dans la liste des invités) —</option>
-            {free.map((g) => (
-              <option key={g.id} value={g.id}>
-                {(g.last_name ?? "").toUpperCase()} {g.first_name}{g.id === r.matched_guest_id ? "  ✓ suggéré" : ""}
-              </option>
+            {/* Même ordre que dans Invités : par groupe, puis par nom. */}
+            {groupsOf(free).map(([group, list]) => (
+              <optgroup key={group} label={group}>
+                {list.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.fullName}{g.id === r.matched_guest_id ? "  ✓ suggéré" : ""}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </label>
@@ -170,6 +175,16 @@ function PendingRequest({ request: r, busy, takenGuestIds, onApprove, onReject }
 }
 
 const NEW_PERSON = "__nouvelle_personne__"
+
+/** Invités déjà triés, regroupés par groupe en gardant l'ordre d'apparition. */
+function groupsOf(guests: FiancaillesGuest[]): [string, FiancaillesGuest[]][] {
+  const map = new Map<string, FiancaillesGuest[]>()
+  for (const g of guests) {
+    const key = g.groupName ?? "Sans groupe"
+    map.set(key, [...(map.get(key) ?? []), g])
+  }
+  return [...map.entries()]
+}
 
 function AddMember({ onAdd, busy }: { onAdd: (b: { email: string; firstName: string; lastName: string }) => void; busy: boolean }) {
   const [email, setEmail] = useState("")

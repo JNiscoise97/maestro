@@ -24,6 +24,8 @@ type CardData =
   | { kind: "member"; id: string; member: GalleryMember; column: "acces" }
 
 const INVITATIONS_KEY = [...KEYS.admin, "invitations"]
+const ALL = "__tous__"
+const NO_GROUP = "Sans groupe"
 
 /**
  * Kanban « Qui a accès aux photos » (page Album) :
@@ -40,6 +42,8 @@ export function GalleryAccessKanban() {
   const { data: members = [] } = useMembers()
   const { data: invitations = [] } = useAdminList<Invitation>("invitations", "sent_at")
   const [query, setQuery] = useState("")
+  const [groupFilter, setGroupFilter] = useState(ALL)
+  const [presence, setPresence] = useState<"all" | "present" | "absent">("all")
 
   // Les accès s'ouvrent depuis la galerie (rattachement automatique, demandes) : rafraîchissement régulier.
   useEffect(() => {
@@ -69,11 +73,14 @@ export function GalleryAccessKanban() {
   const cards = useMemo(() => {
     const memberByGuest = new Map(members.filter((m) => m.guest_id).map((m) => [m.guest_id!, m]))
     const invitationByGuest = new Map(invitations.map((i) => [i.guest_id, i]))
-    const out: CardData[] = guests.map((guest) => {
-      const member = memberByGuest.get(guest.id)
-      const invitation = invitationByGuest.get(guest.id)
-      return { kind: "guest", id: guest.id, guest, member, invitation, column: member ? "acces" : invitation ? "lien" : "liste" }
-    })
+    const out: CardData[] = guests
+      // Les « no-show » sortent de la liste, sauf s'ils ont déjà un accès à la galerie.
+      .filter((guest) => guest.rsvp_status !== "no_show" || memberByGuest.has(guest.id))
+      .map((guest) => {
+        const member = memberByGuest.get(guest.id)
+        const invitation = invitationByGuest.get(guest.id)
+        return { kind: "guest", id: guest.id, guest, member, invitation, column: member ? "acces" : invitation ? "lien" : "liste" }
+      })
     // Personnes hors liste ayant un accès (demande autorisée sans lien avec un invité).
     for (const m of members) {
       if (!m.guest_id && m.role === "guest") out.push({ kind: "member", id: `m:${m.id}`, member: m, column: "acces" })
@@ -81,10 +88,17 @@ export function GalleryAccessKanban() {
     return out
   }, [guests, members, invitations])
 
+  // Groupes proposés dans le filtre, dans l'ordre d'Invités.
+  const groupOptions = useMemo(() => [...new Set(guests.map((g) => g.groupName ?? NO_GROUP))], [guests])
+
   const q = query.trim().toLowerCase()
-  const visible = q
-    ? cards.filter((c) => (c.kind === "guest" ? guestLabel(c.guest) : `${c.member.first_name} ${c.member.last_name} ${c.member.email}`).toLowerCase().includes(q))
-    : cards
+  const visible = cards.filter((c) => {
+    if (q && !(c.kind === "guest" ? `${guestLabel(c.guest)} ${c.guest.groupName ?? ""}` : `${c.member.first_name} ${c.member.last_name} ${c.member.email}`).toLowerCase().includes(q)) return false
+    // Les personnes hors liste n'ont ni groupe ni présence connue : visibles seulement sans filtre.
+    if (groupFilter !== ALL && (c.kind !== "guest" || (c.guest.groupName ?? NO_GROUP) !== groupFilter)) return false
+    if (presence !== "all" && (c.kind !== "guest" || c.guest.present !== (presence === "present"))) return false
+    return true
+  })
   const byColumn = (col: Column) => visible.filter((c) => c.column === col)
 
   const sensors = useSensors(
@@ -106,7 +120,20 @@ export function GalleryAccessKanban() {
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1 sm:max-w-xs">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input className="h-8 pl-8 text-base sm:text-sm" placeholder="Rechercher une personne" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <Input className="h-8 pl-8 text-base sm:text-sm" placeholder="Rechercher une personne ou un groupe" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </div>
+        <select className="h-8 rounded-md border border-input bg-background px-2 text-base sm:text-sm" value={groupFilter}
+          onChange={(e) => setGroupFilter(e.target.value)} aria-label="Filtrer par groupe">
+          <option value={ALL}>Tous les groupes</option>
+          {groupOptions.map((g) => <option key={g} value={g}>{g}</option>)}
+        </select>
+        <div className="flex overflow-hidden rounded-md border border-input text-sm" role="radiogroup" aria-label="Présence aux fiançailles">
+          {([["all", "Tous"], ["present", "Présents"], ["absent", "Absents"]] as const).map(([v, label]) => (
+            <button key={v} type="button" role="radio" aria-checked={presence === v} onClick={() => setPresence(v)}
+              className={cn("px-2.5 py-1", presence === v ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted")}>
+              {label}
+            </button>
+          ))}
         </div>
         <Button size="sm" variant="outline" onClick={() => {
           void navigator.clipboard.writeText(`${window.location.origin}/photos`)
@@ -201,11 +228,21 @@ function KanbanCard({ card, draggable = false, action }: { card: CardData; dragg
         draggable && "cursor-grab touch-none active:cursor-grabbing", isDragging && "opacity-70 shadow-lg")}>
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium">{name}</p>
+        {card.kind === "guest" && (
+          <p className="truncate text-[11px] text-muted-foreground" title={card.guest.groupName ?? "Sans groupe"}>
+            {card.guest.groupName ?? "Sans groupe"}
+          </p>
+        )}
         {detail && <p className="truncate text-[11px] text-muted-foreground">{detail}</p>}
         <div className="mt-0.5 flex flex-wrap gap-1">
           {card.kind === "member" && <Badge className="bg-dore/20 text-brun">Hors liste</Badge>}
           {member?.linked_by === "auto_name_match" && <Badge className="bg-vert-vegetal/15 text-vert-vegetal">Automatique</Badge>}
           {member?.status === "disabled" && <Badge className="bg-bordeaux/10 text-bordeaux">Désactivé</Badge>}
+          {card.kind === "guest" && (card.guest.rsvp_status === "no_show"
+            ? <Badge className="bg-muted text-muted-foreground">No-show</Badge>
+            : card.guest.present
+              ? <Badge className="bg-vert-vegetal/15 text-vert-vegetal">Présent</Badge>
+              : <Badge className="bg-muted text-muted-foreground">Absent</Badge>)}
           {card.kind === "guest" && card.guest.is_child && <Badge className="bg-muted text-muted-foreground">Enfant</Badge>}
         </div>
       </div>

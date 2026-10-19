@@ -14,6 +14,7 @@ import { HomeSelectionAdmin } from "./HomeSelectionAdmin"
 import { JournalAdmin } from "./JournalAdmin"
 import { ModerationAdmin } from "./ModerationAdmin"
 import { PhotosAdmin } from "./PhotosAdmin"
+import { ReactionsAdmin } from "./ReactionsAdmin"
 import { SettingsAdmin } from "./SettingsAdmin"
 import { UploadAdmin } from "./UploadAdmin"
 import { notificationText } from "./format"
@@ -23,6 +24,7 @@ const TABS: { to: AdminTab; label: string }[] = [
   { to: "upload", label: "Importer" },
   { to: "photos", label: "Photos" },
   { to: "accueil", label: "Accueil (50)" },
+  { to: "reactions", label: "Réactions" },
   { to: "acces", label: "Accès" },
   { to: "moderation", label: "Modération" },
   { to: "journal", label: "Journal" },
@@ -87,6 +89,7 @@ function GalleryAdminShell({ nav, embedded = false }: { nav: AdminNav; embedded?
           {nav.tab === "upload" && <UploadAdmin />}
           {nav.tab === "photos" && <PhotosAdmin />}
           {nav.tab === "accueil" && <HomeSelectionAdmin />}
+          {nav.tab === "reactions" && <ReactionsAdmin />}
           {nav.tab === "acces" && <AccessAdmin />}
           {nav.tab === "moderation" && <ModerationAdmin />}
           {nav.tab === "journal" && <JournalAdmin key={nav.params.toString()} />}

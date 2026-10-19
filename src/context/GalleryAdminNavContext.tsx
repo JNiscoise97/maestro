@@ -2,7 +2,7 @@ import { createContext, useContext } from "react"
 
 /** Onglets de l'administration de la galerie privée. */
 export type AdminTab =
-  | "" | "upload" | "photos" | "accueil" | "acces" | "moderation" | "journal" | "reglages" | "export"
+  | "" | "upload" | "photos" | "accueil" | "reactions" | "acces" | "moderation" | "journal" | "reglages" | "export"
 
 /**
  * Navigation de l'administration, indépendante de l'endroit où elle est affichée :

@@ -11,7 +11,7 @@ import {
 } from "@/features/gallery/api"
 import { GalleryError } from "@/features/gallery/client"
 import { useFiancaillesGuests, type FiancaillesGuest } from "@/features/gallery/guests"
-import type { AccessRequest } from "@/features/gallery/types"
+import type { AccessRequest, GalleryMember } from "@/features/gallery/types"
 import { useAdminNav } from "@/context/GalleryAdminNavContext"
 import { memberName } from "./format"
 
@@ -84,7 +84,7 @@ export function AccessAdmin() {
         <CardContent className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-xs text-muted-foreground">
-              <tr><th className="py-1">Personne</th><th>Origine</th><th>Dernière connexion</th><th>Statut</th><th /></tr>
+              <tr><th className="py-1">Personne</th><th>Invité lié</th><th>Origine</th><th>Dernière connexion</th><th>Statut</th><th /></tr>
             </thead>
             <tbody className="divide-y divide-border">
               {shown.map((m) => (
@@ -92,6 +92,15 @@ export function AccessAdmin() {
                   <td className="py-2">
                     <b>{memberName(m)}</b>{m.role === "admin" && <Badge className="ml-2">admin</Badge>}
                     <div className="text-xs text-muted-foreground">{m.email}</div>
+                  </td>
+                  <td className="pr-2">
+                    {m.role === "admin" ? <span className="text-xs text-muted-foreground">—</span> : (
+                      <GuestLinkSelect member={m} takenGuestIds={takenGuestIds}
+                        onChange={(guestId) => update.mutate({ match: { id: m.id }, patch: { guest_id: guestId } }, {
+                          onSuccess: () => toast.success(guestId ? "Compte lié à l'invité." : "Compte détaché : personne hors liste."),
+                          onError: () => toast.error("Lien non enregistré."),
+                        })} />
+                    )}
                   </td>
                   <td className="text-xs">{LINKED_LABELS[m.linked_by] ?? m.linked_by}</td>
                   <td className="text-xs">{m.last_seen_at ? new Date(m.last_seen_at).toLocaleString("fr-FR") : "—"}</td>
@@ -175,6 +184,32 @@ function PendingRequest({ request: r, busy, takenGuestIds, onApprove, onReject }
 }
 
 const NEW_PERSON = "__nouvelle_personne__"
+
+/**
+ * Invité lié à un compte : modifiable après coup (ex. demande autorisée trop vite en « nouvelle
+ * personne » alors qu'elle était invitée). Le kanban de la page Album suit automatiquement.
+ */
+function GuestLinkSelect({ member, takenGuestIds, onChange }: {
+  member: GalleryMember
+  takenGuestIds: Set<string>
+  onChange: (guestId: string | null) => void
+}) {
+  const { data: guests = [] } = useFiancaillesGuests()
+  const free = guests.filter((g) => !takenGuestIds.has(g.id) || g.id === member.guest_id)
+  return (
+    <select className="w-full max-w-56 rounded-md border border-input bg-background px-1.5 py-1 text-xs"
+      value={member.guest_id ?? NEW_PERSON}
+      onChange={(e) => onChange(e.target.value === NEW_PERSON ? null : e.target.value)}
+      aria-label={`Invité lié à ${memberName(member)}`}>
+      <option value={NEW_PERSON}>Hors liste (nouvelle personne)</option>
+      {groupsOf(free).map(([group, list]) => (
+        <optgroup key={group} label={group}>
+          {list.map((g) => <option key={g.id} value={g.id}>{g.fullName}</option>)}
+        </optgroup>
+      ))}
+    </select>
+  )
+}
 
 /** Invités déjà triés, regroupés par groupe en gardant l'ordre d'apparition. */
 function groupsOf(guests: FiancaillesGuest[]): [string, FiancaillesGuest[]][] {

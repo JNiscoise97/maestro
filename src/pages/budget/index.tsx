@@ -21,6 +21,7 @@ import { poleIdForCategory } from "@/lib/budget-poles"
 import type { BudgetItem } from "@/services/supabase/budget"
 import type { Pole } from "@/types/domain"
 import { SequenceName } from "@/components/shared/SequenceName"
+import { BudgetStats } from "./BudgetStats"
 import { DevisTab } from "./DevisTab"
 import { PoleTable, type OptionalCol } from "./PoleTable"
 import { PosteSheet } from "./PosteSheet"
@@ -506,6 +507,8 @@ export function BudgetPage() {
           </div>
         }
       />
+
+      <BudgetStats items={items} model={model} poles={sortedPoles} sequences={sortedSeq} />
 
       <BudgetSummary postes={postes} model={model} />
 

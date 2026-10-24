@@ -253,13 +253,17 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
             </Field>
           ) : (
             <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">Un élément = un sous-poste, sur une seule séquence, avec ses propres montants.</p>
+              <p className="text-xs text-muted-foreground">
+                Un élément = un sous-poste, sur une seule séquence, avec ses propres montants et sa propre priorité
+                (ex. fleurs du jour 1 en Must have, fleurs du jour 2 en Could have).
+              </p>
               {subs.map((x, i) => (
                 <div key={x.key} className="flex items-center gap-2">
                   <span className="w-5 text-right text-xs text-muted-foreground">{i + 1}.</span>
                   <Input className="min-w-0 flex-1" value={x.label} placeholder="Ex : Bouquet de mariée" autoFocus={!x.label && i === subs.length - 1}
                     onChange={(e) => setLine(x.key, { label: e.target.value })} />
-                  <div className="w-48"><SeqSelect value={x.sequenceId} sequences={sequences} onChange={(v) => setLine(x.key, { sequenceId: v })} /></div>
+                  <div className="w-44"><SeqSelect value={x.sequenceId} sequences={sequences} onChange={(v) => setLine(x.key, { sequenceId: v })} /></div>
+                  <PrioritySelect value={x.priority} inherited={main.priority} onChange={(v) => setLine(x.key, { priority: v })} />
                   <button type="button" aria-label="Retirer l'élément" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive" onClick={() => {
                     if (x.id) setRemoved([...removed, x.id])
                     setSubs(subs.filter((y) => y.key !== x.key))
@@ -285,11 +289,7 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
               {multiple && (
                 <label className="flex items-center gap-2 pl-1 text-xs text-muted-foreground">
                   Priorité
-                  <select className="h-7 rounded-md border border-input bg-background px-1.5 text-xs text-foreground" value={l.priority ?? ""}
-                    onChange={(e) => setLine(l.key, { priority: (e.target.value || null) as Priority | null })}>
-                    <option value="">Comme le poste ({main.priority ? PRIORITY_LABELS[main.priority] : "non priorisé"})</option>
-                    {PRIORITIES.map((p) => <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>)}
-                  </select>
+                  <PrioritySelect value={l.priority} inherited={main.priority} onChange={(v) => setLine(l.key, { priority: v })} />
                 </label>
               )}
             </div>
@@ -401,6 +401,19 @@ function Choice({ active, onClick, title, text }: { active: boolean; onClick: ()
       <span className="block text-sm font-semibold">{title}</span>
       <span className="block text-xs text-muted-foreground">{text}</span>
     </button>
+  )
+}
+
+/** Priorité d'un élément : la sienne, ou « comme le poste ». */
+function PrioritySelect({ value, inherited, onChange }: { value: Priority | null; inherited: Priority | null; onChange: (v: Priority | null) => void }) {
+  return (
+    <select className="h-9 w-36 rounded-md border border-input bg-background px-1.5 text-xs" value={value ?? ""}
+      aria-label="Priorité de l'élément" title="Priorité de l'élément"
+      style={value ? { color: PRIORITY_COLORS[value], fontWeight: 600 } : undefined}
+      onChange={(e) => onChange((e.target.value || null) as Priority | null)}>
+      <option value="">Comme le poste{inherited ? ` (${PRIORITY_LABELS[inherited]})` : ""}</option>
+      {PRIORITIES.map((p) => <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>)}
+    </select>
   )
 }
 

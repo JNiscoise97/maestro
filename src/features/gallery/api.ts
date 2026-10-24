@@ -240,13 +240,31 @@ export async function downloadPhoto(photoId: string, quality: "normal" | "hd"): 
   a.remove()
 }
 
-export function logEvent(event: "login" | "logout" | "photo_open" | "search", photoId?: string, details: Record<string, unknown> = {}) {
+export function logEvent(event: "login" | "logout" | "visit" | "photo_open" | "search", photoId?: string, details: Record<string, unknown> = {}) {
   if (!galleryClient) return
   void db().rpc(gt("log"), {
     p_event: event,
     p_photo: photoId ?? null,
-    p_details: event === "login" ? { ...details, device: deviceId() } : details,
+    p_details: event === "login" || event === "visit" ? { ...details, device: deviceId() } : details,
   })
+}
+
+const VISIT_KEY = "sj-galerie-derniere-visite"
+const VISIT_INTERVAL = 30 * 60 * 1000
+
+/** Retour sur la galerie avec une session déjà active : « visite », au plus une fois toutes les 30 min par appareil. */
+export function logVisit() {
+  try {
+    const last = Number(localStorage.getItem(VISIT_KEY) ?? 0)
+    if (Date.now() - last < VISIT_INTERVAL) return
+    localStorage.setItem(VISIT_KEY, String(Date.now()))
+  } catch { /* stockage indisponible : on journalise quand même */ }
+  logEvent("visit")
+}
+
+/** Après une connexion par code : la visite est déjà comptée comme connexion. */
+export function markVisited() {
+  try { localStorage.setItem(VISIT_KEY, String(Date.now())) } catch { /* stockage indisponible */ }
 }
 
 // ── Engagement de confidentialité ─────────────────────────────────────────────

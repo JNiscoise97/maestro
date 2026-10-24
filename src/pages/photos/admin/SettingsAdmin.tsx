@@ -46,6 +46,8 @@ function SwitchesCard({ settings }: { settings: GallerySettings }) {
     { key: "download_hd_enabled", label: "Téléchargement HD (original)" },
     { key: "reactions_enabled", label: "Réactions" },
     { key: "comments_enabled", label: "Commentaires" },
+    { key: "notify_on_login", label: "M'envoyer un e-mail à chaque connexion d'un invité", hint: "À la saisie du code. Pratique au début ; à couper si les e-mails deviennent trop nombreux." },
+    { key: "notify_on_visit", label: "M'envoyer un e-mail quand un invité revient", hint: "Retour sur la galerie sans ressaisir de code : un e-mail par personne et par jour au maximum." },
     { key: "auto_link_known_names", label: "Rattachement automatique par nom/prénom", hint: "Ouvre l'accès sans validation quand le nom correspond à un invité (alerte envoyée). Risque : un nom se devine." },
   ]
   return (

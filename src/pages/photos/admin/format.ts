@@ -16,6 +16,10 @@ export function notificationText(n: GalleryNotification): string {
       return `Accès ouvert automatiquement : ${p.name} (${p.email})`
     case "download_volume":
       return `Volume de téléchargements : ${p.name} — ${p.count_24h} en 24 h`
+    case "visit":
+      return `Visite : ${p.name || p.email}`
+    case "login":
+      return `${p.first_login ? "Première connexion" : "Connexion"} : ${p.name || p.email}`
     case "unusual_login":
       return `Connexions inhabituelles : ${p.name || p.email} — ${p.devices_24h} appareils en 24 h`
     default:
@@ -25,6 +29,7 @@ export function notificationText(n: GalleryNotification): string {
 
 export const EVENT_LABELS: Record<string, string> = {
   login: "Connexion",
+  visit: "Visite",
   logout: "Déconnexion",
   photo_open: "Ouverture d'une photo",
   search: "Recherche",

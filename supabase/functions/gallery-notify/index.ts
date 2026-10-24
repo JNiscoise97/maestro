@@ -1,7 +1,7 @@
 // gallery-notify — e-mail aux administrateurs pour les alertes créées en base (CDCF MOD-04, ADM-03).
 //
 // Appelée par un « Database Webhook » Supabase sur INSERT dans _20260725_gal_notifications,
-// pour les alertes nées dans la base : signalements et connexions inhabituelles.
+// pour les alertes nées dans la base : signalements, connexions d'invités et connexions inhabituelles.
 // (Demandes d'accès, rattachements automatiques et volumes de téléchargement sont déjà
 //  envoyés par gallery-identify / gallery-download.)
 // Sécurité : en-tête « x-webhook-secret » égal au secret GALLERY_WEBHOOK_SECRET.
@@ -126,6 +126,20 @@ Deno.serve(async (req) => {
         `${p.for_self === false ? " (pour une autre personne)" : ""}.<br>Motif(s) : ${reasons}.<br><br>` +
         `La photo est masquée pour tous en attendant votre décision.<br><br>` +
         `<a href="${galleryUrl()}/admin/moderation">Examiner le signalement</a>`))
+  } else if (record.kind === "login") {
+    const name = String(p.name || p.email)
+    await sendMail(await adminEmails(db), `Galerie : ${name} vient de se connecter`,
+      mailLayout(p.first_login ? "Première connexion" : "Connexion à la galerie",
+        `<b>${escapeHtml(name)}</b> (${escapeHtml(String(p.email))}) s'est connecté(e) à la galerie le ${when}` +
+        `${p.first_login ? ", pour la première fois" : ` (connexion n°${p.login_count})`}.<br><br>` +
+        `<a href="${galleryUrl()}/admin/journal">Voir le journal</a>`))
+  } else if (record.kind === "visit") {
+    const name = String(p.name || p.email)
+    await sendMail(await adminEmails(db), `Galerie : ${name} est revenu(e) voir les photos`,
+      mailLayout("Retour sur la galerie",
+        `<b>${escapeHtml(name)}</b> (${escapeHtml(String(p.email))}) est revenu(e) sur la galerie le ${when}.<br>` +
+        `Un seul e-mail de ce type par personne et par jour.<br><br>` +
+        `<a href="${galleryUrl()}/admin/journal">Voir le journal</a>`))
   } else if (record.kind === "unusual_login") {
     await sendMail(await adminEmails(db), "Galerie : connexions inhabituelles",
       mailLayout("Connexions inhabituelles",

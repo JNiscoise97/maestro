@@ -10,6 +10,7 @@ import { downloadText, EVENT_LABELS, memberName, toCsv } from "./format"
 const EVENT_GROUPS: { value: string; label: string }[] = [
   { value: "", label: "Tous les événements" },
   { value: "login", label: "Connexions" },
+  { value: "visit", label: "Visites" },
   { value: "photo_open", label: "Ouvertures de photos" },
   { value: "reaction", label: "Réactions" },
   { value: "comment", label: "Commentaires" },

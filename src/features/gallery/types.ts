@@ -29,6 +29,8 @@ export type GallerySettings = {
   theme: GalleryTheme
   scroll_mode: GalleryScrollMode
   unusual_login_devices: number
+  notify_on_login: boolean
+  notify_on_visit: boolean
   updated_at: string
 }
 

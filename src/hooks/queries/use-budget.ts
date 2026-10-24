@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { budgetService, type BudgetItem, type DevisDraft, type PosteDraft } from "@/services/supabase/budget"
+import { budgetService, type BudgetItem, type DevisDraft, type DevisPlan, type PosteDraft } from "@/services/supabase/budget"
 
 const QK        = ["budget_items"]        as const
 const QK_QUOTE  = (id: string) => ["budget_quotes", id] as const
@@ -178,7 +178,10 @@ export function useDeleteDevis() {
 
 export function useSavePoste() {
   const invalidate = useInvalidateBudget()
-  return useMutation({ mutationFn: (d: PosteDraft) => budgetService.savePoste(d), onSettled: invalidate })
+  return useMutation({
+    mutationFn: ({ draft, plan }: { draft: PosteDraft; plan: DevisPlan }) => budgetService.savePoste(draft, plan),
+    onSettled: invalidate,
+  })
 }
 
 export function useDeletePoste() {

@@ -7,7 +7,7 @@ import type { BudgetDevis, BudgetItem, BudgetPayment, DevisLine } from "@/servic
  *   · Estimé d'une ligne : montant estimé saisi, sinon quantité × prix unitaire.
  *   · Réel d'une ligne : sa part dans le devis retenu qui la couvre, sinon le montant réel saisi.
  *   · Payé d'une ligne : couverte par un devis retenu → versements payés du devis au prorata de sa part ;
- *     sinon ses propres versements payés. Le poste ajoute ses propres versements (facture commune).
+ *     sinon ses propres versements payés (achat direct). Paiements : devis retenu OU ligne, jamais ailleurs.
  */
 
 export function fmt(n: number | null | undefined): string {
@@ -104,14 +104,9 @@ export class BudgetModel {
       ? (sequenceId === undefined ? kids : kids.filter((k) => k.sequenceId === sequenceId))
       : [poste]
     const figures = leaves.map((l) => this.line(l))
-    let paid = sum(figures.map((f) => f.paid))
-    let hasPaidDeposit = figures.some((f) => f.hasPaidDeposit)
-    // Versements propres d'un poste à sous-postes (facture commune) : comptés sur le poste entier.
-    if (kids.length && sequenceId === undefined) {
-      const own = (this.paymentsByItem.get(poste.id) ?? []).filter((p) => p.paid)
-      paid += sum(own.map((p) => p.amount))
-      hasPaidDeposit ||= own.some((p) => p.kind === "acompte")
-    }
+    // Une facture commune à plusieurs sous-postes passe par un devis : le poste n'a pas d'échéancier propre.
+    const paid = sum(figures.map((f) => f.paid))
+    const hasPaidDeposit = figures.some((f) => f.hasPaidDeposit)
     const reals = figures.map((f) => f.real)
     return {
       estimated: sum(figures.map((f) => f.estimated)),

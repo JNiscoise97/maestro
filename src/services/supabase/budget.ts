@@ -353,7 +353,7 @@ export const budgetService = {
    * Enregistre un poste complet depuis sa fenêtre : le poste, ses sous-postes (créés, modifiés ou
    * supprimés) et l'échéancier propre de chaque ligne (remplacé).
    */
-  async savePoste(draft: PosteDraft): Promise<string> {
+  async savePoste(draft: PosteDraft, plan: DevisPlan = { newDevis: [], links: [] }): Promise<{ posteId: string; idsByKey: Record<string, string> }> {
     const fields = (d: LineDraft, parentId: string | null, poleId: string | null) => ({
       parent_id: parentId, pole_id: poleId, sequence_id: d.sequenceId, label: d.label,
       quantity: d.quantity, unit_price: d.unitPrice, estimated_total: d.estimatedTotal, actual_total: d.actualTotal,
@@ -371,16 +371,39 @@ export const budgetService = {
       return data.id as string
     }
     const posteId = await save(draft.poste, null)
-    await replacePayments({ item_id: posteId }, draft.poste.payments)
+    const idsByKey: Record<string, string> = { [draft.poste.key]: posteId }
+    // Poste à sous-postes : pas d'échéancier propre (une facture commune = un devis couvrant les sous-postes).
+    await replacePayments({ item_id: posteId }, draft.subs.length ? [] : draft.poste.payments)
     for (const id of draft.removedSubIds) {
       const { error } = await db.from(tbl("budget_items")).delete().eq("id", id)
       if (error) throw error
     }
     for (const sub of draft.subs) {
       const subId = await save(sub, posteId)
+      idsByKey[sub.key] = subId
       await replacePayments({ item_id: subId }, sub.payments)
     }
-    return posteId
+
+    // Devis : création des nouveaux, puis rattachements des lignes de ce poste (remplacés).
+    const refToId = new Map<string, string>()
+    for (const d of plan.newDevis) {
+      const { data, error } = await db.from(tbl("budget_devis")).insert({
+        vendor: d.vendor, title: d.title, total_amount: d.totalAmount, status: d.status,
+      }).select("id").single()
+      if (error) throw error
+      refToId.set(d.ref, data.id as string)
+    }
+    const lineIds = Object.values(idsByKey)
+    const { error: e1 } = await db.from(tbl("budget_devis_lines")).delete().in("item_id", lineIds)
+    if (e1) throw e1
+    const rows = plan.links
+      .filter((l) => idsByKey[l.lineKey])
+      .map((l) => ({ devis_id: refToId.get(l.devisRef) ?? l.devisRef, item_id: idsByKey[l.lineKey], amount: l.amount }))
+    if (rows.length) {
+      const { error } = await db.from(tbl("budget_devis_lines")).insert(rows)
+      if (error) throw error
+    }
+    return { posteId, idsByKey }
   },
 }
 
@@ -453,6 +476,13 @@ export type LineDraft = {
   notes: string | null
   depositRequired: boolean
   payments: PaymentDraft[]
+}
+
+/** Devis à créer et rattachements des lignes d'un poste, enregistrés avec le poste. */
+export type DevisPlan = {
+  newDevis: { ref: string; vendor: string | null; title: string | null; totalAmount: number | null; status: DevisStatus }[]
+  /** devisRef : id d'un devis existant, ou ref d'un devis de newDevis. */
+  links: { lineKey: string; devisRef: string; amount: number | null }[]
 }
 
 export type PosteDraft = {

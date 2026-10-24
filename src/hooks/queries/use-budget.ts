@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { budgetService, type BudgetItem } from "@/services/supabase/budget"
+import { budgetService, type BudgetItem, type DevisDraft, type PosteDraft } from "@/services/supabase/budget"
 
 const QK        = ["budget_items"]        as const
 const QK_QUOTE  = (id: string) => ["budget_quotes", id] as const
@@ -141,4 +141,47 @@ export function useDeselectBudgetQuotes(itemId: string) {
       qc.invalidateQueries({ queryKey: QK_STATUS })
     },
   })
+}
+
+// ── Devis groupés, lignes couvertes, échéanciers ─────────────────────────────
+
+const QK_DEVIS    = ["budget_devis"] as const
+const QK_LINES    = ["budget_devis_lines"] as const
+const QK_PAYMENTS = ["budget_payments"] as const
+
+export function useBudgetDevis() {
+  return useQuery({ queryKey: QK_DEVIS, queryFn: () => budgetService.listDevis() })
+}
+
+export function useBudgetDevisLines() {
+  return useQuery({ queryKey: QK_LINES, queryFn: () => budgetService.listDevisLines() })
+}
+
+export function useBudgetPayments() {
+  return useQuery({ queryKey: QK_PAYMENTS, queryFn: () => budgetService.listPayments() })
+}
+
+function useInvalidateBudget() {
+  const qc = useQueryClient()
+  return () => Promise.all([QK, QK_DEVIS, QK_LINES, QK_PAYMENTS, QK_STATUS].map((k) => qc.invalidateQueries({ queryKey: k })))
+}
+
+export function useSaveDevis() {
+  const invalidate = useInvalidateBudget()
+  return useMutation({ mutationFn: (d: DevisDraft) => budgetService.saveDevis(d), onSettled: invalidate })
+}
+
+export function useDeleteDevis() {
+  const invalidate = useInvalidateBudget()
+  return useMutation({ mutationFn: (id: string) => budgetService.deleteDevis(id), onSettled: invalidate })
+}
+
+export function useSavePoste() {
+  const invalidate = useInvalidateBudget()
+  return useMutation({ mutationFn: (d: PosteDraft) => budgetService.savePoste(d), onSettled: invalidate })
+}
+
+export function useDeletePoste() {
+  const invalidate = useInvalidateBudget()
+  return useMutation({ mutationFn: (id: string) => budgetService.deletePoste(id), onSettled: invalidate })
 }

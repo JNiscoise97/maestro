@@ -22,6 +22,8 @@ export type BudgetItem = {
   origin: string | null
   itemType: string | null
   notes: string | null
+  /** Un acompte est demandé pour cette ligne. */
+  depositRequired: boolean
   sortOrder: number
 }
 
@@ -55,6 +57,7 @@ function fromRow(r: any): BudgetItem {
     origin:         r.origin,
     itemType:       r.item_type,
     notes:          r.notes,
+    depositRequired: r.deposit_required ?? false,
     sortOrder:      r.sort_order ?? 0,
   }
 }
@@ -105,6 +108,7 @@ export const budgetService = {
         origin:          item.origin,
         item_type:       item.itemType,
         notes:           item.notes,
+        deposit_required: item.depositRequired ?? false,
       })
       .select()
       .single()
@@ -129,6 +133,7 @@ export const budgetService = {
     if (patch.origin         !== undefined) row.origin          = patch.origin
     if (patch.itemType       !== undefined) row.item_type       = patch.itemType
     if (patch.notes          !== undefined) row.notes           = patch.notes
+    if (patch.depositRequired !== undefined) row.deposit_required = patch.depositRequired
     if (patch.sortOrder      !== undefined) row.sort_order      = patch.sortOrder
     if (Object.keys(row).length === 0) return
     const { error } = await db.from(tbl("budget_items")).update(row).eq("id", id)
@@ -283,4 +288,189 @@ export const budgetService = {
     const { error } = await db.from(tbl("budget_items")).insert(rows)
     if (error) throw error
   },
+
+  /** Supprime un poste et ses sous-postes (leurs versements et lignes de devis suivent en cascade). */
+  async deletePoste(id: string): Promise<void> {
+    const { error: e1 } = await db.from(tbl("budget_items")).delete().eq("parent_id", id)
+    if (e1) throw e1
+    const { error } = await db.from(tbl("budget_items")).delete().eq("id", id)
+    if (error) throw error
+  },
+
+  // ── Devis groupés, lignes couvertes et échéanciers ─────────────────────────
+
+  async listDevis(): Promise<BudgetDevis[]> {
+    const { data, error } = await db.from(tbl("budget_devis")).select("*").order("created_at", { ascending: true })
+    if (error) throw error
+    return (data ?? []).map(fromDevisRow)
+  },
+
+  async listDevisLines(): Promise<DevisLine[]> {
+    const { data, error } = await db.from(tbl("budget_devis_lines")).select("*")
+    if (error) throw error
+    return (data ?? []).map((r: any) => ({ devisId: r.devis_id, itemId: r.item_id, amount: num(r.amount) }))
+  },
+
+  async listPayments(): Promise<BudgetPayment[]> {
+    const { data, error } = await db.from(tbl("budget_payments")).select("*")
+      .order("sort_order", { ascending: true }).order("created_at", { ascending: true })
+    if (error) throw error
+    return (data ?? []).map(fromPaymentRow)
+  },
+
+  /** Enregistre un devis complet : en-tête, lignes couvertes (remplacées) et échéancier (remplacé). */
+  async saveDevis(devis: DevisDraft): Promise<string> {
+    const row = {
+      vendor: devis.vendor, title: devis.title, quote_date: devis.quoteDate, valid_until: devis.validUntil,
+      url: devis.url, notes: devis.notes, total_amount: devis.totalAmount, status: devis.status,
+    }
+    let id = devis.id
+    if (id) {
+      const { error } = await db.from(tbl("budget_devis")).update(row).eq("id", id)
+      if (error) throw error
+    } else {
+      const { data, error } = await db.from(tbl("budget_devis")).insert(row).select("id").single()
+      if (error) throw error
+      id = data.id as string
+    }
+    const { error: e1 } = await db.from(tbl("budget_devis_lines")).delete().eq("devis_id", id)
+    if (e1) throw e1
+    if (devis.lines.length) {
+      const { error } = await db.from(tbl("budget_devis_lines"))
+        .insert(devis.lines.map((l) => ({ devis_id: id, item_id: l.itemId, amount: l.amount })))
+      if (error) throw error
+    }
+    await replacePayments({ devis_id: id! }, devis.payments)
+    return id!
+  },
+
+  async deleteDevis(id: string): Promise<void> {
+    const { error } = await db.from(tbl("budget_devis")).delete().eq("id", id)
+    if (error) throw error
+  },
+
+  /**
+   * Enregistre un poste complet depuis sa fenêtre : le poste, ses sous-postes (créés, modifiés ou
+   * supprimés) et l'échéancier propre de chaque ligne (remplacé).
+   */
+  async savePoste(draft: PosteDraft): Promise<string> {
+    const fields = (d: LineDraft, parentId: string | null, poleId: string | null) => ({
+      parent_id: parentId, pole_id: poleId, sequence_id: d.sequenceId, label: d.label,
+      quantity: d.quantity, unit_price: d.unitPrice, estimated_total: d.estimatedTotal, actual_total: d.actualTotal,
+      vendor: d.vendor, account: d.account, origin: d.origin, notes: d.notes, deposit_required: d.depositRequired,
+    })
+    const save = async (d: LineDraft, parentId: string | null): Promise<string> => {
+      const row = fields(d, parentId, draft.poste.poleId)
+      if (d.id) {
+        const { error } = await db.from(tbl("budget_items")).update(row).eq("id", d.id)
+        if (error) throw error
+        return d.id
+      }
+      const { data, error } = await db.from(tbl("budget_items")).insert({ ...row, category: "" }).select("id").single()
+      if (error) throw error
+      return data.id as string
+    }
+    const posteId = await save(draft.poste, null)
+    await replacePayments({ item_id: posteId }, draft.poste.payments)
+    for (const id of draft.removedSubIds) {
+      const { error } = await db.from(tbl("budget_items")).delete().eq("id", id)
+      if (error) throw error
+    }
+    for (const sub of draft.subs) {
+      const subId = await save(sub, posteId)
+      await replacePayments({ item_id: subId }, sub.payments)
+    }
+    return posteId
+  },
+}
+
+async function replacePayments(owner: { item_id: string } | { devis_id: string }, payments: PaymentDraft[]): Promise<void> {
+  const [key, value] = Object.entries(owner)[0]
+  const { error } = await db.from(tbl("budget_payments")).delete().eq(key, value)
+  if (error) throw error
+  if (!payments.length) return
+  const { error: e2 } = await db.from(tbl("budget_payments")).insert(payments.map((p, i) => ({
+    ...owner, kind: p.kind, label: p.label, amount: p.amount, due_date: p.dueDate,
+    paid: p.paid, paid_date: p.paidDate, account: p.account, sort_order: i,
+  })))
+  if (e2) throw e2
+}
+
+const num = (v: unknown): number | null => (v === null || v === undefined || v === "" ? null : Number(v))
+
+export type DevisStatus = "en_cours" | "retenu" | "refuse"
+
+export type BudgetDevis = {
+  id: string
+  vendor: string | null
+  title: string | null
+  quoteDate: string | null
+  validUntil: string | null
+  url: string | null
+  notes: string | null
+  totalAmount: number | null
+  status: DevisStatus
+}
+
+export type DevisLine = { devisId: string; itemId: string; amount: number | null }
+
+export type PaymentKind = "acompte" | "solde" | "paiement"
+
+export type BudgetPayment = {
+  id: string
+  itemId: string | null
+  devisId: string | null
+  kind: PaymentKind
+  label: string | null
+  amount: number | null
+  dueDate: string | null
+  paid: boolean
+  paidDate: string | null
+  account: string | null
+}
+
+export type PaymentDraft = Omit<BudgetPayment, "id" | "itemId" | "devisId">
+
+export type DevisDraft = Omit<BudgetDevis, "id"> & {
+  id?: string
+  lines: { itemId: string; amount: number | null }[]
+  payments: PaymentDraft[]
+}
+
+/** Ligne (poste ou sous-poste) telle qu'éditée dans la fenêtre du poste. */
+export type LineDraft = {
+  id?: string
+  key: string
+  label: string
+  sequenceId: string | null
+  quantity: number | null
+  unitPrice: number | null
+  estimatedTotal: number | null
+  actualTotal: number | null
+  vendor: string | null
+  account: string | null
+  origin: string | null
+  notes: string | null
+  depositRequired: boolean
+  payments: PaymentDraft[]
+}
+
+export type PosteDraft = {
+  poste: LineDraft & { poleId: string | null }
+  subs: LineDraft[]
+  removedSubIds: string[]
+}
+
+function fromDevisRow(r: any): BudgetDevis {
+  return {
+    id: r.id, vendor: r.vendor, title: r.title, quoteDate: r.quote_date, validUntil: r.valid_until,
+    url: r.url, notes: r.notes, totalAmount: num(r.total_amount), status: r.status,
+  }
+}
+
+function fromPaymentRow(r: any): BudgetPayment {
+  return {
+    id: r.id, itemId: r.item_id, devisId: r.devis_id, kind: r.kind, label: r.label, amount: num(r.amount),
+    dueDate: r.due_date, paid: !!r.paid, paidDate: r.paid_date, account: r.account,
+  }
 }

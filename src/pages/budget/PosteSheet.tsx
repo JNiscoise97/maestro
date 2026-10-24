@@ -318,7 +318,7 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
 
   return (
     <Sheet open onOpenChange={(o) => { if (!o) requestClose() }}>
-      <SheetContent className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+      <SheetContent className="flex flex-col gap-0 overflow-hidden p-0 data-[side=right]:w-full data-[side=right]:sm:w-[75vw] data-[side=right]:sm:max-w-none">
         <SheetHeader className="shrink-0 space-y-3 border-b px-6 pb-4 pt-6">
           <SheetTitle>{existing ? existing.label : "Nouveau poste de dépense"}</SheetTitle>
           {figures && (

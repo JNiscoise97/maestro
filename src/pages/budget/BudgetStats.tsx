@@ -68,6 +68,14 @@ export function BudgetStats({ items, model, poles, sequences }: {
         estimated: ls.reduce((t, l) => t + l.estimated, 0), real: ls.reduce((t, l) => t + (l.real ?? 0), 0),
       }
     }).filter((b) => b.estimated > 0 || b.real > 0)
+    // Séquence × priorité (estimé et réel).
+    const seqPrio = new Map<string, { estimated: number; real: number }>()
+    for (const l of lines) {
+      const k = `${l.sequenceId ?? NO_KEY}|${l.priority ?? NO_KEY}`
+      const c = seqPrio.get(k) ?? { estimated: 0, real: 0 }
+      c.estimated += l.estimated; c.real += l.real ?? 0
+      seqPrio.set(k, c)
+    }
     // Marge de manœuvre : estimé des Could / Should pas encore engagés (ni devis retenu ni réel).
     const flexible = (p: string) => lines.filter((l) => l.priority === p && l.real == null).reduce((t, l) => t + l.estimated, 0)
     const poleOrder = new Map(poles.map((p, i) => [p.id, i]))
@@ -108,7 +116,7 @@ export function BudgetStats({ items, model, poles, sequences }: {
     const late = upcoming.filter((u) => u.date < today)
     const in30 = upcoming.filter((u) => u.date >= today && u.date <= addDays(today, 30))
 
-    return { prioBuckets, flexibleCould: flexible("could"), flexibleShould: flexible("should"), poleBuckets, seqBuckets, cell, estimated, real, paid, due, overruns, undecided, pendingDevis, depositsDue, upcoming, late, in30, lineCount: lines.length }
+    return { seqPrio, prioBuckets, flexibleCould: flexible("could"), flexibleShould: flexible("should"), poleBuckets, seqBuckets, cell, estimated, real, paid, due, overruns, undecided, pendingDevis, depositsDue, upcoming, late, in30, lineCount: lines.length }
   }, [items, model, poles, sequences])
 
   const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
@@ -146,6 +154,17 @@ export function BudgetStats({ items, model, poles, sequences }: {
             <Metric label="Lignes de budget" value={String(stats.lineCount)} sub={`${stats.poleBuckets.length} pôles · ${stats.seqBuckets.length} séquences`} />
           </div>
 
+          {/* Base de calcul des camemberts et des barres empilées. */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Répartitions calculées sur :</span>
+            {(["estimated", "real"] as const).map((b) => (
+              <button key={b} type="button" onClick={() => setBasis(b)} aria-pressed={basis === b}
+                className={cn("rounded-full border px-3 py-0.5 text-xs font-medium", basis === b ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:border-foreground/30")}>
+                {b === "estimated" ? "l'estimé" : "le réel"}
+              </button>
+            ))}
+          </div>
+
           {/* ── Priorités MoSCoW ── */}
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -165,6 +184,9 @@ export function BudgetStats({ items, model, poles, sequences }: {
                 et <b className="text-foreground">{fmt(stats.flexibleShould)}</b> de « Should have » ne sont pas encore engagés.
               </p>
             )}
+            <Chart title={`Budget par priorité dans chaque séquence (${basis === "estimated" ? "estimé" : "réel"})`}>
+              <StackedBars rows={stats.seqBuckets} segments={stats.prioBuckets} cell={stats.seqPrio} basis={basis} />
+            </Chart>
             <div className="grid gap-6 lg:grid-cols-2">
               <Chart title="Par priorité (estimé et réel)"><Bars buckets={stats.prioBuckets} /></Chart>
               <Chart title="Part de chaque priorité"><Donut buckets={stats.prioBuckets} basis={basis} /></Chart>
@@ -179,15 +201,6 @@ export function BudgetStats({ items, model, poles, sequences }: {
 
           {/* ── Camemberts ── */}
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">Parts calculées sur :</span>
-              {(["estimated", "real"] as const).map((b) => (
-                <button key={b} type="button" onClick={() => setBasis(b)} aria-pressed={basis === b}
-                  className={cn("rounded-full border px-3 py-0.5 text-xs font-medium", basis === b ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:border-foreground/30")}>
-                  {b === "estimated" ? "l'estimé" : "le réel"}
-                </button>
-              ))}
-            </div>
             <div className="grid gap-6 lg:grid-cols-2">
               <Chart title="Part de chaque pôle"><Donut buckets={stats.poleBuckets} basis={basis} /></Chart>
               <Chart title="Part de chaque séquence"><Donut buckets={stats.seqBuckets} basis={basis} /></Chart>
@@ -273,6 +286,52 @@ function Bars({ buckets }: { buckets: Bucket[] }) {
       <p className="flex gap-4 pl-[9rem] text-[11px] text-muted-foreground sm:pl-[11.5rem]">
         <span><span className="mr-1 inline-block h-2 w-3 rounded-sm bg-foreground/30 align-middle" />Estimé</span>
         <span><span className="mr-1 inline-block h-2 w-3 rounded-sm bg-foreground align-middle" />Réel</span>
+      </p>
+    </div>
+  )
+}
+
+/**
+ * Barres empilées : une barre par séquence, découpée par priorité (Must, Should, Could, non priorisé),
+ * sur l'estimé ou le réel. La longueur compare les séquences, les couleurs montrent la répartition.
+ */
+function StackedBars({ rows, segments, cell, basis }: {
+  rows: Bucket[]
+  segments: Bucket[]
+  cell: Map<string, { estimated: number; real: number }>
+  basis: Basis
+}) {
+  const value = (row: string, seg: string) => cell.get(`${row}|${seg}`)?.[basis] ?? 0
+  const totals = rows.map((r) => segments.reduce((t, s) => t + value(r.key, s.key), 0))
+  const max = Math.max(1, ...totals)
+  if (!rows.length || !segments.length) return <p className="text-xs text-muted-foreground">Aucune donnée.</p>
+  return (
+    <div className="space-y-2">
+      {rows.map((r, i) => (
+        <div key={r.key} className="grid grid-cols-[8.5rem_1fr] items-center gap-2 text-xs sm:grid-cols-[11rem_1fr]">
+          <span className="truncate" title={r.label}>
+            <span aria-hidden className="mr-1.5 inline-block size-2 rounded-full align-middle" style={{ background: r.color }} />
+            {r.label}
+          </span>
+          <div className="flex items-center gap-2">
+            <div className="flex h-4 overflow-hidden rounded-sm" style={{ width: `${(totals[i] / max) * 100}%`, minWidth: totals[i] ? 4 : 0 }}>
+              {segments.map((s) => {
+                const v = value(r.key, s.key)
+                if (!v) return null
+                return (
+                  <div key={s.key} className="h-full" style={{ width: `${(v / totals[i]) * 100}%`, background: s.color }}
+                    title={`${r.label} · ${s.label} : ${fmt(v)} (${Math.round((v / totals[i]) * 100)} %)`} />
+                )
+              })}
+            </div>
+            <span className="shrink-0 tabular-nums text-muted-foreground">{totals[i] ? fmtCompact(totals[i]) : "—"}</span>
+          </div>
+        </div>
+      ))}
+      <p className="flex flex-wrap gap-x-4 gap-y-1 pl-[9rem] text-[11px] text-muted-foreground sm:pl-[11.5rem]">
+        {segments.map((s) => (
+          <span key={s.key}><span className="mr-1 inline-block h-2 w-3 rounded-sm align-middle" style={{ background: s.color }} />{s.label}</span>
+        ))}
       </p>
     </div>
   )

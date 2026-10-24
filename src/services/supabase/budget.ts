@@ -7,6 +7,9 @@ export type BudgetItem = {
   id: string
   parentId: string | null
   sequenceId: string | null
+  /** Pôle (mêmes pôles que les missions) : regroupement principal du budget. */
+  poleId: string | null
+  /** Ancienne catégorie libre, conservée mais plus affichée. */
   category: string
   label: string
   quantity: number | null
@@ -39,6 +42,7 @@ function fromRow(r: any): BudgetItem {
     id:             r.id,
     parentId:       r.parent_id ?? null,
     sequenceId:     r.sequence_id,
+    poleId:         r.pole_id ?? null,
     category:       r.category ?? "",
     label:          r.label,
     quantity:       r.quantity,
@@ -88,6 +92,7 @@ export const budgetService = {
       .insert({
         parent_id:       item.parentId,
         sequence_id:     item.sequenceId,
+        pole_id:         item.poleId,
         category:        item.category,
         label:           item.label,
         quantity:        item.quantity,
@@ -111,6 +116,7 @@ export const budgetService = {
     const row: Record<string, unknown> = {}
     if (patch.parentId       !== undefined) row.parent_id       = patch.parentId
     if (patch.sequenceId     !== undefined) row.sequence_id     = patch.sequenceId
+    if (patch.poleId         !== undefined) row.pole_id         = patch.poleId
     if (patch.category       !== undefined) row.category        = patch.category
     if (patch.label          !== undefined) row.label           = patch.label
     if (patch.quantity       !== undefined) row.quantity        = patch.quantity
@@ -199,6 +205,7 @@ export const budgetService = {
     const { data: copy, error: e2 } = await db.from(tbl("budget_items")).insert({
       parent_id:       orig.parent_id,
       sequence_id:     orig.sequence_id,
+      pole_id:         orig.pole_id,
       category:        orig.category,
       label:           `Copie de ${orig.label}`,
       quantity:        orig.quantity,
@@ -221,6 +228,7 @@ export const budgetService = {
         kids.map((c: any) => ({
           parent_id:       copy.id,
           sequence_id:     c.sequence_id,
+          pole_id:         c.pole_id,
           category:        c.category,
           label:           c.label,
           quantity:        c.quantity,
@@ -257,6 +265,7 @@ export const budgetService = {
   async importItems(items: Omit<BudgetItem, "id" | "sortOrder">[]): Promise<void> {
     const rows = items.map((item, i) => ({
       sequence_id:     item.sequenceId,
+      pole_id:         item.poleId,
       category:        item.category,
       label:           item.label,
       quantity:        item.quantity,

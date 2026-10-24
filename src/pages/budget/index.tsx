@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from "react"
-import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Copy, ExternalLink, FileUp, Pencil, Plus, Trash2, X } from "lucide-react"
+import { ArrowDown, ArrowUp, Check, ChevronRight, Copy, ExternalLink, FileUp, Pencil, Plus, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { PageHeader } from "@/components/shared/PageHeader"
@@ -15,13 +15,10 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover"
 import { useEventSequences } from "@/hooks/queries/use-event-sequences"
 import {
   useBudgetItems, useCreateBudgetItem, useUpdateBudgetItem,
-  useDeleteBudgetItem, useImportBudgetItems, useRenameBudgetCategory,
+  useDeleteBudgetItem, useImportBudgetItems,
   useBudgetQuotes, useCreateBudgetQuote, useUpdateBudgetQuote,
   useDeleteBudgetQuote, useSelectBudgetQuote, useDeselectBudgetQuotes,
   useDuplicateBudgetItem, useSwapBudgetSortOrder, useBudgetQuoteStatus,
@@ -30,6 +27,9 @@ import type { BudgetQuote } from "@/services/supabase/budget"
 import type { BudgetItem } from "@/services/supabase/budget"
 import { sequenceColor, withAlpha } from "@/lib/sequence-colors"
 import { SequenceName } from "@/components/shared/SequenceName"
+import { usePoles } from "@/hooks/queries/use-poles"
+import { poleIdForCategory } from "@/lib/budget-poles"
+import type { Pole } from "@/types/domain"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -172,6 +172,7 @@ function parseCsvFiancailles(lines: string[]): ParsedRow[] {
       parentId:       null,
       sequenceId:     null,
       category:       currentCategory,
+      poleId:         null,
       label:          r.label,
       quantity:       null,
       unitPrice:      null,
@@ -221,6 +222,7 @@ function parseCsvGeneric(lines: string[]): ParsedRow[] {
       parentId:       null,
       sequenceId:     null,
       category:       (iCat >= 0 ? cols[iCat]?.trim() : "") || "",
+      poleId:         null,
       label,
       quantity:       iQty    >= 0 ? parseFrNumber(cols[iQty]    ?? "") : null,
       unitPrice:      iPU     >= 0 ? parseFrNumber(cols[iPU]     ?? "") : null,
@@ -251,144 +253,7 @@ function parseCsv(text: string): ParsedRow[] {
   return parseCsvGeneric(lines)
 }
 
-// ── Sélecteur de catégorie ────────────────────────────────────────────────────
-
-function CategoryCombobox({
-  value,
-  categories,
-  onChange,
-  onRename,
-}: {
-  value: string
-  categories: string[]
-  onChange: (v: string) => void
-  onRename: (oldName: string, newName: string) => Promise<void>
-}) {
-  const [open,        setOpen]        = useState(false)
-  const [newMode,     setNewMode]     = useState(false)
-  const [newName,     setNewName]     = useState("")
-  const [renaming,    setRenaming]    = useState<string | null>(null)
-  const [renameDraft, setRenameDraft] = useState("")
-  const newInputRef    = useRef<HTMLInputElement>(null)
-  const renameInputRef = useRef<HTMLInputElement>(null)
-
-  function confirmNew() {
-    const trimmed = newName.trim()
-    if (trimmed) onChange(trimmed)
-    setNewName("")
-    setNewMode(false)
-    setOpen(false)
-  }
-
-  async function confirmRename() {
-    const trimmed = renameDraft.trim()
-    if (!trimmed || !renaming || trimmed === renaming) { cancelRename(); return }
-    await onRename(renaming, trimmed)
-    if (value === renaming) onChange(trimmed)
-    cancelRename()
-  }
-
-  function cancelRename() { setRenaming(null); setRenameDraft("") }
-
-  function startNew() {
-    setNewMode(true)
-    setNewName("")
-    setTimeout(() => newInputRef.current?.focus(), 50)
-  }
-
-  function startRename(cat: string, e: React.MouseEvent) {
-    e.stopPropagation()
-    setRenaming(cat)
-    setRenameDraft(cat)
-    setTimeout(() => renameInputRef.current?.focus(), 50)
-  }
-
-  const displayValue = value || "Choisir…"
-
-  return (
-    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setNewMode(false); setNewName(""); cancelRename() } }}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="flex h-9 w-full items-center justify-between rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs hover:bg-accent/30 transition-colors"
-        >
-          <span className={value ? "text-foreground" : "text-muted-foreground"}>{displayValue}</span>
-          <ChevronDown className="size-3.5 text-muted-foreground shrink-0" />
-        </button>
-      </PopoverTrigger>
-
-      <PopoverContent className="p-1 w-64" align="start">
-        <div className="max-h-56 overflow-y-auto">
-          {categories.length === 0 && (
-            <p className="px-3 py-2 text-xs text-muted-foreground">Aucune catégorie existante</p>
-          )}
-          {categories.map((cat) => (
-            <div key={cat}>
-              {renaming === cat ? (
-                <div className="flex items-center gap-1 px-2 py-1">
-                  <input
-                    ref={renameInputRef}
-                    value={renameDraft}
-                    onChange={(e) => setRenameDraft(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") confirmRename(); if (e.key === "Escape") cancelRename() }}
-                    className="flex-1 min-w-0 rounded border border-input bg-background px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <button type="button" onClick={confirmRename} className="rounded p-0.5 hover:bg-muted text-emerald-600"><Check className="size-3.5" /></button>
-                  <button type="button" onClick={cancelRename}  className="rounded p-0.5 hover:bg-muted text-muted-foreground"><X className="size-3.5" /></button>
-                </div>
-              ) : (
-                <div
-                  className="group flex items-center justify-between rounded px-2 py-1.5 text-sm cursor-pointer hover:bg-accent transition-colors"
-                  onClick={() => { onChange(cat); setOpen(false) }}
-                >
-                  <span className="flex items-center gap-2">
-                    {value === cat && <Check className="size-3 text-primary shrink-0" />}
-                    <span className={value === cat ? "font-medium" : ""}>{cat}</span>
-                  </span>
-                  <button
-                    type="button"
-                    title="Renommer cette catégorie"
-                    onClick={(e) => startRename(cat, e)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity rounded p-0.5 hover:bg-muted text-muted-foreground hover:text-foreground"
-                  >
-                    <Pencil className="size-3" />
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        <div className="border-t mt-1 pt-1">
-          {newMode ? (
-            <div className="flex items-center gap-1 px-2 py-1">
-              <input
-                ref={newInputRef}
-                placeholder="Nouvelle catégorie…"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") confirmNew(); if (e.key === "Escape") { setNewMode(false); setNewName("") } }}
-                className="flex-1 min-w-0 rounded border border-input bg-background px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
-              />
-              <button type="button" onClick={confirmNew} disabled={!newName.trim()} className="rounded p-0.5 hover:bg-muted text-emerald-600 disabled:opacity-40"><Check className="size-3.5" /></button>
-              <button type="button" onClick={() => { setNewMode(false); setNewName("") }} className="rounded p-0.5 hover:bg-muted text-muted-foreground"><X className="size-3.5" /></button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={startNew}
-              className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            >
-              <Plus className="size-3.5" /> Nouvelle catégorie
-            </button>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-// ── Devis (comparatif prestataires) ──────────────────────────────────────────
+// ── Devis ─────────────────────────────────────────────────────────────────────
 
 const EMPTY_QUOTE = { vendorName: "", price: "", notes: "", url: "", validUntil: "" }
 
@@ -571,6 +436,7 @@ function DevisSection({
 const EMPTY_FORM: Omit<BudgetItem, "id" | "sortOrder"> = {
   parentId:       null,
   sequenceId:     null,
+  poleId:         null,
   category:       "",
   label:          "",
   quantity:       null,
@@ -597,22 +463,21 @@ function fromFormStr(s: string): number | null {
 
 function ItemEditSheet({
   item,
-  defaultCategory = "",
+  defaultPoleId = null,
   defaultParentId = null,
-  categories,
+  poles,
   sequences,
   onClose,
 }: {
   item: BudgetItem | "new" | null
-  defaultCategory?: string
+  defaultPoleId?: string | null
   defaultParentId?: string | null
-  categories: string[]
+  poles: Pole[]
   sequences: { id: string; name: string; color?: string | null; sortOrder?: number }[]
   onClose: () => void
 }) {
   const create  = useCreateBudgetItem()
   const update  = useUpdateBudgetItem()
-  const rename  = useRenameBudgetCategory()
 
   const { data: allItems = [] } = useBudgetItems()
   const children = useMemo(
@@ -636,6 +501,7 @@ function ItemEditSheet({
     await createChild.mutateAsync({
       parentId:   (item as BudgetItem).id,
       sequenceId: null,
+      poleId:     form.poleId,
       category:   form.category,
       label:      childLabel.trim(),
       quantity:   null,
@@ -654,6 +520,7 @@ function ItemEditSheet({
       ? {
           parentId:       (item as BudgetItem).parentId,
           sequenceId:     item.sequenceId,
+          poleId:         item.poleId,
           category:       item.category,
           label:          item.label,
           quantity:       item.quantity,
@@ -667,7 +534,7 @@ function ItemEditSheet({
           itemType:       item.itemType,
           notes:          item.notes,
         }
-      : { ...EMPTY_FORM, category: defaultCategory, parentId: defaultParentId }
+      : { ...EMPTY_FORM, poleId: defaultPoleId, parentId: defaultParentId }
   )
 
   const [qty,   setQty]   = useState(toFormStr(form.quantity))
@@ -725,13 +592,14 @@ function ItemEditSheet({
               />
             )}
             <div className="grid grid-cols-2 gap-3">
-              {field("Catégorie",
-                <CategoryCombobox
-                  value={form.category}
-                  categories={categories}
-                  onChange={(v) => setForm((f) => ({ ...f, category: v }))}
-                  onRename={(old, nw) => rename.mutateAsync({ oldName: old, newName: nw })}
-                />
+              {field("Pôle",
+                <Select value={form.poleId ?? NONE} onValueChange={(v) => setForm((f) => ({ ...f, poleId: v === NONE ? null : v }))}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>— Sans pôle —</SelectItem>
+                    {poles.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               )}
               {field("Séquence",
                 <Select value={form.sequenceId ?? NONE} onValueChange={(v) => setForm((f) => ({ ...f, sequenceId: v === NONE ? null : v }))}>
@@ -901,10 +769,12 @@ function ItemEditSheet({
 function ImportCsvDialog({
   open,
   sequences,
+  poles,
   onClose,
 }: {
   open: boolean
   sequences: { id: string; name: string; color?: string | null; sortOrder?: number }[]
+  poles: Pole[]
   onClose: () => void
 }) {
   const importItems = useImportBudgetItems()
@@ -945,7 +815,7 @@ function ImportCsvDialog({
 
   async function handleConfirm() {
     if (!parsed) return
-    const items = parsed.map((r) => ({ ...r, sequenceId: seqId === NONE ? null : seqId }))
+    const items = parsed.map((r) => ({ ...r, sequenceId: seqId === NONE ? null : seqId, poleId: poleIdForCategory(r.category, poles) }))
     try {
       await importItems.mutateAsync(items)
       toast.success(`${items.length} ligne${items.length > 1 ? "s" : ""} importée${items.length > 1 ? "s" : ""}.`)
@@ -1007,7 +877,7 @@ function ImportCsvDialog({
                 <table className="w-full text-xs">
                   <thead className="bg-muted/50">
                     <tr>
-                      {["Poste","Catégorie","Estimé","Payé","Compte"].map((h) => (
+                      {["Poste","Catégorie → pôle","Estimé","Payé","Compte"].map((h) => (
                         <th key={h} className="px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -1016,7 +886,9 @@ function ImportCsvDialog({
                     {parsed.slice(0, 30).map((row, i) => (
                       <tr key={i} className="hover:bg-muted/20">
                         <td className="px-3 py-1.5 font-medium max-w-[200px] truncate" title={row.label}>{row.label}</td>
-                        <td className="px-3 py-1.5 text-muted-foreground">{row.category || "—"}</td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {row.category || "—"} → {poles.find((p) => p.id === poleIdForCategory(row.category, poles))?.name ?? "Sans pôle"}
+                        </td>
                         <td className="px-3 py-1.5 tabular-nums">{row.estimatedTotal != null ? fmt(row.estimatedTotal) : "—"}</td>
                         <td className="px-3 py-1.5 tabular-nums">{row.actualTotal   != null ? fmt(row.actualTotal)   : "—"}</td>
                         <td className="px-3 py-1.5 text-muted-foreground">{row.account ?? "—"}</td>
@@ -1109,10 +981,11 @@ function BudgetSummary({ items, childrenMap }: { items: BudgetItem[]; childrenMa
   )
 }
 
-// ── Tableau par catégorie ─────────────────────────────────────────────────────
+// ── Tableau par pôle (sous-regroupé par séquence) ───────────────────────────────
 
-function CategorySection({
-  category,
+function PoleSection({
+  title,
+  poleId,
   items,
   childrenMap,
   sequences,
@@ -1121,9 +994,10 @@ function CategorySection({
   onEdit,
   onDelete,
   onAddSubItem,
-  onAddInCategory,
+  onAddInPole,
 }: {
-  category: string
+  title: string
+  poleId: string | null
   items: BudgetItem[]
   childrenMap: Map<string, BudgetItem[]>
   sequences: { id: string; name: string; color?: string | null; sortOrder?: number }[]
@@ -1131,8 +1005,8 @@ function CategorySection({
   visibleCols: Set<ColKey>
   onEdit: (item: BudgetItem) => void
   onDelete: (id: string) => void
-  onAddSubItem: (parentId: string, category: string) => void
-  onAddInCategory: (category: string) => void
+  onAddSubItem: (parentId: string, poleId: string | null) => void
+  onAddInPole: (poleId: string | null) => void
 }) {
   const [open,         setOpen]         = useState(true)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
@@ -1218,7 +1092,7 @@ function CategorySection({
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
-      {/* En-tête catégorie */}
+      {/* En-tête du pôle */}
       <div className="flex items-center justify-between px-4 py-3 bg-muted/30">
         <button
           type="button"
@@ -1226,7 +1100,7 @@ function CategorySection({
           className="flex items-center gap-3 hover:opacity-70 transition-opacity text-left"
         >
           <span className={`transition-transform ${open ? "rotate-90" : ""} text-muted-foreground text-xs`}>▶</span>
-          <span className="font-semibold text-sm">{category || "Sans catégorie"}</span>
+          <span className="font-semibold text-sm">{title}</span>
           <span className="text-xs text-muted-foreground">{sortedItems.length} ligne{sortedItems.length > 1 ? "s" : ""}</span>
         </button>
         <div className="flex items-center gap-4">
@@ -1271,7 +1145,7 @@ function CategorySection({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/30">
-                {sortedItems.map((item) => {
+                {sortedItems.map((item, index) => {
                   const kids     = (childrenMap.get(item.id) ?? []).slice().sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
                   const hasKids  = kids.length > 0
                   const expanded = expandedRows.has(item.id)
@@ -1358,7 +1232,7 @@ function CategorySection({
                                   className="rounded p-1 hover:bg-muted text-muted-foreground hover:text-foreground">
                                   <Copy className="size-3.5" />
                                 </button>
-                                <button type="button" title="Ajouter une sous-dépense" onClick={() => onAddSubItem(it.id, it.category)}
+                                <button type="button" title="Ajouter une sous-dépense" onClick={() => onAddSubItem(it.id, it.poleId)}
                                   className="rounded p-1 hover:bg-muted text-muted-foreground hover:text-foreground">
                                   <Plus className="size-3.5" />
                                 </button>
@@ -1376,8 +1250,28 @@ function CategorySection({
                     )
                   }
 
+                  // Nouvelle séquence : intertitre avec ses sous-totaux.
+                  const newSequence = index === 0 || sortedItems[index - 1].sequenceId !== item.sequenceId
+                  const seqItems = newSequence ? sortedItems.filter((i) => i.sequenceId === item.sequenceId) : []
+                  const seq = item.sequenceId ? seqById.get(item.sequenceId) : undefined
                   return (
                     <React.Fragment key={item.id}>
+                      {newSequence && (
+                        <tr className="bg-muted/40">
+                          <td colSpan={6 + visibleCols.size} className="px-4 py-1.5">
+                            <div className="flex items-center justify-between gap-3 text-xs">
+                              <span className="font-semibold">
+                                {seq ? <SequenceName sequence={seq} /> : <span className="text-muted-foreground">Sans séquence</span>}
+                                <span className="ml-2 font-normal text-muted-foreground">{seqItems.length} poste{seqItems.length > 1 ? "s" : ""}</span>
+                              </span>
+                              <span className="flex gap-4 tabular-nums text-muted-foreground">
+                                <span>Estimé <b className="text-foreground">{fmt(seqItems.reduce((t, i) => t + rollupEstim(i), 0))}</b></span>
+                                <span>Réel <b className="text-foreground">{fmt(seqItems.reduce((t, i) => t + rollupReel(i), 0))}</b></span>
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                       {renderRow(item, false)}
                       {hasKids && expanded && kids.map((child) => renderRow(child, true))}
                     </React.Fragment>
@@ -1390,10 +1284,10 @@ function CategorySection({
           <div className="border-t border-border/30 px-4 py-2">
             <button
               type="button"
-              onClick={() => onAddInCategory(category)}
+              onClick={() => onAddInPole(poleId)}
               className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
-              <Plus className="size-3.5" /> Ajouter dans "{category || "Sans catégorie"}"
+              <Plus className="size-3.5" /> Ajouter dans "{title}"
             </button>
           </div>
         </>
@@ -1408,14 +1302,16 @@ export function BudgetPage() {
   const { data: items       = [], isLoading: lItems } = useBudgetItems()
   const { data: sequences   = [], isLoading: lSeq }  = useEventSequences()
   const { data: quoteStatus = {} }                   = useBudgetQuoteStatus()
+  const { data: poles       = [] }                   = usePoles()
   const deleteItem = useDeleteBudgetItem()
+  const sortedPoles = useMemo(() => [...poles].sort((a, b) => a.sortOrder - b.sortOrder), [poles])
 
   const sortedSeq = useMemo(() => [...sequences].sort((a, b) => a.sortOrder - b.sortOrder), [sequences])
 
   const [seqFilter,   setSeqFilter]   = useState<string | null>(null)
-  const [catFilter,   setCatFilter]   = useState<string | null>(null)
+  const [poleFilter,  setPoleFilter]  = useState<string | null>(null)
   const [editItem,    setEditItem]    = useState<BudgetItem | "new" | null>(null)
-  const [newCategory, setNewCategory] = useState<string>("")
+  const [newPoleId,   setNewPoleId]   = useState<string | null>(null)
   const [newParentId, setNewParentId] = useState<string | null>(null)
   const [importOpen,  setImportOpen]  = useState(false)
   const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(new Set())
@@ -1440,31 +1336,40 @@ export function BudgetPage() {
     return map
   }, [items])
 
-  // Catégories disponibles (top-level uniquement)
-  const categories = useMemo(
-    () => [...new Set(items.filter((i) => !i.parentId).map((i) => i.category || "Sans catégorie"))].sort(),
-    [items]
-  )
+  // Pôles ayant au moins une ligne (filtre), dans l'ordre des missions ; « Sans pôle » en dernier.
+  const NO_POLE = "__sans_pole__"
+  const usedPoles = useMemo(() => {
+    const used = new Set(items.filter((i) => !i.parentId).map((i) => i.poleId ?? NO_POLE))
+    return [
+      ...sortedPoles.filter((p) => used.has(p.id)).map((p) => ({ id: p.id, name: p.name })),
+      ...(used.has(NO_POLE) ? [{ id: NO_POLE, name: "Sans pôle" }] : []),
+    ]
+  }, [items, sortedPoles])
 
   // Filtre (top-level seulement)
   const filtered = useMemo(() => {
     let list = items.filter((i) => !i.parentId)
     if (seqFilter) list = list.filter((i) => i.sequenceId === seqFilter)
-    if (catFilter) list = list.filter((i) => (i.category || "Sans catégorie") === catFilter)
+    if (poleFilter) list = list.filter((i) => (i.poleId ?? NO_POLE) === poleFilter)
     return list
-  }, [items, seqFilter, catFilter])
+  }, [items, seqFilter, poleFilter])
 
-  // Groupement par catégorie
+  // Groupement par pôle, dans l'ordre des pôles des missions ; « Sans pôle » en dernier.
   const grouped = useMemo(() => {
     const map = new Map<string, BudgetItem[]>()
     for (const item of filtered) {
-      const cat = item.category || "Sans catégorie"
-      const list = map.get(cat) ?? []
-      list.push(item)
-      map.set(cat, list)
+      const key = item.poleId ?? NO_POLE
+      map.set(key, [...(map.get(key) ?? []), item])
     }
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b, "fr"))
-  }, [filtered])
+    const order = new Map(sortedPoles.map((p, i) => [p.id, i]))
+    return [...map.entries()]
+      .sort(([a], [b]) => (order.get(a) ?? Infinity) - (order.get(b) ?? Infinity))
+      .map(([id, list]) => ({
+        poleId: id === NO_POLE ? null : id,
+        title: id === NO_POLE ? "Sans pôle" : sortedPoles.find((p) => p.id === id)?.name ?? "Pôle inconnu",
+        items: list,
+      }))
+  }, [filtered, sortedPoles])
 
   async function handleDelete(id: string) {
     if (!confirm("Supprimer cette ligne ?")) return
@@ -1476,15 +1381,15 @@ export function BudgetPage() {
     }
   }
 
-  function handleAddInCategory(cat: string) {
+  function handleAddInPole(poleId: string | null) {
     setNewParentId(null)
-    setNewCategory(cat)
+    setNewPoleId(poleId)
     setEditItem("new")
   }
 
-  function handleAddSubItem(parentId: string, category: string) {
+  function handleAddSubItem(parentId: string, poleId: string | null) {
     setNewParentId(parentId)
-    setNewCategory(category)
+    setNewPoleId(poleId)
     setEditItem("new")
   }
 
@@ -1506,7 +1411,7 @@ export function BudgetPage() {
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               <FileUp className="size-4 mr-1.5" /> Importer CSV
             </Button>
-            <Button size="sm" onClick={() => { setNewCategory(""); setEditItem("new") }}>
+            <Button size="sm" onClick={() => { setNewPoleId(null); setEditItem("new") }}>
               <Plus className="size-4 mr-1.5" /> Ajouter
             </Button>
           </div>
@@ -1547,18 +1452,18 @@ export function BudgetPage() {
           })}
         </div>
 
-        {/* Catégories */}
-        {categories.length > 1 && (
+        {/* Pôles */}
+        {usedPoles.length > 1 && (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-muted-foreground font-medium">Catégorie :</span>
-            <button onClick={() => setCatFilter(null)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${catFilter == null ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-foreground/30"}`}>
-              Toutes
+            <span className="text-xs text-muted-foreground font-medium">Pôle :</span>
+            <button onClick={() => setPoleFilter(null)}
+              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${poleFilter == null ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-foreground/30"}`}>
+              Tous
             </button>
-            {categories.map((cat) => (
-              <button key={cat} onClick={() => setCatFilter(cat === catFilter ? null : cat)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${catFilter === cat ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-foreground/30"}`}>
-                {cat}
+            {usedPoles.map((p) => (
+              <button key={p.id} onClick={() => setPoleFilter(p.id === poleFilter ? null : p.id)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${poleFilter === p.id ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-foreground/30"}`}>
+                {p.name}
               </button>
             ))}
           </div>
@@ -1573,11 +1478,12 @@ export function BudgetPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {grouped.map(([cat, catItems]) => (
-            <CategorySection
-              key={cat}
-              category={cat}
-              items={catItems}
+          {grouped.map((g) => (
+            <PoleSection
+              key={g.poleId ?? "sans-pole"}
+              title={g.title}
+              poleId={g.poleId}
+              items={g.items}
               childrenMap={childrenMap}
               sequences={sortedSeq}
               quoteStatus={quoteStatus}
@@ -1585,7 +1491,7 @@ export function BudgetPage() {
               onEdit={setEditItem}
               onDelete={handleDelete}
               onAddSubItem={handleAddSubItem}
-              onAddInCategory={handleAddInCategory}
+              onAddInPole={handleAddInPole}
             />
           ))}
         </div>
@@ -1593,11 +1499,11 @@ export function BudgetPage() {
 
       {/* Sheet édition */}
       <ItemEditSheet
-        key={editItem === null ? "closed" : editItem === "new" ? `new-${newParentId}-${newCategory}` : editItem.id}
+        key={editItem === null ? "closed" : editItem === "new" ? `new-${newParentId}-${newPoleId}` : editItem.id}
         item={editItem}
-        defaultCategory={newCategory}
+        defaultPoleId={newPoleId}
         defaultParentId={newParentId}
-        categories={categories.filter((c) => c !== "Sans catégorie")}
+        poles={sortedPoles}
         sequences={sortedSeq}
         onClose={() => { setEditItem(null); setNewParentId(null) }}
       />
@@ -1606,6 +1512,7 @@ export function BudgetPage() {
       <ImportCsvDialog
         open={importOpen}
         sequences={sortedSeq}
+        poles={sortedPoles}
         onClose={() => setImportOpen(false)}
       />
     </div>

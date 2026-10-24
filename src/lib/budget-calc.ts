@@ -97,12 +97,12 @@ export class BudgetModel {
     return { estimated, real: item.actualTotal, paid: sum(own.map((p) => p.amount)), hasPaidDeposit: own.some((p) => p.kind === "acompte") }
   }
 
-  /** Chiffres d'un poste, éventuellement limités aux sous-postes d'une séquence. */
-  poste(poste: BudgetItem, sequenceId?: string | null): LineFigures & { depositRequired: boolean } {
+  /** Chiffres d'un poste, éventuellement limités aux sous-postes d'une séquence et/ou filtrés. */
+  poste(poste: BudgetItem, sequenceId?: string | null, keep?: (line: BudgetItem) => boolean): LineFigures & { depositRequired: boolean } {
     const kids = this.children(poste.id)
-    const leaves = kids.length
+    const leaves = (kids.length
       ? (sequenceId === undefined ? kids : kids.filter((k) => k.sequenceId === sequenceId))
-      : [poste]
+      : [poste]).filter((l) => !keep || keep(l))
     const figures = leaves.map((l) => this.line(l))
     // Une facture commune à plusieurs sous-postes passe par un devis : le poste n'a pas d'échéancier propre.
     const paid = sum(figures.map((f) => f.paid))
@@ -157,4 +157,33 @@ export function parseAmount(s: string): number | null {
 
 export function amountInput(n: number | null | undefined): string {
   return n == null ? "" : String(n).replace(".", ",")
+}
+
+// ── Priorité MoSCoW ─────────────────────────────────────────────────────────
+
+export const PRIORITIES = ["must", "should", "could"] as const
+
+export const PRIORITY_LABELS: Record<(typeof PRIORITIES)[number], string> = {
+  must: "Must have",
+  should: "Should have",
+  could: "Could have",
+}
+
+export const PRIORITY_SHORT: Record<(typeof PRIORITIES)[number], string> = { must: "Must", should: "Should", could: "Could" }
+
+export const PRIORITY_HINTS: Record<(typeof PRIORITIES)[number], string> = {
+  must: "Indispensable : le mariage ne se fait pas sans.",
+  should: "Important, mais on pourrait s'en passer.",
+  could: "Souhaitable, à garder si le budget le permet.",
+}
+
+/** Couleurs : bordeaux (indispensable) → vert → or (souhaitable). */
+export const PRIORITY_COLORS: Record<(typeof PRIORITIES)[number], string> = { must: "#7a272c", should: "#3f6f48", could: "#c08a3e" }
+
+/** Priorité effective d'une ligne : la sienne, sinon celle de son poste. */
+export function effectivePriority(model: BudgetModel, item: { priority: string | null; parentId: string | null }) {
+  const own = item.priority as (typeof PRIORITIES)[number] | null
+  if (own) return own
+  const parent = item.parentId ? model.itemsById.get(item.parentId) : undefined
+  return (parent?.priority as (typeof PRIORITIES)[number] | null | undefined) ?? null
 }

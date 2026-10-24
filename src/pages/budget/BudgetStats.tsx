@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react"
 import { BarChart3, ChevronDown } from "lucide-react"
 
-import { fmt, fmtCompact, type BudgetModel } from "@/lib/budget-calc"
+import {
+  PRIORITIES, PRIORITY_COLORS, PRIORITY_LABELS, effectivePriority, fmt, fmtCompact, type BudgetModel,
+} from "@/lib/budget-calc"
 import { sequenceColor } from "@/lib/sequence-colors"
 import { cn } from "@/lib/utils"
 import type { BudgetItem } from "@/services/supabase/budget"
@@ -37,7 +39,7 @@ export function BudgetStats({ items, model, poles, sequences }: {
     const lines = items.filter((i) => i.parentId || model.children(i.id).length === 0).map((i) => {
       const top = i.parentId ? model.itemsById.get(i.parentId) : i
       const f = model.line(i)
-      return { item: i, poleId: top?.poleId ?? null, sequenceId: i.sequenceId, posteLabel: top?.label ?? i.label, ...f }
+      return { item: i, poleId: top?.poleId ?? null, sequenceId: i.sequenceId, posteLabel: top?.label ?? i.label, priority: effectivePriority(model, i), ...f }
     })
 
     const poleColor = new Map(poles.map((p, i) => [p.id, POLE_PALETTE[i % POLE_PALETTE.length]]))
@@ -58,6 +60,16 @@ export function BudgetStats({ items, model, poles, sequences }: {
       c.estimated += l.estimated; c.real += l.real ?? 0
       cell.set(`${pk}|${sk}`, c)
     }
+    // Par priorité MoSCoW (« Non priorisé » en dernier).
+    const prioBuckets: Bucket[] = [...PRIORITIES, null].map((p) => {
+      const ls = lines.filter((l) => l.priority === p)
+      return {
+        key: p ?? NO_KEY, label: p ? PRIORITY_LABELS[p] : "Non priorisé", color: p ? PRIORITY_COLORS[p] : "#9ca3af",
+        estimated: ls.reduce((t, l) => t + l.estimated, 0), real: ls.reduce((t, l) => t + (l.real ?? 0), 0),
+      }
+    }).filter((b) => b.estimated > 0 || b.real > 0)
+    // Marge de manœuvre : estimé des Could / Should pas encore engagés (ni devis retenu ni réel).
+    const flexible = (p: string) => lines.filter((l) => l.priority === p && l.real == null).reduce((t, l) => t + l.estimated, 0)
     const poleOrder = new Map(poles.map((p, i) => [p.id, i]))
     const seqOrder = new Map(sequences.map((s, i) => [s.id, i]))
     const poleBuckets = [...byPole.values()].sort((a, b) => (poleOrder.get(a.key) ?? 99) - (poleOrder.get(b.key) ?? 99))
@@ -96,7 +108,7 @@ export function BudgetStats({ items, model, poles, sequences }: {
     const late = upcoming.filter((u) => u.date < today)
     const in30 = upcoming.filter((u) => u.date >= today && u.date <= addDays(today, 30))
 
-    return { poleBuckets, seqBuckets, cell, estimated, real, paid, due, overruns, undecided, pendingDevis, depositsDue, upcoming, late, in30, lineCount: lines.length }
+    return { prioBuckets, flexibleCould: flexible("could"), flexibleShould: flexible("should"), poleBuckets, seqBuckets, cell, estimated, real, paid, due, overruns, undecided, pendingDevis, depositsDue, upcoming, late, in30, lineCount: lines.length }
   }, [items, model, poles, sequences])
 
   const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
@@ -132,6 +144,31 @@ export function BudgetStats({ items, model, poles, sequences }: {
             <Metric label="Acomptes à verser" value={String(stats.depositsDue.length)} sub="lignes avec acompte requis non versé"
               tone={stats.depositsDue.length ? "warn" : "ok"} />
             <Metric label="Lignes de budget" value={String(stats.lineCount)} sub={`${stats.poleBuckets.length} pôles · ${stats.seqBuckets.length} séquences`} />
+          </div>
+
+          {/* ── Priorités MoSCoW ── */}
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {stats.prioBuckets.map((b) => (
+                <div key={b.key} className="space-y-1 rounded-lg border p-3" style={{ borderColor: `color-mix(in srgb, ${b.color} 35%, transparent)` }}>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: b.color }}>{b.label}</p>
+                  <p className="text-xl font-bold tabular-nums">{fmt(b.estimated)}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {pct(b.estimated, stats.estimated)} % du budget · réel {fmt(b.real)}
+                  </p>
+                </div>
+              ))}
+            </div>
+            {(stats.flexibleCould > 0 || stats.flexibleShould > 0) && (
+              <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                Marge de manœuvre si le budget doit baisser : <b className="text-foreground">{fmt(stats.flexibleCould)}</b> de « Could have »
+                et <b className="text-foreground">{fmt(stats.flexibleShould)}</b> de « Should have » ne sont pas encore engagés.
+              </p>
+            )}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Chart title="Par priorité (estimé et réel)"><Bars buckets={stats.prioBuckets} /></Chart>
+              <Chart title="Part de chaque priorité"><Donut buckets={stats.prioBuckets} basis={basis} /></Chart>
+            </div>
           </div>
 
           {/* ── Barres par pôle et par séquence ── */}

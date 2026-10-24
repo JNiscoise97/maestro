@@ -2,7 +2,10 @@ import { useState } from "react"
 import { ChevronRight, Plus } from "lucide-react"
 
 import { SequenceName } from "@/components/shared/SequenceName"
-import { PAYMENT_STATUS_LABELS, fmt, paymentStatus, type BudgetModel, type PaymentStatus } from "@/lib/budget-calc"
+import {
+  PAYMENT_STATUS_LABELS, PRIORITY_COLORS, PRIORITY_LABELS, PRIORITY_SHORT, effectivePriority, fmt, paymentStatus,
+  type BudgetModel, type PaymentStatus,
+} from "@/lib/budget-calc"
 import type { BudgetItem } from "@/services/supabase/budget"
 
 type Seq = { id: string; name: string; color?: string | null; sortOrder?: number }
@@ -22,8 +25,13 @@ const STATUS_CLASS: Record<PaymentStatus, string> = {
  * plusieurs séquences apparaît sous chacune, avec seulement les sous-postes de cette séquence ;
  * les sous-totaux par séquence restent ainsi exacts. Un clic ouvre la fenêtre complète du poste.
  */
-export function PoleTable({ title, postes, model, sequences, seqFilter, visibleCols, onOpen, onAdd }: {
+export function PoleTable({ title, postes, model, sequences, seqFilter, priorityFilter, visibleCols, open, onToggle, onOpen, onAdd }: {
   title: string
+  /** Filtre de priorité : seules les lignes de cette priorité comptent (« none » = non priorisées). */
+  priorityFilter: string | null
+  /** Pôle déplié (piloté par la page : « Tout déplier / Tout replier »). */
+  open: boolean
+  onToggle: () => void
   postes: BudgetItem[]
   model: BudgetModel
   sequences: Seq[]
@@ -32,16 +40,19 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, visibleC
   onOpen: (poste: BudgetItem) => void
   onAdd: (sequenceId: string | null) => void
 }) {
-  const [open, setOpen] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   // Séquences présentes dans ce pôle (ordre des séquences, « Sans séquence » en dernier).
   const order = new Map(sequences.map((s, i) => [s.id, i]))
-  const seqIds = [...new Set(postes.flatMap((p) => model.sequencesOf(p)))]
+  const keep = priorityFilter ? (l: BudgetItem) => (effectivePriority(model, l) ?? "none") === priorityFilter : undefined
+  // Séquences d'un poste qui ont au moins une ligne retenue par le filtre de priorité.
+  const seqsOf = (p: BudgetItem) => [...new Set(model.leaves(p).filter((l) => !keep || keep(l))
+    .map((l) => (model.children(p.id).length ? l.sequenceId : p.sequenceId)))]
+  const seqIds = [...new Set(postes.flatMap(seqsOf))]
     .filter((id) => !seqFilter || id === seqFilter)
     .sort((a, b) => (a === null ? Infinity : order.get(a) ?? Infinity) - (b === null ? Infinity : order.get(b) ?? Infinity))
 
-  const totals = postes.map((p) => model.poste(p))
+  const totals = postes.map((p) => model.poste(p, undefined, keep))
   const sumOf = (k: "estimated" | "paid") => totals.reduce((t, f) => t + f[k], 0)
   const realSum = totals.reduce((t, f) => t + (f.real ?? 0), 0)
   const cols = 5 + visibleCols.size
@@ -49,7 +60,7 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, visibleC
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
       <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/30 px-4 py-3">
-        <button type="button" onClick={() => setOpen((o) => !o)} className="flex items-center gap-3 text-left transition-opacity hover:opacity-70">
+        <button type="button" onClick={onToggle} aria-expanded={open} className="flex items-center gap-3 text-left transition-opacity hover:opacity-70">
           <span className={`text-xs text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
           <span className="text-sm font-semibold">{title}</span>
           <span className="text-xs text-muted-foreground">{postes.length} poste{postes.length > 1 ? "s" : ""}</span>
@@ -80,9 +91,9 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, visibleC
             <tbody className="divide-y divide-border/30">
               {seqIds.map((seqId) => {
                 const inSeq = postes
-                  .filter((p) => model.sequencesOf(p).includes(seqId))
+                  .filter((p) => seqsOf(p).includes(seqId))
                   .sort((a, b) => a.label.localeCompare(b.label, "fr"))
-                const figs = inSeq.map((p) => model.poste(p, model.children(p.id).length ? seqId : undefined))
+                const figs = inSeq.map((p) => model.poste(p, model.children(p.id).length ? seqId : undefined, keep))
                 const seq = seqId ? sequences.find((s) => s.id === seqId) : undefined
                 return [
                   <tr key={`seq-${seqId}`} className="bg-muted/40">
@@ -102,7 +113,7 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, visibleC
                     </td>
                   </tr>,
                   ...inSeq.flatMap((p, i) => {
-                    const kids = model.children(p.id).filter((k) => k.sequenceId === seqId)
+                    const kids = model.children(p.id).filter((k) => k.sequenceId === seqId && (!keep || keep(k)))
                     const key = `${p.id}:${seqId}`
                     const isOpen = expanded.has(key)
                     const f = figs[i]
@@ -121,6 +132,7 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, visibleC
                               </button>
                             ) : <span className="w-3.5 shrink-0" />}
                             <span className="truncate" title={p.label}>{p.label}</span>
+                            <PriorityBadges priorities={(kids.length ? kids : [p]).map((l) => effectivePriority(model, l))} />
                             {kids.length > 0 && <span className="shrink-0 text-[11px] font-normal text-muted-foreground">{kids.length} sous-poste{kids.length > 1 ? "s" : ""}</span>}
                             {model.sequencesOf(p).length > 1 && <span className="shrink-0 rounded bg-muted px-1 text-[10px] font-normal text-muted-foreground" title="Ce poste a des sous-postes sur d'autres séquences">+ autres séq.</span>}
                           </div>
@@ -142,7 +154,7 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, visibleC
                         const kf = model.line(k)
                         rows.push(
                           <tr key={`${key}:${k.id}`} className="cursor-pointer bg-muted/10 text-[13px] hover:bg-muted/20" onClick={() => onOpen(p)}>
-                            <td className="px-4 py-2 pl-12 text-muted-foreground"><span className="mr-1 text-muted-foreground/40">└</span>{k.label}</td>
+                            <td className="px-4 py-2 pl-12 text-muted-foreground"><span className="mr-1 text-muted-foreground/40">└</span>{k.label} <PriorityBadges priorities={[effectivePriority(model, k)]} /></td>
                             {visibleCols.has("qty") && <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{k.quantity ?? "—"}</td>}
                             {visibleCols.has("pu") && <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{fmt(k.unitPrice)}</td>}
                             <td className="px-3 py-2 text-right tabular-nums">{fmt(kf.estimated)}</td>
@@ -164,6 +176,21 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, visibleC
         </div>
       )}
     </div>
+  )
+}
+
+/** Pastilles MoSCoW (une par priorité présente). */
+function PriorityBadges({ priorities }: { priorities: (keyof typeof PRIORITY_LABELS | null)[] }) {
+  const set = [...new Set(priorities.filter((p): p is keyof typeof PRIORITY_LABELS => !!p))]
+  return (
+    <>
+      {set.map((p) => (
+        <span key={p} title={PRIORITY_LABELS[p]} className="shrink-0 rounded px-1 text-[10px] font-semibold"
+          style={{ color: PRIORITY_COLORS[p], background: `color-mix(in srgb, ${PRIORITY_COLORS[p]} 12%, transparent)` }}>
+          {PRIORITY_SHORT[p]}
+        </span>
+      ))}
+    </>
   )
 }
 

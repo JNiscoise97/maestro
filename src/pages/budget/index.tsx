@@ -16,7 +16,7 @@ import {
   useBudgetDevis, useBudgetDevisLines, useBudgetItems, useBudgetPayments, useImportBudgetItems,
 } from "@/hooks/queries/use-budget"
 import { usePoles } from "@/hooks/queries/use-poles"
-import { BudgetModel, fmt, fmtCompact } from "@/lib/budget-calc"
+import { BudgetModel, PRIORITIES, PRIORITY_LABELS, effectivePriority, fmt, fmtCompact } from "@/lib/budget-calc"
 import { poleIdForCategory } from "@/lib/budget-poles"
 import type { BudgetItem } from "@/services/supabase/budget"
 import type { Pole } from "@/types/domain"
@@ -143,6 +143,7 @@ function parseCsvFiancailles(lines: string[]): ParsedRow[] {
       category:       currentCategory,
       poleId:         null,
       depositRequired: false,
+      priority:       null,
       label:          r.label,
       quantity:       null,
       unitPrice:      null,
@@ -194,6 +195,7 @@ function parseCsvGeneric(lines: string[]): ParsedRow[] {
       category:       (iCat >= 0 ? cols[iCat]?.trim() : "") || "",
       poleId:         null,
       depositRequired: false,
+      priority:       null,
       label,
       quantity:       iQty    >= 0 ? parseFrNumber(cols[iQty]    ?? "") : null,
       unitPrice:      iPU     >= 0 ? parseFrNumber(cols[iPU]     ?? "") : null,
@@ -454,9 +456,12 @@ export function BudgetPage() {
   const [tab, setTab] = useState<Tab>("postes")
   const [seqFilter, setSeqFilter] = useState<string | null>(null)
   const [poleFilter, setPoleFilter] = useState<string | null>(null)
+  const [priorityFilter, setPriorityFilter] = useState<string | null>(null)
   const [sheet, setSheet] = useState<{ poste: BudgetItem | "new"; poleId?: string | null; sequenceId?: string | null } | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [visibleCols, setVisibleCols] = useState<Set<OptionalCol>>(new Set())
+  // Pôles repliés (tous dépliés par défaut).
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   const NO_POLE = "__sans_pole__"
   const postes = useMemo(() => items.filter((i) => !i.parentId), [items])
@@ -464,7 +469,8 @@ export function BudgetPage() {
   // Postes filtrés : par pôle, et par séquence (un poste concerne une séquence via lui-même ou ses sous-postes).
   const filtered = postes.filter((p) =>
     (!poleFilter || (p.poleId ?? NO_POLE) === poleFilter)
-    && (!seqFilter || model.sequencesOf(p).includes(seqFilter)))
+    && (!seqFilter || model.sequencesOf(p).includes(seqFilter))
+    && (!priorityFilter || model.leaves(p).some((l) => (effectivePriority(model, l) ?? "none") === priorityFilter)))
 
   const usedPoles = [
     ...sortedPoles.filter((p) => postes.some((x) => x.poleId === p.id)).map((p) => ({ id: p.id, name: p.name })),
@@ -543,6 +549,15 @@ export function BudgetPage() {
               </div>
             )}
             <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Priorité :</span>
+              <button className={chip(priorityFilter == null)} onClick={() => setPriorityFilter(null)}>Toutes</button>
+              {[...PRIORITIES, "none" as const].map((p) => (
+                <button key={p} className={chip(priorityFilter === p)} onClick={() => setPriorityFilter(priorityFilter === p ? null : p)}>
+                  {p === "none" ? "Non priorisé" : PRIORITY_LABELS[p]}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">Colonnes :</span>
               {(Object.keys(COL_LABELS) as OptionalCol[]).map((key) => (
                 <button key={key} className={chip(visibleCols.has(key))} onClick={() => setVisibleCols((prev) => {
@@ -554,6 +569,16 @@ export function BudgetPage() {
             </div>
           </div>
 
+          {grouped.length > 1 && (
+            <div className="flex items-center gap-3 text-xs">
+              <button type="button" className="text-muted-foreground transition-colors hover:text-foreground"
+                onClick={() => setCollapsed(new Set())}>Tout déplier</button>
+              <span className="text-border">·</span>
+              <button type="button" className="text-muted-foreground transition-colors hover:text-foreground"
+                onClick={() => setCollapsed(new Set(grouped.map((g) => g.poleId ?? NO_POLE)))}>Tout replier</button>
+            </div>
+          )}
+
           {grouped.length === 0 ? (
             <div className="space-y-2 rounded-xl border border-dashed border-border py-16 text-center">
               <p className="text-sm text-muted-foreground">Aucun poste de dépense.</p>
@@ -563,7 +588,14 @@ export function BudgetPage() {
             <div className="space-y-3">
               {grouped.map((g) => (
                 <PoleTable key={g.poleId ?? "sans-pole"} title={g.title} postes={g.postes} model={model} sequences={sortedSeq}
-                  seqFilter={seqFilter} visibleCols={visibleCols}
+                  seqFilter={seqFilter} priorityFilter={priorityFilter} visibleCols={visibleCols}
+                  open={!collapsed.has(g.poleId ?? NO_POLE)}
+                  onToggle={() => setCollapsed((prev) => {
+                    const next = new Set(prev)
+                    const key = g.poleId ?? NO_POLE
+                    if (next.has(key)) next.delete(key); else next.add(key)
+                    return next
+                  })}
                   onOpen={(poste) => setSheet({ poste })}
                   onAdd={(sequenceId) => setSheet({ poste: "new", poleId: g.poleId, sequenceId })} />
               ))}

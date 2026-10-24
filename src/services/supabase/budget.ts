@@ -24,8 +24,12 @@ export type BudgetItem = {
   notes: string | null
   /** Un acompte est demandé pour cette ligne. */
   depositRequired: boolean
+  /** Priorité MoSCoW ; null sur un sous-poste = celle du poste. */
+  priority: Priority | null
   sortOrder: number
 }
+
+export type Priority = "must" | "should" | "could"
 
 export type BudgetQuote = {
   id: string
@@ -58,6 +62,7 @@ function fromRow(r: any): BudgetItem {
     itemType:       r.item_type,
     notes:          r.notes,
     depositRequired: r.deposit_required ?? false,
+    priority:       r.priority ?? null,
     sortOrder:      r.sort_order ?? 0,
   }
 }
@@ -134,6 +139,7 @@ export const budgetService = {
     if (patch.itemType       !== undefined) row.item_type       = patch.itemType
     if (patch.notes          !== undefined) row.notes           = patch.notes
     if (patch.depositRequired !== undefined) row.deposit_required = patch.depositRequired
+    if (patch.priority       !== undefined) row.priority        = patch.priority
     if (patch.sortOrder      !== undefined) row.sort_order      = patch.sortOrder
     if (Object.keys(row).length === 0) return
     const { error } = await db.from(tbl("budget_items")).update(row).eq("id", id)
@@ -358,6 +364,7 @@ export const budgetService = {
       parent_id: parentId, pole_id: poleId, sequence_id: d.sequenceId, label: d.label,
       quantity: d.quantity, unit_price: d.unitPrice, estimated_total: d.estimatedTotal, actual_total: d.actualTotal,
       vendor: d.vendor, account: d.account, origin: d.origin, notes: d.notes, deposit_required: d.depositRequired,
+      priority: d.priority,
     })
     const save = async (d: LineDraft, parentId: string | null): Promise<string> => {
       const row = fields(d, parentId, draft.poste.poleId)
@@ -475,6 +482,7 @@ export type LineDraft = {
   origin: string | null
   notes: string | null
   depositRequired: boolean
+  priority: Priority | null
   payments: PaymentDraft[]
 }
 

@@ -8,11 +8,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useDeletePoste, useSavePoste } from "@/hooks/queries/use-budget"
 import {
-  ACCOUNT_SUGGESTIONS, ORIGIN_SUGGESTIONS, PAYMENT_STATUS_LABELS, amountInput, fmt, parseAmount, paymentStatus,
-  type BudgetModel,
+  ACCOUNT_SUGGESTIONS, ORIGIN_SUGGESTIONS, PAYMENT_STATUS_LABELS, PRIORITIES, PRIORITY_COLORS, PRIORITY_HINTS,
+  PRIORITY_LABELS, amountInput, fmt, parseAmount, paymentStatus, type BudgetModel,
 } from "@/lib/budget-calc"
 import { cn } from "@/lib/utils"
-import type { BudgetDevis, BudgetItem, DevisPlan, DevisStatus, LineDraft, PaymentDraft } from "@/services/supabase/budget"
+import type { BudgetDevis, BudgetItem, DevisPlan, DevisStatus, LineDraft, PaymentDraft, Priority } from "@/services/supabase/budget"
 import type { Pole } from "@/types/domain"
 import { DevisSheet } from "./DevisSheet"
 import { PaymentsEditor } from "./PaymentsEditor"
@@ -24,7 +24,7 @@ type Line = LineDraft & { purchase: Purchase; links: DevisLink[] }
 type NewDevis = { ref: string; vendor: string; title: string; totalAmount: string; status: DevisStatus }
 
 const STEPS = [
-  { id: 1, title: "Quoi ?", hint: "Le nom du poste et son pôle." },
+  { id: 1, title: "Quoi ?", hint: "Le nom du poste, son pôle et sa priorité." },
   { id: 2, title: "Pour quelles séquences ?", hint: "Une seule séquence, ou plusieurs éléments répartis sur des séquences." },
   { id: 3, title: "Combien ?", hint: "L'estimation de chaque élément." },
   { id: 4, title: "Comment c'est acheté ?", hint: "Pas encore décidé, achat direct ou via un devis." },
@@ -48,7 +48,7 @@ function fromItem(model: BudgetModel, item: BudgetItem): Line {
     id: item.id, key: item.id, label: item.label, sequenceId: item.sequenceId,
     quantity: item.quantity, unitPrice: item.unitPrice, estimatedTotal: item.estimatedTotal, actualTotal: item.actualTotal,
     vendor: item.vendor, account: item.account, origin: item.origin, notes: item.notes,
-    depositRequired: item.depositRequired, payments,
+    depositRequired: item.depositRequired, priority: item.priority, payments,
     purchase: links.length ? "devis" : direct ? "direct" : "undecided", links,
   }
 }
@@ -56,7 +56,7 @@ function fromItem(model: BudgetModel, item: BudgetItem): Line {
 function emptyLine(sequenceId: string | null = null, label = ""): Line {
   return {
     key: newKey(), label, sequenceId, quantity: null, unitPrice: null, estimatedTotal: null, actualTotal: null,
-    vendor: null, account: null, origin: null, notes: null, depositRequired: false, payments: [],
+    vendor: null, account: null, origin: null, notes: null, depositRequired: false, priority: null, payments: [],
     purchase: "undecided", links: [],
   }
 }
@@ -208,6 +208,24 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
               {poles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </Field>
+          <div className="space-y-1">
+            <span className="block text-xs font-medium text-muted-foreground">Priorité</span>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {PRIORITIES.map((p) => (
+                <button key={p} type="button" aria-pressed={main.priority === p} onClick={() => setMain({ ...main, priority: p })}
+                  className={cn("rounded-lg border p-2 text-left transition-colors", main.priority === p ? "ring-1" : "border-border hover:border-foreground/30")}
+                  style={main.priority === p ? { borderColor: PRIORITY_COLORS[p], boxShadow: `0 0 0 1px ${PRIORITY_COLORS[p]}`, background: `color-mix(in srgb, ${PRIORITY_COLORS[p]} 8%, transparent)` } : undefined}>
+                  <span className="block text-sm font-semibold" style={{ color: PRIORITY_COLORS[p] }}>{PRIORITY_LABELS[p]}</span>
+                  <span className="block text-[11px] leading-snug text-muted-foreground">{PRIORITY_HINTS[p]}</span>
+                </button>
+              ))}
+              <button type="button" aria-pressed={main.priority === null} onClick={() => setMain({ ...main, priority: null })}
+                className={cn("rounded-lg border p-2 text-left text-sm transition-colors", main.priority === null ? "border-primary bg-primary/5" : "border-border hover:border-foreground/30")}>
+                <span className="block font-semibold">Pas encore priorisé</span>
+              </button>
+            </div>
+            {multiple && <span className="block text-[11px] text-muted-foreground">Chaque élément hérite de cette priorité, sauf si vous lui en donnez une autre à l'étape 3.</span>}
+          </div>
           <Field label="Notes (facultatif)">
             <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Idées, contraintes, contacts…" />
           </Field>
@@ -224,7 +242,7 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
             <Choice active={multiple} onClick={() => {
               if (!multiple && subs.length === 0) {
                 // Premier élément : il reprend ce qui était saisi sur le poste.
-                setSubs([{ ...main, key: newKey(), id: undefined, label: "", links: main.links }])
+                setSubs([{ ...main, key: newKey(), id: undefined, label: "", links: main.links, priority: null }])
               }
               setMultiple(true)
             }} title="Plusieurs éléments" text="Ex. « Fleurs » : bouquet de mariée (église), bouquets de table (réception)…" />
@@ -261,7 +279,21 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
           <div className="hidden grid-cols-[1fr_6rem_7rem_8rem] gap-2 px-1 text-[11px] font-medium text-muted-foreground sm:grid">
             <span>Élément</span><span>Quantité</span><span>Prix unitaire €</span><span>Estimé €</span>
           </div>
-          {lines.map((l) => <EstimateRow key={l.key} line={l} label={multiple ? l.label : name} sequences={sequences} onChange={(p) => setLine(l.key, p)} />)}
+          {lines.map((l) => (
+            <div key={l.key} className="space-y-1.5">
+              <EstimateRow line={l} label={multiple ? l.label : name} sequences={sequences} onChange={(p) => setLine(l.key, p)} />
+              {multiple && (
+                <label className="flex items-center gap-2 pl-1 text-xs text-muted-foreground">
+                  Priorité
+                  <select className="h-7 rounded-md border border-input bg-background px-1.5 text-xs text-foreground" value={l.priority ?? ""}
+                    onChange={(e) => setLine(l.key, { priority: (e.target.value || null) as Priority | null })}>
+                    <option value="">Comme le poste ({main.priority ? PRIORITY_LABELS[main.priority] : "non priorisé"})</option>
+                    {PRIORITIES.map((p) => <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>)}
+                  </select>
+                </label>
+              )}
+            </div>
+          ))}
           <p className="text-right text-sm tabular-nums">Total estimé <b>{fmt(lines.reduce((t, l) => t + (estimateOf(l) ?? 0), 0))}</b></p>
         </div>
       )
@@ -280,7 +312,7 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
           </p>
         </div>
       )
-      default: return <Recap name={name} pole={poles.find((p) => p.id === poleId)?.name ?? "Sans pôle"} lines={lines} multiple={multiple} sequences={sequences} devisLabel={devisLabel} />
+      default: return <Recap name={name} pole={poles.find((p) => p.id === poleId)?.name ?? "Sans pôle"} lines={lines} multiple={multiple} sequences={sequences} devisLabel={devisLabel} postePriority={main.priority} />
     }
   }
 
@@ -548,7 +580,8 @@ function PurchaseCard({ line, label, sequences, devisOptions, newDevis, devisLab
   )
 }
 
-function Recap({ name, pole, lines, multiple, sequences, devisLabel }: {
+function Recap({ name, pole, lines, multiple, sequences, devisLabel, postePriority }: {
+  postePriority: Priority | null
   name: string
   pole: string
   lines: Line[]
@@ -563,7 +596,7 @@ function Recap({ name, pole, lines, multiple, sequences, devisLabel }: {
     <div className="space-y-3">
       <div className="rounded-xl bg-muted/40 p-3">
         <p className="text-base font-semibold">{name}</p>
-        <p className="text-xs text-muted-foreground">{pole} · estimé {fmt(total)}</p>
+        <p className="text-xs text-muted-foreground">{pole} · estimé {fmt(total)} · {postePriority ? PRIORITY_LABELS[postePriority] : "non priorisé"}</p>
       </div>
       <ul className="divide-y divide-border rounded-xl border border-border">
         {lines.map((l) => (
@@ -572,7 +605,10 @@ function Recap({ name, pole, lines, multiple, sequences, devisLabel }: {
               <span className="font-medium">{multiple ? l.label : name}</span>
               <span className="tabular-nums">{fmt(estimateOf(l))}</span>
             </div>
-            <p className="text-xs text-muted-foreground">{sequences.find((s) => s.id === l.sequenceId)?.name ?? "Sans séquence"} · {mode(l)}</p>
+            <p className="text-xs text-muted-foreground">
+              {sequences.find((s) => s.id === l.sequenceId)?.name ?? "Sans séquence"} · {mode(l)}
+              {multiple && l.priority && ` · ${PRIORITY_LABELS[l.priority]}`}
+            </p>
           </li>
         ))}
       </ul>

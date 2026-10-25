@@ -20,7 +20,9 @@ type Invitation = { guest_id: string; sent_at: string; sent_by: string | null }
 type Column = "liste" | "lien" | "acces"
 
 type CardData =
-  | { kind: "guest"; id: string; guest: FiancaillesGuest; column: Column; invitation?: Invitation; member?: GalleryMember }
+  | { kind: "guest"; id: string; guest: FiancaillesGuest; column: Column; invitation?: Invitation; member?: GalleryMember
+      /** Lien reçu via le partenaire inséparable (lien envoyé à lui, ou accès déjà ouvert). */
+      viaPartner?: string }
   | { kind: "member"; id: string; member: GalleryMember; column: "acces" }
 
 const INVITATIONS_KEY = [...KEYS.admin, "invitations"]
@@ -73,13 +75,22 @@ export function GalleryAccessKanban() {
   const cards = useMemo(() => {
     const memberByGuest = new Map(members.filter((m) => m.guest_id).map((m) => [m.guest_id!, m]))
     const invitationByGuest = new Map(invitations.map((i) => [i.guest_id, i]))
+    const guestById = new Map(guests.map((g) => [g.id, g]))
     const out: CardData[] = guests
-      // Les « no-show » sortent de la liste, sauf s'ils ont déjà un accès à la galerie.
-      .filter((guest) => guest.rsvp_status !== "no_show" || memberByGuest.has(guest.id))
+      // Sortent de la liste, sauf s'ils ont déjà un accès : les « no-show » et les mineurs
+      // (même règle que les communications : enfant, ou tranche d'âge qui finit avant 18 ans).
+      .filter((guest) => (guest.rsvp_status !== "no_show" && !guest.minor) || memberByGuest.has(guest.id))
       .map((guest) => {
         const member = memberByGuest.get(guest.id)
         const invitation = invitationByGuest.get(guest.id)
-        return { kind: "guest", id: guest.id, guest, member, invitation, column: member ? "acces" : invitation ? "lien" : "liste" }
+        // Couple inséparable : le lien envoyé à l'un (ou son accès ouvert) vaut pour l'autre.
+        const partner = guest.paired_with_id ? guestById.get(guest.paired_with_id) : undefined
+        const partnerReached = !!partner && (invitationByGuest.has(partner.id) || memberByGuest.has(partner.id))
+        const viaPartner = !member && !invitation && partnerReached ? guestLabel(partner!) : undefined
+        return {
+          kind: "guest", id: guest.id, guest, member, invitation, viaPartner,
+          column: member ? "acces" : invitation || viaPartner ? "lien" : "liste",
+        }
       })
     // Personnes hors liste ayant un accès (demande autorisée sans lien avec un invité).
     for (const m of members) {
@@ -110,6 +121,10 @@ export function GalleryAccessKanban() {
     const target = e.over?.id as Column | undefined
     if (!card || card.kind !== "guest" || !target || target === card.column) return
     if (target === "acces") { toast.info("La colonne Accès se remplit toute seule quand l'invité obtient son accès."); return }
+    if (target === "liste" && card.viaPartner) {
+      toast.info(`Lien reçu via ${card.viaPartner} : remettez ${card.viaPartner} dans la liste pour l'annuler.`)
+      return
+    }
     toggleInvitation.mutate({ guestId: card.guest.id, sent: target === "lien" })
   }
 
@@ -160,8 +175,8 @@ export function GalleryAccessKanban() {
 
           <KanbanColumn id="lien" title="Lien envoyé" hint="Glissez une carte ici quand vous avez envoyé le lien" count={byColumn("lien").length} accent="border-t-dore">
             {byColumn("lien").map((c) => (
-              <KanbanCard key={c.id} card={c} draggable
-                action={c.kind === "guest" && (
+              <KanbanCard key={c.id} card={c} draggable={!(c.kind === "guest" && c.viaPartner)}
+                action={c.kind === "guest" && !c.viaPartner && (
                   <button type="button" title="Remettre dans la liste" aria-label="Remettre dans la liste"
                     onClick={() => toggleInvitation.mutate({ guestId: c.guest.id, sent: false })}
                     className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
@@ -214,7 +229,9 @@ function KanbanCard({ card, draggable = false, action }: { card: CardData; dragg
   const name = card.kind === "guest" ? guestLabel(card.guest) : `${card.member.first_name} ${card.member.last_name}`.trim() || card.member.email
   const member = card.member
   let detail: ReactNode = null
-  if (card.column === "lien" && card.kind === "guest" && card.invitation) {
+  if (card.column === "lien" && card.kind === "guest" && card.viaPartner) {
+    detail = `Lien reçu via ${card.viaPartner}`
+  } else if (card.column === "lien" && card.kind === "guest" && card.invitation) {
     detail = `Lien envoyé le ${new Date(card.invitation.sent_at).toLocaleDateString("fr-FR")}`
   } else if (card.column === "acces" && member) {
     detail = member.last_seen_at

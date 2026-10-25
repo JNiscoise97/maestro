@@ -3,7 +3,7 @@ import { ChevronRight, Plus } from "lucide-react"
 
 import { SequenceName } from "@/components/shared/SequenceName"
 import {
-  PAYMENT_STATUS_LABELS, PRIORITY_COLORS, PRIORITY_LABELS, PRIORITY_SHORT, effectivePriority, fmt, paymentStatus,
+  PAYMENT_STATUS_LABELS, PRIORITY_COLORS, PRIORITY_LABELS, PRIORITY_SHORT, effectivePriority, fmt, lineMatches, paymentStatus,
   type BudgetModel, type PaymentStatus,
 } from "@/lib/budget-calc"
 import type { BudgetItem } from "@/services/supabase/budget"
@@ -25,8 +25,10 @@ const STATUS_CLASS: Record<PaymentStatus, string> = {
  * plusieurs séquences apparaît sous chacune, avec seulement les sous-postes de cette séquence ;
  * les sous-totaux par séquence restent ainsi exacts. Un clic ouvre la fenêtre complète du poste.
  */
-export function PoleTable({ title, postes, model, sequences, seqFilter, priorityFilter, visibleCols, open, onToggle, onOpen, onAdd }: {
+export function PoleTable({ title, postes, model, sequences, seqFilter, priorityFilter, search, visibleCols, open, onToggle, onOpen, onAdd }: {
   title: string
+  /** Recherche : un poste qui correspond s'affiche entier ; sinon seuls ses sous-postes qui correspondent. */
+  search: string
   /** Filtre de priorité : seules les lignes de cette priorité comptent (« none » = non priorisées). */
   priorityFilter: string | null
   /** Pôle déplié (piloté par la page : « Tout déplier / Tout replier »). */
@@ -44,15 +46,21 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, priority
 
   // Séquences présentes dans ce pôle (ordre des séquences, « Sans séquence » en dernier).
   const order = new Map(sequences.map((s, i) => [s.id, i]))
-  const keep = priorityFilter ? (l: BudgetItem) => (effectivePriority(model, l) ?? "none") === priorityFilter : undefined
+  const byPriority = (l: BudgetItem) => !priorityFilter || (effectivePriority(model, l) ?? "none") === priorityFilter
+  // Filtre des lignes d'un poste : priorité, puis recherche si le nom du poste lui-même ne correspond pas.
+  const keepFor = (p: BudgetItem) => {
+    const searching = !!search.trim() && !lineMatches(p, search)
+    if (!priorityFilter && !searching) return undefined
+    return (l: BudgetItem) => byPriority(l) && (!searching || lineMatches(l, search))
+  }
   // Séquences d'un poste qui ont au moins une ligne retenue par le filtre de priorité.
-  const seqsOf = (p: BudgetItem) => [...new Set(model.leaves(p).filter((l) => !keep || keep(l))
+  const seqsOf = (p: BudgetItem) => [...new Set(model.leaves(p).filter((l) => { const keep = keepFor(p); return !keep || keep(l) })
     .map((l) => (model.children(p.id).length ? l.sequenceId : p.sequenceId)))]
   const seqIds = [...new Set(postes.flatMap(seqsOf))]
     .filter((id) => !seqFilter || id === seqFilter)
     .sort((a, b) => (a === null ? Infinity : order.get(a) ?? Infinity) - (b === null ? Infinity : order.get(b) ?? Infinity))
 
-  const totals = postes.map((p) => model.poste(p, undefined, keep))
+  const totals = postes.map((p) => model.poste(p, undefined, keepFor(p)))
   const sumOf = (k: "estimated" | "paid") => totals.reduce((t, f) => t + f[k], 0)
   const realSum = totals.reduce((t, f) => t + (f.real ?? 0), 0)
   const cols = 5 + visibleCols.size
@@ -93,7 +101,7 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, priority
                 const inSeq = postes
                   .filter((p) => seqsOf(p).includes(seqId))
                   .sort((a, b) => a.label.localeCompare(b.label, "fr"))
-                const figs = inSeq.map((p) => model.poste(p, model.children(p.id).length ? seqId : undefined, keep))
+                const figs = inSeq.map((p) => model.poste(p, model.children(p.id).length ? seqId : undefined, keepFor(p)))
                 const seq = seqId ? sequences.find((s) => s.id === seqId) : undefined
                 return [
                   <tr key={`seq-${seqId}`} className="bg-muted/40">
@@ -113,9 +121,11 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, priority
                     </td>
                   </tr>,
                   ...inSeq.flatMap((p, i) => {
+                    const keep = keepFor(p)
                     const kids = model.children(p.id).filter((k) => k.sequenceId === seqId && (!keep || keep(k)))
                     const key = `${p.id}:${seqId}`
-                    const isOpen = expanded.has(key)
+                    // En recherche, les sous-postes trouvés sont dépliés d'office.
+                    const isOpen = expanded.has(key) || (!!search.trim() && kids.length > 0)
                     const f = figs[i]
                     const devis = model.retained.get(p.id)?.devis
                     const vendors = [...new Set((kids.length ? kids : [p]).map((l) => model.retained.get(l.id)?.devis.vendor ?? l.vendor).filter(Boolean))]

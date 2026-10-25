@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState } from "react"
-import { FileUp, Plus, X } from "lucide-react"
+import { FileUp, Plus, Search, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { PageHeader } from "@/components/shared/PageHeader"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
@@ -16,7 +17,7 @@ import {
   useBudgetDevis, useBudgetDevisLines, useBudgetItems, useBudgetPayments, useImportBudgetItems,
 } from "@/hooks/queries/use-budget"
 import { usePoles } from "@/hooks/queries/use-poles"
-import { BudgetModel, PRIORITIES, PRIORITY_LABELS, effectivePriority, fmt, fmtCompact } from "@/lib/budget-calc"
+import { BudgetModel, PRIORITIES, PRIORITY_LABELS, effectivePriority, fmt, fmtCompact, lineMatches } from "@/lib/budget-calc"
 import { poleIdForCategory } from "@/lib/budget-poles"
 import type { BudgetItem } from "@/services/supabase/budget"
 import type { Pole } from "@/types/domain"
@@ -457,6 +458,7 @@ export function BudgetPage() {
   const [seqFilter, setSeqFilter] = useState<string | null>(null)
   const [poleFilter, setPoleFilter] = useState<string | null>(null)
   const [priorityFilter, setPriorityFilter] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
   const [sheet, setSheet] = useState<{ poste: BudgetItem | "new"; poleId?: string | null; sequenceId?: string | null } | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [visibleCols, setVisibleCols] = useState<Set<OptionalCol>>(new Set())
@@ -470,7 +472,9 @@ export function BudgetPage() {
   const filtered = postes.filter((p) =>
     (!poleFilter || (p.poleId ?? NO_POLE) === poleFilter)
     && (!seqFilter || model.sequencesOf(p).includes(seqFilter))
-    && (!priorityFilter || model.leaves(p).some((l) => (effectivePriority(model, l) ?? "none") === priorityFilter)))
+    && (!priorityFilter || model.leaves(p).some((l) => (effectivePriority(model, l) ?? "none") === priorityFilter))
+    // Recherche : nom, enseigne ou notes du poste ou d'un de ses sous-postes.
+    && (!search.trim() || lineMatches(p, search) || model.children(p.id).some((c) => lineMatches(c, search))))
 
   const usedPoles = [
     ...sortedPoles.filter((p) => postes.some((x) => x.poleId === p.id)).map((p) => ({ id: p.id, name: p.name })),
@@ -531,6 +535,18 @@ export function BudgetPage() {
         <DevisTab devis={devis} model={model} items={items} poles={sortedPoles} />
       ) : (
         <>
+          <div className="relative max-w-sm">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input className="pl-8 pr-8 text-base sm:text-sm" placeholder="Rechercher un poste ou un sous-poste (nom, enseigne, notes)"
+              value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Rechercher dans le budget" />
+            {search && (
+              <button type="button" aria-label="Effacer la recherche" onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground">
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+
           <div className="flex flex-wrap gap-4">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">Séquence :</span>
@@ -581,14 +597,14 @@ export function BudgetPage() {
 
           {grouped.length === 0 ? (
             <div className="space-y-2 rounded-xl border border-dashed border-border py-16 text-center">
-              <p className="text-sm text-muted-foreground">Aucun poste de dépense.</p>
+              <p className="text-sm text-muted-foreground">{search.trim() ? `Aucun poste ni sous-poste ne correspond à « ${search.trim()} ».` : "Aucun poste de dépense."}</p>
               <p className="text-xs text-muted-foreground">Crée un poste avec « Nouveau poste » ou importe un CSV.</p>
             </div>
           ) : (
             <div className="space-y-3">
               {grouped.map((g) => (
                 <PoleTable key={g.poleId ?? "sans-pole"} title={g.title} postes={g.postes} model={model} sequences={sortedSeq}
-                  seqFilter={seqFilter} priorityFilter={priorityFilter} visibleCols={visibleCols}
+                  seqFilter={seqFilter} priorityFilter={priorityFilter} search={search} visibleCols={visibleCols}
                   open={!collapsed.has(g.poleId ?? NO_POLE)}
                   onToggle={() => setCollapsed((prev) => {
                     const next = new Set(prev)

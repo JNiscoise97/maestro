@@ -159,6 +159,19 @@ export function amountInput(n: number | null | undefined): string {
   return n == null ? "" : String(n).replace(".", ",")
 }
 
+// ── Recherche ───────────────────────────────────────────────────────────────
+
+/** Texte normalisé pour la recherche (minuscules, sans accents). */
+export function searchKey(s: string | null | undefined): string {
+  return (s ?? "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase()
+}
+
+/** Une ligne correspond à la recherche : nom, enseigne ou notes. */
+export function lineMatches(item: { label: string; vendor: string | null; notes: string | null }, query: string): boolean {
+  const q = searchKey(query.trim())
+  return !q || [item.label, item.vendor, item.notes].some((v) => searchKey(v).includes(q))
+}
+
 // ── Priorité MoSCoW ─────────────────────────────────────────────────────────
 
 export const PRIORITIES = ["must", "should", "could"] as const

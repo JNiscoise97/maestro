@@ -12,7 +12,7 @@ import {
   PRIORITY_LABELS, amountInput, fmt, parseAmount, paymentStatus, type BudgetModel,
 } from "@/lib/budget-calc"
 import { cn } from "@/lib/utils"
-import type { BudgetDevis, BudgetItem, DevisPlan, DevisStatus, LineDraft, PaymentDraft, Priority } from "@/services/supabase/budget"
+import type { AmountStatus, BudgetDevis, BudgetItem, DevisPlan, DevisStatus, LineDraft, PaymentDraft, Priority } from "@/services/supabase/budget"
 import type { Pole } from "@/types/domain"
 import { DevisSheet } from "./DevisSheet"
 import { PaymentsEditor } from "./PaymentsEditor"
@@ -49,6 +49,7 @@ function fromItem(model: BudgetModel, item: BudgetItem): Line {
     quantity: item.quantity, unitPrice: item.unitPrice, estimatedTotal: item.estimatedTotal, actualTotal: item.actualTotal,
     vendor: item.vendor, account: item.account, origin: item.origin, notes: item.notes,
     depositRequired: item.depositRequired, priority: item.priority, payments,
+    amountStatus: item.amountStatus, includedInId: item.includedInId, guestDependent: item.guestDependent,
     purchase: links.length ? "devis" : direct ? "direct" : "undecided", links,
   }
 }
@@ -57,11 +58,16 @@ function emptyLine(sequenceId: string | null = null, label = ""): Line {
   return {
     key: newKey(), label, sequenceId, quantity: null, unitPrice: null, estimatedTotal: null, actualTotal: null,
     vendor: null, account: null, origin: null, notes: null, depositRequired: false, priority: null, payments: [],
+    amountStatus: "estimated", includedInId: null, guestDependent: false,
     purchase: "undecided", links: [],
   }
 }
 
-const estimateOf = (l: Line) => l.estimatedTotal ?? (l.quantity != null && l.unitPrice != null ? l.quantity * l.unitPrice : null)
+const estimateOf = (l: Line) => l.amountStatus !== "estimated"
+  ? null
+  : l.estimatedTotal ?? (l.quantity != null && l.unitPrice != null ? l.quantity * l.unitPrice : null)
+
+type Target = { id: string; label: string; group: string }
 
 /**
  * Poste de dépense. Création : assistant en 4 étapes (Quoi ? → Séquences → Combien ? → Achat) puis
@@ -130,6 +136,10 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
     if (s === 1 && !name.trim()) return "Donnez un nom au poste (ex. Fleurs)."
     if (s === 2 && multiple && subs.length === 0) return "Ajoutez au moins un élément, ou choisissez « Une seule séquence »."
     if (s === 2 && multiple && subs.some((x) => !x.label.trim())) return "Chaque élément doit avoir un nom."
+    if (s === 3) {
+      const orphan = lines.find((l) => l.amountStatus === "included" && !l.includedInId)
+      if (orphan) return `« ${orphan.label || name} » : choisissez la ligne qui l'inclut.`
+    }
     if (s === 4) {
       const orphan = lines.find((l) => l.purchase === "devis" && l.links.length === 0)
       if (orphan) return `« ${orphan.label || name} » : rattachez un devis, ou choisissez un autre mode d'achat.`
@@ -144,7 +154,7 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
   }
 
   async function handleSave() {
-    for (const s of [1, 2, 4] as Step[]) {
+    for (const s of [1, 2, 3, 4] as Step[]) {
       const err = stepError(s)
       if (err) { toast.error(err); if (!creating) setStep(s); return }
     }
@@ -155,16 +165,15 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
         ref: d.ref, vendor: d.vendor.trim() || null, title: d.title.trim() || null,
         totalAmount: parseAmount(d.totalAmount), status: d.status,
       })),
-      links: lines.flatMap((l) => l.purchase === "devis"
+      links: lines.flatMap((l) => l.purchase === "devis" && l.amountStatus !== "included"
         ? l.links.map((x) => ({ lineKey: l.key, devisRef: x.devisRef, amount: parseAmount(x.amount) }))
         : []),
     }
     // Une ligne sous devis n'a pas de versements propres ; « pas encore décidé » n'en a pas non plus.
-    const clean = (l: Line): LineDraft => ({
-      ...l,
-      payments: l.purchase === "direct" ? l.payments : [],
-      actualTotal: l.purchase === "direct" ? l.actualTotal : null,
-    })
+    const clean = (l: Line): LineDraft => {
+      const direct = l.purchase === "direct" && l.amountStatus !== "included"
+      return { ...l, payments: direct ? l.payments : [], actualTotal: direct ? l.actualTotal : null }
+    }
     try {
       await save.mutateAsync({
         draft: {
@@ -186,6 +195,13 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
   }
 
   const figures = existing ? model.poste(existing) : null
+  const targets: Target[] = useMemo(() => items
+    .filter((i) => i.id !== existing?.id && i.amountStatus !== "included")
+    .map((i) => {
+      const top = i.parentId ? model.itemsById.get(i.parentId) : i
+      return { id: i.id, label: model.fullLabel(i.id), group: poles.find((p) => p.id === top?.poleId)?.name ?? "Sans pôle" }
+    })
+    .sort((a, b) => a.group.localeCompare(b.group, "fr") || a.label.localeCompare(b.label, "fr")), [items, model, poles, existing])
   const devisOptions = [...model.devisById.values()].sort((a, b) => (a.vendor ?? "").localeCompare(b.vendor ?? "", "fr"))
   const devisLabel = (ref: string) => {
     const nd = newDevis.find((d) => d.ref === ref)
@@ -279,13 +295,15 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
       )
       case 3: return (
         <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">Quantité × prix unitaire calcule l'estimation ; vous pouvez aussi saisir directement un montant.</p>
-          <div className="hidden grid-cols-[1fr_6rem_7rem_8rem] gap-2 px-1 text-[11px] font-medium text-muted-foreground sm:grid">
-            <span>Élément</span><span>Quantité</span><span>Prix unitaire €</span><span>Estimé €</span>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Quantité × prix unitaire calcule l'estimation ; vous pouvez aussi saisir directement un montant. Si vous ne pouvez pas encore
+            l'estimer, choisissez « Pas encore estimable » ; s'il est compris dans une autre dépense (ex. sonorisation incluse dans le lieu),
+            choisissez « Inclus dans… ».
+          </p>
           {lines.map((l) => (
             <div key={l.key} className="space-y-1.5">
-              <EstimateRow line={l} label={multiple ? l.label : name} sequences={sequences} onChange={(p) => setLine(l.key, p)} />
+              <EstimateRow line={l} label={multiple ? l.label : name} sequences={sequences} targets={targets.filter((t) => t.id !== l.id)}
+                onChange={(p) => setLine(l.key, p)} />
               {multiple && (
                 <label className="flex items-center gap-2 pl-1 text-xs text-muted-foreground">
                   Priorité
@@ -300,7 +318,12 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
       case 4: return (
         <div className="space-y-3">
           {lines.map((l) => (
-            <PurchaseCard key={l.key} line={l} label={multiple ? l.label : name} sequences={sequences}
+            l.amountStatus === "included" ? (
+              <div key={l.key} className="rounded-xl border border-dashed border-border p-3 text-sm">
+                <b>{multiple ? l.label : name}</b>
+                <span className="text-muted-foreground"> · inclus dans {model.fullLabel(l.includedInId)} : rien à acheter ni à payer.</span>
+              </div>
+            ) : <PurchaseCard key={l.key} line={l} label={multiple ? l.label : name} sequences={sequences}
               devisOptions={devisOptions} newDevis={newDevis} devisLabel={devisLabel}
               onChange={(p) => setLine(l.key, p)}
               onCreateDevis={(d) => setNewDevis([...newDevis, d])}
@@ -427,11 +450,24 @@ function SeqSelect({ value, sequences, onChange }: { value: string | null; seque
   )
 }
 
-function EstimateRow({ line, label, sequences, onChange }: { line: Line; label: string; sequences: Seq[]; onChange: (p: Partial<Line>) => void }) {
+const STATUS_OPTIONS: { value: AmountStatus; label: string }[] = [
+  { value: "estimated", label: "Estimé" },
+  { value: "to_estimate", label: "Pas encore estimable" },
+  { value: "included", label: "Inclus dans…" },
+]
+
+function EstimateRow({ line, label, sequences, targets, onChange }: {
+  line: Line
+  label: string
+  sequences: Seq[]
+  targets: Target[]
+  onChange: (p: Partial<Line>) => void
+}) {
   const [qty, setQty] = useState(amountInput(line.quantity))
   const [pu, setPu] = useState(amountInput(line.unitPrice))
   const [estim, setEstim] = useState(amountInput(line.estimatedTotal))
   const seq = sequences.find((s) => s.id === line.sequenceId)
+  const estimated = line.amountStatus === "estimated"
 
   function update(nextQty: string, nextPu: string) {
     setQty(nextQty)
@@ -444,15 +480,48 @@ function EstimateRow({ line, label, sequences, onChange }: { line: Line; label: 
   }
 
   return (
-    <div className="grid grid-cols-3 items-center gap-2 rounded-lg border border-border p-2 sm:grid-cols-[1fr_6rem_7rem_8rem] sm:border-0 sm:p-0">
-      <div className="col-span-3 min-w-0 sm:col-span-1">
-        <p className="truncate text-sm font-medium">{label || "Sans nom"}</p>
-        <p className="text-[11px] text-muted-foreground">{seq?.name ?? "Sans séquence"}</p>
+    <div className="space-y-2 rounded-lg border border-border p-2">
+      <div className="grid grid-cols-3 items-center gap-2 sm:grid-cols-[1fr_6rem_7rem_8rem]">
+        <div className="col-span-3 min-w-0 sm:col-span-1">
+          <p className="truncate text-sm font-medium">{label || "Sans nom"}</p>
+          <p className="text-[11px] text-muted-foreground">{seq?.name ?? "Sans séquence"}</p>
+        </div>
+        <Input className="font-mono" inputMode="decimal" placeholder="Qté" value={qty} disabled={!estimated} onChange={(e) => update(e.target.value, pu)} aria-label="Quantité" />
+        <Input className="font-mono" inputMode="decimal" placeholder="P.U." value={pu} disabled={!estimated} onChange={(e) => update(qty, e.target.value)} aria-label="Prix unitaire" />
+        <Input className="font-mono" inputMode="decimal" aria-label="Estimé"
+          placeholder={line.amountStatus === "to_estimate" ? "à estimer" : line.amountStatus === "included" ? "0 € (inclus)" : "Montant"}
+          value={estimated ? estim : ""} disabled={!estimated}
+          onChange={(e) => { setEstim(e.target.value); onChange({ estimatedTotal: parseAmount(e.target.value) }) }} />
       </div>
-      <Input className="font-mono" inputMode="decimal" placeholder="Qté" value={qty} onChange={(e) => update(e.target.value, pu)} aria-label="Quantité" />
-      <Input className="font-mono" inputMode="decimal" placeholder="P.U." value={pu} onChange={(e) => update(qty, e.target.value)} aria-label="Prix unitaire" />
-      <Input className="font-mono" inputMode="decimal" placeholder="Montant" value={estim} aria-label="Estimé"
-        onChange={(e) => { setEstim(e.target.value); onChange({ estimatedTotal: parseAmount(e.target.value) }) }} />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex overflow-hidden rounded-md border border-border text-xs" role="radiogroup" aria-label="État du montant">
+          {STATUS_OPTIONS.map((o) => (
+            <button key={o.value} type="button" role="radio" aria-checked={line.amountStatus === o.value}
+              onClick={() => onChange({ amountStatus: o.value, ...(o.value !== "included" ? { includedInId: null } : {}) })}
+              className={cn("px-2 py-1", line.amountStatus === o.value ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted")}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+        {line.amountStatus === "included" && (
+          <select className="h-7 min-w-0 flex-1 rounded-md border border-input bg-background px-1.5 text-xs" value={line.includedInId ?? ""}
+            onChange={(e) => onChange({ includedInId: e.target.value || null })} aria-label="Ligne qui l'inclut">
+            <option value="">Choisir la ligne qui l'inclut (ex. Domaine Ostara)…</option>
+            {[...new Set(targets.map((t) => t.group))].map((g) => (
+              <optgroup key={g} label={g}>
+                {targets.filter((t) => t.group === g).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        )}
+        <label className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground" title="Le montant changera si le nombre d'invités change (traiteur, boissons…)">
+          <input type="checkbox" checked={line.guestDependent} onChange={(e) => onChange({ guestDependent: e.target.checked })} />
+          👥 Dépend du nombre d'invités
+        </label>
+      </div>
+      {line.amountStatus === "to_estimate" && (
+        <p className="text-[11px] text-muted-foreground">Compte pour 0 € dans les totaux, et apparaît dans les lignes « à estimer » des statistiques.</p>
+      )}
     </div>
   )
 }
@@ -603,7 +672,8 @@ function Recap({ name, pole, lines, multiple, sequences, devisLabel, postePriori
   devisLabel: (ref: string) => string
 }) {
   const total = lines.reduce((t, l) => t + (estimateOf(l) ?? 0), 0)
-  const mode = (l: Line) => l.purchase === "direct" ? `Achat direct${l.vendor ? ` · ${l.vendor}` : ""}`
+  const mode = (l: Line) => l.amountStatus === "included" ? "Inclus dans une autre ligne"
+    : l.purchase === "direct" ? `Achat direct${l.vendor ? ` · ${l.vendor}` : ""}`
     : l.purchase === "devis" ? `Devis : ${l.links.map((x) => devisLabel(x.devisRef)).join(", ")}` : "Achat pas encore décidé"
   return (
     <div className="space-y-3">
@@ -616,7 +686,10 @@ function Recap({ name, pole, lines, multiple, sequences, devisLabel, postePriori
           <li key={l.key} className="space-y-0.5 px-3 py-2 text-sm">
             <div className="flex justify-between gap-2">
               <span className="font-medium">{multiple ? l.label : name}</span>
-              <span className="tabular-nums">{fmt(estimateOf(l))}</span>
+              <span className="tabular-nums">
+                {l.amountStatus === "to_estimate" ? "à estimer" : l.amountStatus === "included" ? "inclus" : fmt(estimateOf(l))}
+                {l.guestDependent && " 👥"}
+              </span>
             </div>
             <p className="text-xs text-muted-foreground">
               {sequences.find((s) => s.id === l.sequenceId)?.name ?? "Sans séquence"} · {mode(l)}

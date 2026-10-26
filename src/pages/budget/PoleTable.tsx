@@ -25,8 +25,10 @@ const STATUS_CLASS: Record<PaymentStatus, string> = {
  * plusieurs séquences apparaît sous chacune, avec seulement les sous-postes de cette séquence ;
  * les sous-totaux par séquence restent ainsi exacts. Un clic ouvre la fenêtre complète du poste.
  */
-export function PoleTable({ title, postes, model, sequences, seqFilter, priorityFilter, search, visibleCols, open, onToggle, onOpen, onAdd }: {
+export function PoleTable({ title, postes, model, sequences, seqFilter, priorityFilter, guestOnly, search, visibleCols, open, onToggle, onOpen, onAdd }: {
   title: string
+  /** Seulement les lignes qui dépendent du nombre d'invités. */
+  guestOnly: boolean
   /** Recherche : un poste qui correspond s'affiche entier ; sinon seuls ses sous-postes qui correspondent. */
   search: string
   /** Filtre de priorité : seules les lignes de cette priorité comptent (« none » = non priorisées). */
@@ -50,8 +52,8 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, priority
   // Filtre des lignes d'un poste : priorité, puis recherche si le nom du poste lui-même ne correspond pas.
   const keepFor = (p: BudgetItem) => {
     const searching = !!search.trim() && !lineMatches(p, search)
-    if (!priorityFilter && !searching) return undefined
-    return (l: BudgetItem) => byPriority(l) && (!searching || lineMatches(l, search))
+    if (!priorityFilter && !searching && !guestOnly) return undefined
+    return (l: BudgetItem) => byPriority(l) && (!guestOnly || l.guestDependent) && (!searching || lineMatches(l, search))
   }
   // Séquences d'un poste qui ont au moins une ligne retenue par le filtre de priorité.
   const seqsOf = (p: BudgetItem) => [...new Set(model.leaves(p).filter((l) => { const keep = keepFor(p); return !keep || keep(l) })
@@ -143,13 +145,14 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, priority
                             ) : <span className="w-3.5 shrink-0" />}
                             <span className="truncate" title={p.label}>{p.label}</span>
                             <PriorityBadges priorities={(kids.length ? kids : [p]).map((l) => effectivePriority(model, l))} />
+                            <LineMarkers model={model} lines={kids.length ? kids : [p]} />
                             {kids.length > 0 && <span className="shrink-0 text-[11px] font-normal text-muted-foreground">{kids.length} sous-poste{kids.length > 1 ? "s" : ""}</span>}
                             {model.sequencesOf(p).length > 1 && <span className="shrink-0 rounded bg-muted px-1 text-[10px] font-normal text-muted-foreground" title="Ce poste a des sous-postes sur d'autres séquences">+ autres séq.</span>}
                           </div>
                         </td>
                         {visibleCols.has("qty") && <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{kids.length ? "" : p.quantity ?? "—"}</td>}
                         {visibleCols.has("pu") && <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{kids.length ? "" : fmt(p.unitPrice)}</td>}
-                        <td className="px-3 py-2.5 text-right tabular-nums">{fmt(f.estimated)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums"><EstimateCell model={model} lines={kids.length ? kids : [p]} estimated={f.estimated} /></td>
                         <td className="px-3 py-2.5 text-right tabular-nums">{f.real == null ? "—" : fmt(f.real)}</td>
                         <td className="px-3 py-2.5"><StatusBadge status={paymentStatus(f)} paid={f.paid} /></td>
                         <td className="truncate px-3 py-2.5 text-muted-foreground" title={vendors.join(", ")}>
@@ -164,10 +167,10 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, priority
                         const kf = model.line(k)
                         rows.push(
                           <tr key={`${key}:${k.id}`} className="cursor-pointer bg-muted/10 text-[13px] hover:bg-muted/20" onClick={() => onOpen(p)}>
-                            <td className="px-4 py-2 pl-12 text-muted-foreground"><span className="mr-1 text-muted-foreground/40">└</span>{k.label} <PriorityBadges priorities={[effectivePriority(model, k)]} /></td>
+                            <td className="px-4 py-2 pl-12 text-muted-foreground"><span className="mr-1 text-muted-foreground/40">└</span>{k.label} <PriorityBadges priorities={[effectivePriority(model, k)]} /> <LineMarkers model={model} lines={[k]} /></td>
                             {visibleCols.has("qty") && <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{k.quantity ?? "—"}</td>}
                             {visibleCols.has("pu") && <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{fmt(k.unitPrice)}</td>}
-                            <td className="px-3 py-2 text-right tabular-nums">{fmt(kf.estimated)}</td>
+                            <td className="px-3 py-2 text-right tabular-nums"><EstimateCell model={model} lines={[k]} estimated={kf.estimated} /></td>
                             <td className="px-3 py-2 text-right tabular-nums">{kf.real == null ? "—" : fmt(kf.real)}</td>
                             <td className="px-3 py-2"><StatusBadge status={paymentStatus({ ...kf, depositRequired: k.depositRequired })} paid={kf.paid} /></td>
                             <td className="truncate px-3 py-2 text-muted-foreground">{model.retained.get(k.id)?.devis.vendor ?? k.vendor ?? "—"}</td>
@@ -186,6 +189,47 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, priority
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * Montant estimé d'un poste ou d'une ligne : « à estimer » / « inclus » quand il n'y a pas de montant,
+ * sinon le montant, suivi de « + N à estimer » si certaines lignes ne sont pas encore estimées.
+ */
+function EstimateCell({ model, lines, estimated }: { model: BudgetModel; lines: BudgetItem[]; estimated: number }) {
+  const toEstimate = lines.filter((l) => l.amountStatus === "to_estimate").length
+  const included = lines.filter((l) => l.amountStatus === "included")
+  if (lines.length === 1 && included.length === 1) {
+    return <span className="text-[11px] text-muted-foreground" title={`Inclus dans ${model.fullLabel(included[0].includedInId)}`}>inclus</span>
+  }
+  if (toEstimate === lines.length) return <span className="rounded bg-amber-400/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">à estimer</span>
+  return (
+    <span className="inline-flex flex-col items-end">
+      {fmt(estimated)}
+      {toEstimate > 0 && <span className="text-[10px] font-medium text-amber-700 dark:text-amber-400">+ {toEstimate} à estimer</span>}
+    </span>
+  )
+}
+
+/** Repères d'une ligne : 👥 dépend du nombre d'invités, « inclus dans … », « inclut … ». */
+function LineMarkers({ model, lines }: { model: BudgetModel; lines: BudgetItem[] }) {
+  const guest = lines.some((l) => l.guestDependent)
+  const included = lines.length === 1 && lines[0].amountStatus === "included" ? lines[0] : null
+  const includes = lines.flatMap((l) => model.includedIn(l.id))
+  return (
+    <>
+      {guest && <span className="shrink-0 text-[11px]" title="Dépend du nombre d'invités">👥</span>}
+      {included && (
+        <span className="shrink-0 truncate text-[11px] font-normal text-muted-foreground" title={`Inclus dans ${model.fullLabel(included.includedInId)}`}>
+          · inclus dans {model.fullLabel(included.includedInId)}
+        </span>
+      )}
+      {includes.length > 0 && (
+        <span className="shrink-0 truncate text-[11px] font-normal text-muted-foreground" title={includes.map((i) => model.fullLabel(i.id)).join(", ")}>
+          · inclut : {includes.map((i) => i.label).join(", ")}
+        </span>
+      )}
+    </>
   )
 }
 

@@ -91,7 +91,11 @@ export function BudgetStats({ items, model, poles, sequences }: {
     // Lignes au-dessus de leur estimation.
     const overruns = lines.filter((l) => l.real != null && l.estimated > 0 && l.real > l.estimated + 0.005)
     // Lignes sans achat décidé : ni devis, ni montant réel, ni versement.
-    const undecided = lines.filter((l) => !model.linesByItem.get(l.item.id)?.length && l.real == null && !(model.paymentsByItem.get(l.item.id)?.length))
+    const undecided = lines.filter((l) => l.item.amountStatus !== "included" && !model.linesByItem.get(l.item.id)?.length && l.real == null && !(model.paymentsByItem.get(l.item.id)?.length))
+    // Lignes pas encore estimables (comptées 0 €) et lignes dont le montant dépend du nombre d'invités.
+    const toEstimate = lines.filter((l) => l.item.amountStatus === "to_estimate")
+    const guestLines = lines.filter((l) => l.item.guestDependent)
+    const includedCount = lines.filter((l) => l.item.amountStatus === "included").length
     // Devis en cours (ni retenus ni refusés).
     const pendingDevis = [...model.devisById.values()].filter((d) => d.status === "en_cours")
     // Acomptes demandés mais pas encore versés.
@@ -116,7 +120,7 @@ export function BudgetStats({ items, model, poles, sequences }: {
     const late = upcoming.filter((u) => u.date < today)
     const in30 = upcoming.filter((u) => u.date >= today && u.date <= addDays(today, 30))
 
-    return { seqPrio, prioBuckets, flexibleCould: flexible("could"), flexibleShould: flexible("should"), poleBuckets, seqBuckets, cell, estimated, real, paid, due, overruns, undecided, pendingDevis, depositsDue, upcoming, late, in30, lineCount: lines.length }
+    return { toEstimate, guestLines, includedCount, seqPrio, prioBuckets, flexibleCould: flexible("could"), flexibleShould: flexible("should"), poleBuckets, seqBuckets, cell, estimated, real, paid, due, overruns, undecided, pendingDevis, depositsDue, upcoming, late, in30, lineCount: lines.length }
   }, [items, model, poles, sequences])
 
   const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
@@ -129,6 +133,7 @@ export function BudgetStats({ items, model, poles, sequences }: {
         <span className="text-sm font-semibold">Statistiques</span>
         <span className="text-xs text-muted-foreground">
           {fmt(stats.estimated)} estimés · {pct(stats.real, stats.estimated)} % engagés · {pct(stats.paid, stats.due)} % payés
+          {stats.toEstimate.length > 0 && <span className="ml-1 font-medium text-amber-700 dark:text-amber-400">· {stats.toEstimate.length} ligne{stats.toEstimate.length > 1 ? "s" : ""} à estimer</span>}
         </span>
         <ChevronDown className={cn("ml-auto size-4 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
@@ -151,7 +156,48 @@ export function BudgetStats({ items, model, poles, sequences }: {
               sub={`${fmt(stats.pendingDevis.reduce((t, d) => t + (d.totalAmount ?? model.devisLinesTotal(d.id)), 0))} à arbitrer`} />
             <Metric label="Acomptes à verser" value={String(stats.depositsDue.length)} sub="lignes avec acompte requis non versé"
               tone={stats.depositsDue.length ? "warn" : "ok"} />
-            <Metric label="Lignes de budget" value={String(stats.lineCount)} sub={`${stats.poleBuckets.length} pôles · ${stats.seqBuckets.length} séquences`} />
+            <Metric label="Lignes de budget" value={String(stats.lineCount)}
+              sub={`${stats.poleBuckets.length} pôles · ${stats.seqBuckets.length} séquences${stats.includedCount ? ` · ${stats.includedCount} incluse${stats.includedCount > 1 ? "s" : ""} dans d'autres` : ""}`} />
+          </div>
+
+          {/* ── Budget incomplet et sensibilité au nombre d'invités ── */}
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className={cn("space-y-2 rounded-lg border p-3", stats.toEstimate.length ? "border-amber-400/50 bg-amber-400/5" : "border-border")}>
+              <p className="text-sm font-semibold">
+                {stats.toEstimate.length
+                  ? `⚠ ${stats.toEstimate.length} ligne${stats.toEstimate.length > 1 ? "s" : ""} pas encore estimée${stats.toEstimate.length > 1 ? "s" : ""}`
+                  : "Toutes les lignes sont estimées"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {stats.toEstimate.length ? "Elles comptent pour 0 € : le budget estimé ci-dessus est incomplet." : "Le budget estimé couvre toutes les dépenses prévues."}
+              </p>
+              {stats.toEstimate.length > 0 && (
+                <ul className="max-h-40 space-y-0.5 overflow-y-auto text-xs">
+                  {stats.toEstimate.map((l) => (
+                    <li key={l.item.id} className="truncate">• {model.fullLabel(l.item.id)}
+                      <span className="text-muted-foreground"> · {poles.find((p) => p.id === l.poleId)?.name ?? "Sans pôle"}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="space-y-2 rounded-lg border border-border p-3">
+              <p className="text-sm font-semibold">
+                👥 {fmt(stats.guestLines.reduce((t, l) => t + l.estimated, 0))} dépendent du nombre d'invités
+                <span className="font-normal text-muted-foreground"> · {pct(stats.guestLines.reduce((t, l) => t + l.estimated, 0), stats.estimated)} % du budget</span>
+              </p>
+              <p className="text-xs text-muted-foreground">À revoir si le nombre d'invités change (montants mis à jour à la main).</p>
+              {stats.guestLines.length > 0 ? (
+                <ul className="max-h-40 space-y-0.5 overflow-y-auto text-xs">
+                  {[...stats.guestLines].sort((a, b) => b.estimated - a.estimated).map((l) => (
+                    <li key={l.item.id} className="flex gap-2">
+                      <span className="min-w-0 flex-1 truncate">• {model.fullLabel(l.item.id)}</span>
+                      <span className="tabular-nums text-muted-foreground">{l.item.amountStatus === "to_estimate" ? "à estimer" : fmt(l.estimated)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="text-xs text-muted-foreground">Aucune ligne marquée pour l'instant.</p>}
+            </div>
           </div>
 
           {/* Base de calcul des camemberts et des barres empilées. */}

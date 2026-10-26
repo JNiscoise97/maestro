@@ -26,10 +26,17 @@ export type BudgetItem = {
   depositRequired: boolean
   /** Priorité MoSCoW ; null sur un sous-poste = celle du poste. */
   priority: Priority | null
+  /** Estimé, pas encore estimable (0 € signalé) ou inclus dans une autre ligne (0 €). */
+  amountStatus: AmountStatus
+  /** Ligne qui inclut celle-ci (amountStatus = included). */
+  includedInId: string | null
+  /** Le montant dépend du nombre d'invités (étiquette, sans calcul). */
+  guestDependent: boolean
   sortOrder: number
 }
 
 export type Priority = "must" | "should" | "could"
+export type AmountStatus = "estimated" | "to_estimate" | "included"
 
 export type BudgetQuote = {
   id: string
@@ -63,6 +70,9 @@ function fromRow(r: any): BudgetItem {
     notes:          r.notes,
     depositRequired: r.deposit_required ?? false,
     priority:       r.priority ?? null,
+    amountStatus:   r.amount_status ?? "estimated",
+    includedInId:   r.included_in_id ?? null,
+    guestDependent: r.guest_dependent ?? false,
     sortOrder:      r.sort_order ?? 0,
   }
 }
@@ -140,6 +150,9 @@ export const budgetService = {
     if (patch.notes          !== undefined) row.notes           = patch.notes
     if (patch.depositRequired !== undefined) row.deposit_required = patch.depositRequired
     if (patch.priority       !== undefined) row.priority        = patch.priority
+    if (patch.amountStatus   !== undefined) row.amount_status   = patch.amountStatus
+    if (patch.includedInId   !== undefined) row.included_in_id  = patch.includedInId
+    if (patch.guestDependent !== undefined) row.guest_dependent = patch.guestDependent
     if (patch.sortOrder      !== undefined) row.sort_order      = patch.sortOrder
     if (Object.keys(row).length === 0) return
     const { error } = await db.from(tbl("budget_items")).update(row).eq("id", id)
@@ -365,6 +378,8 @@ export const budgetService = {
       quantity: d.quantity, unit_price: d.unitPrice, estimated_total: d.estimatedTotal, actual_total: d.actualTotal,
       vendor: d.vendor, account: d.account, origin: d.origin, notes: d.notes, deposit_required: d.depositRequired,
       priority: d.priority,
+      amount_status: d.amountStatus, included_in_id: d.amountStatus === "included" ? d.includedInId : null,
+      guest_dependent: d.guestDependent,
     })
     const save = async (d: LineDraft, parentId: string | null): Promise<string> => {
       const row = fields(d, parentId, draft.poste.poleId)
@@ -483,6 +498,9 @@ export type LineDraft = {
   notes: string | null
   depositRequired: boolean
   priority: Priority | null
+  amountStatus: AmountStatus
+  includedInId: string | null
+  guestDependent: boolean
   payments: PaymentDraft[]
 }
 

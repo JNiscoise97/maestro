@@ -84,7 +84,11 @@ export class BudgetModel {
 
   /** Chiffres d'une ligne (poste simple ou sous-poste). */
   line(item: BudgetItem): LineFigures {
-    const estimated = item.estimatedTotal ?? (item.quantity != null && item.unitPrice != null ? item.quantity * item.unitPrice : 0)
+    // Inclus dans une autre ligne : 0 €, rien à payer. Pas encore estimable : 0 € estimé (signalé ailleurs).
+    if (item.amountStatus === "included") return { estimated: 0, real: 0, paid: 0, hasPaidDeposit: false }
+    const estimated = item.amountStatus === "to_estimate"
+      ? 0
+      : item.estimatedTotal ?? (item.quantity != null && item.unitPrice != null ? item.quantity * item.unitPrice : 0)
     const r = this.retained.get(item.id)
     if (r) {
       const share = r.amount ?? 0
@@ -115,6 +119,19 @@ export class BudgetModel {
       hasPaidDeposit,
       depositRequired: poste.depositRequired || leaves.some((l) => l.depositRequired),
     }
+  }
+
+  /** Lignes incluses dans une ligne donnée (ex. Sonorisation incluse dans Domaine Ostara). */
+  includedIn(itemId: string): BudgetItem[] {
+    return [...this.itemsById.values()].filter((i) => i.amountStatus === "included" && i.includedInId === itemId)
+  }
+
+  /** Libellé complet d'une ligne : « Poste › Sous-poste ». */
+  fullLabel(itemId: string | null): string {
+    const item = itemId ? this.itemsById.get(itemId) : undefined
+    if (!item) return "?"
+    const parent = item.parentId ? this.itemsById.get(item.parentId) : undefined
+    return parent ? `${parent.label} › ${item.label}` : item.label
   }
 
   /** Séquences d'un poste : celles de ses sous-postes, ou la sienne. */

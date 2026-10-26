@@ -145,6 +145,9 @@ function parseCsvFiancailles(lines: string[]): ParsedRow[] {
       poleId:         null,
       depositRequired: false,
       priority:       null,
+      amountStatus:   "estimated",
+      includedInId:   null,
+      guestDependent: false,
       label:          r.label,
       quantity:       null,
       unitPrice:      null,
@@ -197,6 +200,9 @@ function parseCsvGeneric(lines: string[]): ParsedRow[] {
       poleId:         null,
       depositRequired: false,
       priority:       null,
+      amountStatus:   "estimated",
+      includedInId:   null,
+      guestDependent: false,
       label,
       quantity:       iQty    >= 0 ? parseFrNumber(cols[iQty]    ?? "") : null,
       unitPrice:      iPU     >= 0 ? parseFrNumber(cols[iPU]     ?? "") : null,
@@ -459,6 +465,7 @@ export function BudgetPage() {
   const [poleFilter, setPoleFilter] = useState<string | null>(null)
   const [priorityFilter, setPriorityFilter] = useState<string | null>(null)
   const [search, setSearch] = useState("")
+  const [guestOnly, setGuestOnly] = useState(false)
   const [sheet, setSheet] = useState<{ poste: BudgetItem | "new"; poleId?: string | null; sequenceId?: string | null } | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [visibleCols, setVisibleCols] = useState<Set<OptionalCol>>(new Set())
@@ -473,6 +480,7 @@ export function BudgetPage() {
     (!poleFilter || (p.poleId ?? NO_POLE) === poleFilter)
     && (!seqFilter || model.sequencesOf(p).includes(seqFilter))
     && (!priorityFilter || model.leaves(p).some((l) => (effectivePriority(model, l) ?? "none") === priorityFilter))
+    && (!guestOnly || model.leaves(p).some((l) => l.guestDependent))
     // Recherche : nom, enseigne ou notes du poste ou d'un de ses sous-postes.
     && (!search.trim() || lineMatches(p, search) || model.children(p.id).some((c) => lineMatches(c, search))))
 
@@ -572,6 +580,9 @@ export function BudgetPage() {
                   {p === "none" ? "Non priorisé" : PRIORITY_LABELS[p]}
                 </button>
               ))}
+              <button className={chip(guestOnly)} onClick={() => setGuestOnly((v) => !v)} title="Lignes dont le montant dépend du nombre d'invités">
+                👥 Dépend du nombre d'invités
+              </button>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">Colonnes :</span>
@@ -604,7 +615,7 @@ export function BudgetPage() {
             <div className="space-y-3">
               {grouped.map((g) => (
                 <PoleTable key={g.poleId ?? "sans-pole"} title={g.title} postes={g.postes} model={model} sequences={sortedSeq}
-                  seqFilter={seqFilter} priorityFilter={priorityFilter} search={search} visibleCols={visibleCols}
+                  seqFilter={seqFilter} priorityFilter={priorityFilter} guestOnly={guestOnly} search={search} visibleCols={visibleCols}
                   open={!collapsed.has(g.poleId ?? NO_POLE)}
                   onToggle={() => setCollapsed((prev) => {
                     const next = new Set(prev)

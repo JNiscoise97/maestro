@@ -12,6 +12,10 @@ export type GalleryMember = {
   linked_by: "admin_bootstrap" | "auto_name_match" | "admin_approval" | "admin_manual"
   created_at: string
   last_seen_at: string | null
+  /** Liste blanche : année de naissance acceptée à la place du code par mail. */
+  birth_year: number | null
+  year_failures: number
+  year_locked_until: string | null
 }
 
 export type GallerySettings = {

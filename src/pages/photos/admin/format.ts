@@ -46,6 +46,8 @@ export const EVENT_LABELS: Record<string, string> = {
   download_hd: "Téléchargement HD",
   photo_status: "Statut de photo modifié",
   account_created: "Compte ouvert",
+  year_login_failed: "Année de naissance incorrecte",
+  year_login_locked: "Connexion par année bloquée (1 h)",
   admin_member_update: "Compte modifié (admin)",
   admin_member_created: "Compte créé (admin)",
   admin_member_deleted: "Compte supprimé (admin)",

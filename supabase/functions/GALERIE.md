@@ -60,3 +60,13 @@ Depuis `/photos/admin` (connecté avec une adresse administrateur) :
 
 `node supabase/scripts/export_galerie.mjs ./archive-galerie` (variables `SUPABASE_URL` et
 `SUPABASE_SERVICE_ROLE_KEY`) : originaux par album, renommés SJ-0001…, et catalogue JSON.
+
+## Connexion par année de naissance (liste blanche, migration 0168)
+
+- Admin › Accès › « Connexion par année de naissance » : choisir un compte invité et saisir son année.
+- La personne saisit son e-mail puis son année : `gallery-identify` vérifie l'essai via
+  `_20260725_gal_year_attempt` (atomique), puis génère un jeton à usage unique (`generateLink`, aucun mail)
+  que le navigateur échange contre une session (`verifyOtp({ token_hash, type: "magiclink" })`).
+- 2 années incorrectes → voie bloquée 1 h, code envoyé par mail, alerte aux admins ; « Débloquer » dans l'admin.
+- Les comptes administrateurs ne sont jamais concernés (code par mail uniquement).
+- Après la migration, redéployer `gallery-identify`.

@@ -1,7 +1,10 @@
 // gallery-identify — étape d'identification de la galerie privée (CDCF ACC-02, ACC-06).
 //
-// Entrée : { email, firstName?, lastName? }
-// Sortie : { status: "ready" }      → le navigateur demande le code (signInWithOtp, shouldCreateUser: false)
+// Entrée : { email, firstName?, lastName? }  ou  { email, birthYear }  (connexion par année, liste blanche)
+// Sortie : { status: "ready", yearLogin? } → le navigateur demande le code (signInWithOtp, shouldCreateUser: false),
+//                                            ou l'année de naissance si yearLogin
+//          { status: "signed", tokenHash } → année correcte : session ouverte par verifyOtp(token_hash), sans mail
+//          { status: "wrong_year", remaining } / { status: "locked" } → 2 échecs : blocage 1 h, repli sur le code mail
 //          { status: "need_name" }  → adresse inconnue : demander prénom et nom
 //          { status: "pending" }    → demande transmise à Sarah et Jordan
 //
@@ -112,7 +115,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
   if (req.method !== "POST") return json({ error: "method" }, 405)
 
-  let body: { email?: string; firstName?: string; lastName?: string }
+  let body: { email?: string; firstName?: string; lastName?: string; birthYear?: number | string }
   try { body = await req.json() } catch { return json({ error: "invalid_body" }, 400) }
 
   const email = (body.email ?? "").trim().toLowerCase()
@@ -122,9 +125,17 @@ Deno.serve(async (req) => {
 
   const db = serviceClient()
 
-  // 1. Compte existant : actif → code ; désactivé → même réponse qu'une demande en attente.
-  const { data: member } = await db.from(t("members")).select("id, status").eq("email", email).maybeSingle()
-  if (member) return json({ status: member.status === "active" ? "ready" : "pending" })
+  // 0. Connexion par année de naissance (liste blanche).
+  if (body.birthYear != null) return yearLogin(db, email, Number(body.birthYear))
+
+  // 1. Compte existant : actif → code (ou année si liste blanche) ; désactivé → même réponse qu'une demande en attente.
+  const { data: member } = await db.from(t("members"))
+    .select("id, status, role, birth_year, year_locked_until").eq("email", email).maybeSingle()
+  if (member) {
+    if (member.status !== "active") return json({ status: "pending" })
+    const locked = member.year_locked_until && new Date(member.year_locked_until) > new Date()
+    return json({ status: "ready", yearLogin: member.role === "guest" && member.birth_year != null && !locked })
+  }
 
   // 2. Administrateur déclaré : ouverture de son compte à la première connexion.
   const { data: adminRow } = await db.from(t("admin_emails")).select("email").eq("email", email).maybeSingle()
@@ -193,6 +204,39 @@ Deno.serve(async (req) => {
       `<a href="${galleryUrl()}/admin/acces">Voir les demandes</a>`))
   return json({ status: "pending" })
 })
+
+/**
+ * Connexion par année de naissance : essai compté de façon atomique en base (2 échecs → blocage 1 h).
+ * Année correcte : jeton de connexion à usage unique généré côté serveur (aucun mail envoyé),
+ * que le navigateur échange contre une session avec verifyOtp({ token_hash }).
+ */
+async function yearLogin(db: SupabaseClient, email: string, year: number): Promise<Response> {
+  if (!Number.isInteger(year) || year < 1900 || year > 2100) return json({ status: "wrong_year", remaining: 1 })
+  const { data, error } = await db.rpc("_20260725_gal_year_attempt", { p_email: email, p_year: year })
+  if (error) { console.error("[identify] year_attempt", error); return json({ error: "server" }, 500) }
+  const row = (data as { result: string; remaining: number; member_id: string | null }[])[0]
+
+  if (row.result === "unavailable") return json({ status: "ready", yearLogin: false })
+  if (row.result === "wrong") {
+    await db.from(t("activity")).insert({ member_id: row.member_id, event: "year_login_failed", details: {} })
+    return json({ status: "wrong_year", remaining: row.remaining })
+  }
+  if (row.result === "locked") {
+    await db.from(t("activity")).insert({ member_id: row.member_id, event: "year_login_locked", details: {} })
+    const { data: m } = await db.from(t("members")).select("first_name, last_name").eq("id", row.member_id).maybeSingle()
+    await sendMail(await adminEmails(db), "Galerie : connexion par année bloquée",
+      mailLayout("Connexion par année bloquée",
+        `Deux années de naissance incorrectes ont été saisies pour ${escapeHtml(`${m?.first_name ?? ""} ${m?.last_name ?? ""}`.trim() || email)} ` +
+        `(${escapeHtml(email)}). La connexion par année est bloquée pendant 1 heure ; la personne a reçu un code par mail à la place.<br><br>` +
+        `Si ce n'est pas elle, vérifiez son compte : <a href="${galleryUrl()}/admin/acces">${galleryUrl()}/admin/acces</a>`))
+    return json({ status: "locked" })
+  }
+
+  const { data: link, error: linkError } = await db.auth.admin.generateLink({ type: "magiclink", email })
+  const tokenHash = link?.properties?.hashed_token
+  if (linkError || !tokenHash) { console.error("[identify] generateLink", linkError); return json({ error: "server" }, 500) }
+  return json({ status: "signed", tokenHash })
+}
 
 /** Crée l'utilisateur Supabase Auth (adresse confirmée) ou retrouve celui qui existe déjà. */
 async function ensureAuthUser(db: ReturnType<typeof serviceClient>, email: string): Promise<string | null> {

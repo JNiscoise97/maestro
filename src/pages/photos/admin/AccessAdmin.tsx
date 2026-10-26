@@ -131,6 +131,8 @@ export function AccessAdmin() {
         </CardContent>
       </Card>
 
+      <YearLogins members={members} />
+
       <AdminEmails />
     </div>
   )
@@ -226,6 +228,94 @@ function AddMember({ onAdd, busy }: { onAdd: (b: { email: string; firstName: str
           <Button type="submit" disabled={busy || !email.trim()}>Créer</Button>
         </form>
         <p className="mt-2 text-xs text-muted-foreground">Un compte par personne, même au sein d'un foyer (chaque action doit être attribuable).</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * Liste blanche « connexion par année de naissance » : ces personnes saisissent leur année au lieu du
+ * code reçu par mail. 2 années incorrectes bloquent cette voie 1 h (code par mail à la place, alerte admins).
+ * Réservé aux comptes invités : un compte administrateur garde toujours le code par mail.
+ */
+function YearLogins({ members }: { members: GalleryMember[] }) {
+  const update = useAdminUpdate("members")
+  const [now] = useState(() => Date.now())
+  const [memberId, setMemberId] = useState<string | null>(null)
+  const [year, setYear] = useState("")
+  const listed = members.filter((m) => m.birth_year != null)
+    .sort((a, b) => memberName(a).localeCompare(memberName(b), "fr"))
+  const candidates = members.filter((m) => m.role === "guest" && m.birth_year == null)
+    .sort((a, b) => memberName(a).localeCompare(memberName(b), "fr"))
+  const maxYear = new Date(now).getFullYear()
+  const yearValue = Number(year)
+  const validYear = /^\d{4}$/.test(year) && yearValue >= 1900 && yearValue <= maxYear
+
+  function save(m: GalleryMember, patch: Partial<GalleryMember>, ok: string) {
+    update.mutate({ match: { id: m.id }, patch }, {
+      onSuccess: () => toast.success(ok),
+      onError: () => toast.error("Modification non enregistrée."),
+    })
+  }
+
+  return (
+    <Card>
+      <CardHeader><CardTitle className="text-base">Connexion par année de naissance ({listed.length})</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          Ces personnes saisissent leur e-mail puis leur année de naissance, sans recevoir de code par mail (elles peuvent
+          toujours le demander). Après 2 années incorrectes, cette voie est bloquée 1 heure : la personne reçoit alors le code
+          par mail et vous recevez une alerte. Une année se devine plus facilement qu'un code : réservez-la aux personnes qui
+          en ont vraiment besoin.
+        </p>
+        {listed.length > 0 && (
+          <ul className="divide-y divide-border text-sm">
+            {listed.map((m) => {
+              const locked = m.year_locked_until != null && new Date(m.year_locked_until).getTime() > now
+              return (
+                <li key={m.id} className="flex flex-wrap items-center gap-2 py-2">
+                  <div className="min-w-0 flex-1">
+                    <b>{memberName(m)}</b>
+                    <span className="ml-2 text-xs text-muted-foreground">{m.email}</span>
+                    {m.status !== "active" && <Badge className="ml-2 bg-bordeaux/10 text-bordeaux">Désactivé</Badge>}
+                    {locked && (
+                      <Badge className="ml-2 bg-amber-500/15 text-amber-700">
+                        Bloqué jusqu'à {new Date(m.year_locked_until!).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="font-mono text-sm tabular-nums">{m.birth_year}</span>
+                  {locked && (
+                    <Button size="xs" variant="outline" onClick={() => save(m, { year_locked_until: null, year_failures: 0 }, "Connexion par année débloquée.")}>
+                      Débloquer
+                    </Button>
+                  )}
+                  <Button size="xs" variant="ghost" className="text-bordeaux"
+                    onClick={() => save(m, { birth_year: null, year_failures: 0, year_locked_until: null }, "Retiré de la liste : code par mail uniquement.")}>
+                    Retirer
+                  </Button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        <form className="flex flex-wrap items-center gap-2" onSubmit={(e) => {
+          e.preventDefault()
+          const m = members.find((x) => x.id === memberId)
+          if (!m || !validYear) return
+          save(m, { birth_year: yearValue, year_failures: 0, year_locked_until: null }, `${memberName(m)} peut se connecter avec son année de naissance.`)
+          setMemberId(null); setYear("")
+        }}>
+          <SearchableSelect className="h-8 w-72 text-sm" value={memberId} onChange={setMemberId} ariaLabel="Compte à ajouter"
+            placeholder="Choisir un compte…" searchPlaceholder="Rechercher un nom ou un e-mail…" empty="Aucun compte ne correspond."
+            options={candidates.map((m) => ({ value: m.id, label: memberName(m), hint: m.email }))} />
+          <Input className="h-8 w-24 font-mono" inputMode="numeric" maxLength={4} placeholder="AAAA" aria-label="Année de naissance"
+            value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, ""))} />
+          <Button type="submit" size="sm" variant="outline" disabled={!memberId || !validYear || update.isPending}>Ajouter</Button>
+        </form>
+        <p className="text-xs text-muted-foreground">
+          La personne doit d'abord avoir un compte (demande approuvée, rattachement automatique ou « Ouvrir un compte manuellement »).
+        </p>
       </CardContent>
     </Card>
   )

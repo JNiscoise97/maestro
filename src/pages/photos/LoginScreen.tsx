@@ -5,13 +5,20 @@ import { useResetZoomOn } from "@/features/gallery/zoom"
 import type { ColorMode } from "@/features/gallery/theme"
 import { Masthead, ModeToggle } from "./GalleryChrome"
 
-type Step = "email" | "name" | "code" | "pending"
+type Step = "email" | "name" | "year" | "code" | "pending"
+
+type IdentifyResult =
+  | { status: "ready"; yearLogin?: boolean }
+  | { status: "need_name" | "pending" | "locked" }
+  | { status: "signed"; tokenHash: string }
+  | { status: "wrong_year"; remaining: number }
 
 const input = "w-full border-b bg-transparent py-2 text-base outline-none sm:text-sm focus:border-[var(--p-accent)]"
 const primary = "w-full py-3 text-xs uppercase tracking-[0.2em] text-white disabled:opacity-40"
 
 /**
  * Identification (CDCF ACC-01..03) : e-mail → (prénom/nom si inconnu) → code à 6 chiffres.
+ * Liste blanche : e-mail → année de naissance au lieu du code (2 erreurs → code par mail).
  * Aucun compte n'est créé par le navigateur (shouldCreateUser: false) : c'est gallery-identify qui décide.
  */
 export function LoginScreen({ mode, onToggleMode, compact = false }: {
@@ -27,6 +34,9 @@ export function LoginScreen({ mode, onToggleMode, compact = false }: {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [code, setCode] = useState("")
+  const [year, setYear] = useState("")
+  // Message affiché au-dessus du code (ex. bascule sur le mail après 2 années incorrectes).
+  const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -48,14 +58,38 @@ export function LoginScreen({ mode, onToggleMode, compact = false }: {
     setBusy(true)
     setError(null)
     try {
-      const res = await callGalleryFunction<{ status: "ready" | "need_name" | "pending" }>("gallery-identify", {
+      const res = await callGalleryFunction<IdentifyResult>("gallery-identify", {
         email, ...(withName ? { firstName, lastName } : {}),
       })
-      if (res.status === "ready") await sendCode()
+      if (res.status === "ready" && res.yearLogin) { setYear(""); setStep("year") }
+      else if (res.status === "ready") await sendCode()
       else if (res.status === "need_name") setStep("name")
       else setStep("pending")
     } catch {
       setError("Une erreur est survenue. Vérifiez votre adresse et réessayez.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function verifyYear() {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await callGalleryFunction<IdentifyResult>("gallery-identify", { email, birthYear: Number(year) })
+      if (res.status === "signed") {
+        const { error: verifyError } = await galleryClient!.auth.verifyOtp({ token_hash: res.tokenHash, type: "magiclink" })
+        if (verifyError) setError("La connexion a échoué. Réessayez dans un instant.")
+      } else if (res.status === "wrong_year") {
+        setYear("")
+        setError(`Année incorrecte. Il vous reste ${res.remaining} essai${res.remaining > 1 ? "s" : ""}.`)
+      } else {
+        // Bloqué (2 erreurs) ou plus sur liste blanche : code par mail.
+        setNotice(res.status === "locked" ? "Pour votre sécurité, la connexion par année est suspendue pendant 1 heure." : null)
+        await sendCode()
+      }
+    } catch {
+      setError("Une erreur est survenue. Réessayez dans un instant.")
     } finally {
       setBusy(false)
     }
@@ -111,6 +145,27 @@ export function LoginScreen({ mode, onToggleMode, compact = false }: {
           </form>
         )}
 
+        {step === "year" && (
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void verifyYear() }}>
+            <p className="text-sm" style={{ color: "var(--p-muted)" }}>
+              Saisissez votre <b style={{ color: "var(--p-fg)" }}>année de naissance</b> pour vous connecter.
+            </p>
+            <input inputMode="numeric" autoComplete="off" maxLength={4} required value={year}
+              onChange={(e) => setYear(e.target.value.replace(/\D/g, ""))} placeholder="AAAA" aria-label="Année de naissance"
+              className={`${input} text-center text-2xl tracking-[0.5em]`} style={{ borderColor: "var(--p-line)" }} />
+            <button type="submit" disabled={busy || year.length !== 4} className={primary}
+              style={{ background: "var(--p-accent)", borderRadius: "var(--p-radius)" }}>
+              {busy ? "Vérification…" : "Se connecter"}
+            </button>
+            <div className="flex justify-between text-xs" style={{ color: "var(--p-muted)" }}>
+              <button type="button" className="underline" onClick={() => { setError(null); setStep("email") }}>Changer d'adresse</button>
+              <button type="button" className="underline" disabled={busy} onClick={() => { setError(null); setNotice(null); void sendCode() }}>
+                Recevoir plutôt un code par mail
+              </button>
+            </div>
+          </form>
+        )}
+
         {step === "pending" && (
           <div className="space-y-4 text-sm">
             <p>Votre demande a bien été transmise à Sarah et Jordan.</p>
@@ -123,6 +178,7 @@ export function LoginScreen({ mode, onToggleMode, compact = false }: {
 
         {step === "code" && (
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void verify() }}>
+            {notice && <p className="text-sm">{notice}</p>}
             <p className="text-sm" style={{ color: "var(--p-muted)" }}>
               Saisissez le code envoyé à <b style={{ color: "var(--p-fg)" }}>{email}</b>. Il est valable 15 minutes.
             </p>
@@ -134,7 +190,7 @@ export function LoginScreen({ mode, onToggleMode, compact = false }: {
               {busy ? "Vérification…" : "Se connecter"}
             </button>
             <div className="flex justify-between text-xs" style={{ color: "var(--p-muted)" }}>
-              <button type="button" className="underline" onClick={() => { setCode(""); setStep("email") }}>Changer d'adresse</button>
+              <button type="button" className="underline" onClick={() => { setCode(""); setNotice(null); setStep("email") }}>Changer d'adresse</button>
               <button type="button" className="underline" disabled={busy} onClick={() => void sendCode()}>Renvoyer un code</button>
             </div>
           </form>

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { CircleAlert, Plus, Trash2 } from "lucide-react"
+import { CircleAlert, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import { useDeleteDevis, useSaveDevis } from "@/hooks/queries/use-budget"
 import { amountInput, fmt, parseAmount, type BudgetModel } from "@/lib/budget-calc"
 import type { BudgetDevis, BudgetItem, DevisStatus, PaymentDraft } from "@/services/supabase/budget"
 import type { Pole } from "@/types/domain"
+import { SearchableSelect } from "@/components/shared/SearchableSelect"
 import { PaymentsEditor } from "./PaymentsEditor"
 
 const STATUS_LABELS: Record<DevisStatus, string> = { en_cours: "En cours", retenu: "Retenu", refuse: "Refusé" }
@@ -42,7 +43,6 @@ export function DevisSheet({ devis, presetItemIds = [], model, items, poles, onC
   const [payments, setPayments] = useState<PaymentDraft[]>(() =>
     devis ? (model.paymentsByDevis.get(devis.id) ?? []).map(({ kind, label, amount, dueDate, paid, paidDate, account }) =>
       ({ kind, label, amount, dueDate, paid, paidDate, account })) : [])
-  const [picker, setPicker] = useState("")
 
   // Lignes pouvant être couvertes : postes sans sous-poste et sous-postes (jamais un poste à sous-postes).
   const pickable = useMemo(() => {
@@ -142,19 +142,12 @@ export function DevisSheet({ devis, presetItemIds = [], model, items, poles, onC
                 </div>
               )
             })}
-            <div className="flex items-center gap-2">
-              <select className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm" value={picker} onChange={(e) => setPicker(e.target.value)}>
-                <option value="">Ajouter une ligne couverte…</option>
-                {[...new Set(pickable.map((p) => p.group))].map((g) => (
-                  <optgroup key={g} label={g}>
-                    {pickable.filter((p) => p.group === g && !chosen.has(p.id)).map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-                  </optgroup>
-                ))}
-              </select>
-              <Button size="sm" variant="outline" disabled={!picker} onClick={() => { setLines([...lines, { itemId: picker, amount: "" }]); setPicker("") }}>
-                <Plus className="size-3.5" /> Ajouter
-              </Button>
-            </div>
+            {/* Choisir une ligne l'ajoute directement. */}
+            <SearchableSelect value={null} clearable={false} className="h-9 text-sm" ariaLabel="Ajouter une ligne couverte"
+              placeholder="+ Ajouter une ligne couverte (poste ou sous-poste)…" searchPlaceholder="Rechercher un poste, un sous-poste, un pôle…"
+              empty="Aucune ligne ne correspond."
+              options={pickable.filter((p) => !chosen.has(p.id)).map((p) => ({ value: p.id, label: p.label, group: p.group }))}
+              onChange={(id) => { if (id) setLines([...lines, { itemId: id, amount: "" }]) }} />
             {lines.length > 0 && (
               <p className={`flex items-center gap-1 text-xs tabular-nums ${Math.abs(gap) > 0.005 ? "text-amber-600" : "text-muted-foreground"}`}>
                 {Math.abs(gap) > 0.005 && <CircleAlert className="size-3.5" />}

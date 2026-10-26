@@ -9,6 +9,7 @@ import {
   revokeSessions, useAccessRequests, useAdminAction, useAdminDelete, useAdminEmails, useAdminInsert,
   useAdminUpdate, useMembers,
 } from "@/features/gallery/api"
+import { SearchableSelect } from "@/components/shared/SearchableSelect"
 import { GalleryError } from "@/features/gallery/client"
 import { useFiancaillesGuests, type FiancaillesGuest } from "@/features/gallery/guests"
 import type { AccessRequest, GalleryMember } from "@/features/gallery/types"
@@ -161,20 +162,11 @@ function PendingRequest({ request: r, busy, takenGuestIds, onApprove, onReject }
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex min-w-0 flex-1 items-center gap-2 text-xs text-muted-foreground">
           Lier à
-          <select className="min-w-0 flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
-            value={choice} onChange={(e) => setChoice(e.target.value)}>
-            <option value={NEW_PERSON}>— Nouvelle personne (pas dans la liste des invités) —</option>
-            {/* Même ordre que dans Invités : par groupe, puis par nom. */}
-            {groupsOf(free).map(([group, list]) => (
-              <optgroup key={group} label={group}>
-                {list.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.fullName}{g.id === r.matched_guest_id ? "  ✓ suggéré" : ""}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+          {/* Même ordre que dans Invités : par groupe, puis par nom ; recherche par nom ou groupe. */}
+          <SearchableSelect className="h-8 min-w-0 flex-1 text-sm" value={choice} clearable={false} ariaLabel="Invité à lier"
+            searchPlaceholder="Rechercher un invité ou un groupe…" empty="Aucun invité ne correspond."
+            options={guestOptions(free, r.matched_guest_id)}
+            onChange={(v) => setChoice(v ?? NEW_PERSON)} />
         </label>
         <Button size="sm" disabled={busy} onClick={() => onApprove(choice === NEW_PERSON ? null : choice)}>Autoriser</Button>
         <Button size="sm" variant="outline" disabled={busy} onClick={onReject}>Refuser</Button>
@@ -197,28 +189,22 @@ function GuestLinkSelect({ member, takenGuestIds, onChange }: {
   const { data: guests = [] } = useFiancaillesGuests()
   const free = guests.filter((g) => !takenGuestIds.has(g.id) || g.id === member.guest_id)
   return (
-    <select className="w-full max-w-56 rounded-md border border-input bg-background px-1.5 py-1 text-xs"
-      value={member.guest_id ?? NEW_PERSON}
-      onChange={(e) => onChange(e.target.value === NEW_PERSON ? null : e.target.value)}
-      aria-label={`Invité lié à ${memberName(member)}`}>
-      <option value={NEW_PERSON}>Hors liste (nouvelle personne)</option>
-      {groupsOf(free).map(([group, list]) => (
-        <optgroup key={group} label={group}>
-          {list.map((g) => <option key={g.id} value={g.id}>{g.fullName}</option>)}
-        </optgroup>
-      ))}
-    </select>
+    <SearchableSelect className="max-w-60" value={member.guest_id ?? NEW_PERSON} clearable={false}
+      ariaLabel={`Invité lié à ${memberName(member)}`} searchPlaceholder="Rechercher un invité ou un groupe…" empty="Aucun invité ne correspond."
+      options={guestOptions(free, null, "Hors liste (nouvelle personne)")}
+      onChange={(v) => { const next = !v || v === NEW_PERSON ? null : v; if (next !== member.guest_id) onChange(next) }} />
   )
 }
 
-/** Invités déjà triés, regroupés par groupe en gardant l'ordre d'apparition. */
-function groupsOf(guests: FiancaillesGuest[]): [string, FiancaillesGuest[]][] {
-  const map = new Map<string, FiancaillesGuest[]>()
-  for (const g of guests) {
-    const key = g.groupName ?? "Sans groupe"
-    map.set(key, [...(map.get(key) ?? []), g])
-  }
-  return [...map.entries()]
+/** Options du select intelligent : « nouvelle personne » en tête, puis les invités par groupe (ordre d'Invités). */
+function guestOptions(guests: FiancaillesGuest[], suggestedId: string | null, newLabel = "— Nouvelle personne (pas dans la liste des invités) —") {
+  return [
+    { value: NEW_PERSON, label: newLabel },
+    ...guests.map((g) => ({
+      value: g.id, label: g.fullName, group: g.groupName ?? "Sans groupe",
+      hint: g.id === suggestedId ? "✓ suggéré" : undefined,
+    })),
+  ]
 }
 
 function AddMember({ onAdd, busy }: { onAdd: (b: { email: string; firstName: string; lastName: string }) => void; busy: boolean }) {

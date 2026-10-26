@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils"
 import type { AmountStatus, BudgetDevis, BudgetItem, DevisPlan, DevisStatus, LineDraft, PaymentDraft, Priority } from "@/services/supabase/budget"
 import type { Pole } from "@/types/domain"
+import { SearchableSelect } from "@/components/shared/SearchableSelect"
 import { DevisSheet } from "./DevisSheet"
 import { PaymentsEditor } from "./PaymentsEditor"
 
@@ -504,15 +505,11 @@ function EstimateRow({ line, label, sequences, targets, onChange }: {
           ))}
         </div>
         {line.amountStatus === "included" && (
-          <select className="h-7 min-w-0 flex-1 rounded-md border border-input bg-background px-1.5 text-xs" value={line.includedInId ?? ""}
-            onChange={(e) => onChange({ includedInId: e.target.value || null })} aria-label="Ligne qui l'inclut">
-            <option value="">Choisir la ligne qui l'inclut (ex. Domaine Ostara)…</option>
-            {[...new Set(targets.map((t) => t.group))].map((g) => (
-              <optgroup key={g} label={g}>
-                {targets.filter((t) => t.group === g).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-              </optgroup>
-            ))}
-          </select>
+          <SearchableSelect className="min-w-0 flex-1" value={line.includedInId} ariaLabel="Ligne qui l'inclut"
+            placeholder="Choisir la ligne qui l'inclut (ex. Domaine Ostara)…" searchPlaceholder="Rechercher un poste ou sous-poste…"
+            empty="Aucune ligne ne correspond."
+            options={targets.map((t) => ({ value: t.id, label: t.label, group: t.group }))}
+            onChange={(v) => onChange({ includedInId: v })} />
         )}
         <label className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground" title="Le montant changera si le nombre d'invités change (traiteur, boissons…)">
           <input type="checkbox" checked={line.guestDependent} onChange={(e) => onChange({ guestDependent: e.target.checked })} />
@@ -537,7 +534,6 @@ function PurchaseCard({ line, label, sequences, devisOptions, newDevis, devisLab
   onCreateDevis: (d: NewDevis) => void
   onOpenDevis: (id: string) => void
 }) {
-  const [picker, setPicker] = useState("")
   const [creating, setCreating] = useState<NewDevis | null>(null)
   const seq = sequences.find((s) => s.id === line.sequenceId)
   const estimate = estimateOf(line)
@@ -614,21 +610,20 @@ function PurchaseCard({ line, label, sequences, devisOptions, newDevis, devisLab
             )
           })}
           <div className="flex flex-wrap items-center gap-2">
-            <select className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm" value={picker} onChange={(e) => setPicker(e.target.value)}>
-              <option value="">Rattacher un devis…</option>
-              {newDevis.length > 0 && (
-                <optgroup label="Créés dans ce poste">
-                  {newDevis.filter((d) => !line.links.some((l) => l.devisRef === d.ref)).map((d) => <option key={d.ref} value={d.ref}>{devisLabel(d.ref)}</option>)}
-                </optgroup>
-              )}
-              <optgroup label="Devis existants">
-                {devisOptions.filter((d) => !line.links.some((l) => l.devisRef === d.id)).map((d) => <option key={d.id} value={d.id}>{devisLabel(d.id)}</option>)}
-              </optgroup>
-            </select>
-            <Button size="sm" variant="outline" disabled={!picker} onClick={() => {
-              onChange({ links: [...line.links, { devisRef: picker, amount: amountInput(estimate) }] })
-              setPicker("")
-            }}>Rattacher</Button>
+            {/* Choisir un devis le rattache directement, avec l'estimé comme part par défaut. */}
+            <SearchableSelect value={null} clearable={false} className="h-8 min-w-0 flex-1 text-sm" ariaLabel="Rattacher un devis"
+              placeholder="Rattacher un devis existant…" searchPlaceholder="Rechercher un fournisseur, un intitulé…" empty="Aucun devis ne correspond."
+              options={[
+                ...newDevis.filter((d) => !line.links.some((l) => l.devisRef === d.ref))
+                  .map((d) => ({ value: d.ref, label: devisLabel(d.ref), group: "Créés dans ce poste" })),
+                ...devisOptions.filter((d) => !line.links.some((l) => l.devisRef === d.id))
+                  .map((d) => ({
+                    value: d.id, label: devisLabel(d.id),
+                    group: d.status === "retenu" ? "Devis retenus" : d.status === "refuse" ? "Devis refusés" : "Devis en cours",
+                    hint: d.totalAmount != null ? fmt(d.totalAmount) : undefined,
+                  })),
+              ]}
+              onChange={(ref) => { if (ref) onChange({ links: [...line.links, { devisRef: ref, amount: amountInput(estimate) }] }) }} />
             <Button size="sm" variant="outline" onClick={() => setCreating({ ref: newKey("devis"), vendor: "", title: "", totalAmount: amountInput(estimate), status: "en_cours" })}>
               <Plus className="size-3.5" /> Nouveau devis
             </Button>

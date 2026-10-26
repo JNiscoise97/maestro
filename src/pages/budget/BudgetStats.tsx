@@ -183,7 +183,8 @@ export function BudgetStats({ items, model, poles, sequences }: {
             </div>
             <div className="space-y-2 rounded-lg border border-border p-3">
               <p className="text-sm font-semibold">
-                👥 {fmt(stats.guestLines.reduce((t, l) => t + l.estimated, 0))} dépendent du nombre d'invités
+                <span className="mr-1.5 rounded bg-sky-500/10 px-1 text-[10px] font-semibold text-sky-700 dark:text-sky-400">% invités</span>
+                {fmt(stats.guestLines.reduce((t, l) => t + l.estimated, 0))} dépendent du nombre d'invités
                 <span className="font-normal text-muted-foreground"> · {pct(stats.guestLines.reduce((t, l) => t + l.estimated, 0), stats.estimated)} % du budget</span>
               </p>
               <p className="text-xs text-muted-foreground">À revoir si le nombre d'invités change (montants mis à jour à la main).</p>

@@ -516,7 +516,7 @@ function EstimateRow({ line, label, sequences, targets, onChange }: {
         )}
         <label className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground" title="Le montant changera si le nombre d'invités change (traiteur, boissons…)">
           <input type="checkbox" checked={line.guestDependent} onChange={(e) => onChange({ guestDependent: e.target.checked })} />
-          👥 Dépend du nombre d'invités
+          Dépend du nombre d'invités <span className="shrink-0 rounded bg-sky-500/10 px-1 text-[10px] font-semibold text-sky-700 dark:text-sky-400">% invités</span>
         </label>
       </div>
       {line.amountStatus === "to_estimate" && (
@@ -688,7 +688,7 @@ function Recap({ name, pole, lines, multiple, sequences, devisLabel, postePriori
               <span className="font-medium">{multiple ? l.label : name}</span>
               <span className="tabular-nums">
                 {l.amountStatus === "to_estimate" ? "à estimer" : l.amountStatus === "included" ? "inclus" : fmt(estimateOf(l))}
-                {l.guestDependent && " 👥"}
+                {l.guestDependent && <span className="ml-1 rounded bg-sky-500/10 px-1 text-[10px] font-semibold text-sky-700 dark:text-sky-400">% invités</span>}
               </span>
             </div>
             <p className="text-xs text-muted-foreground">

@@ -581,7 +581,7 @@ export function BudgetPage() {
                 </button>
               ))}
               <button className={chip(guestOnly)} onClick={() => setGuestOnly((v) => !v)} title="Lignes dont le montant dépend du nombre d'invités">
-                👥 Dépend du nombre d'invités
+                % invités
               </button>
             </div>
             <div className="flex flex-wrap items-center gap-2">

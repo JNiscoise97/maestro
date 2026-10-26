@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react"
-import { FileUp, Plus, Search, X } from "lucide-react"
+import { FileDown, FileUp, Plus, Search, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { PageHeader } from "@/components/shared/PageHeader"
@@ -19,6 +19,7 @@ import {
 import { usePoles } from "@/hooks/queries/use-poles"
 import { BudgetModel, PRIORITIES, PRIORITY_LABELS, effectivePriority, fmt, fmtCompact, lineMatches } from "@/lib/budget-calc"
 import { poleIdForCategory } from "@/lib/budget-poles"
+import { exportBudgetXlsx } from "@/lib/budget-export"
 import type { BudgetItem } from "@/services/supabase/budget"
 import type { Pole } from "@/types/domain"
 import { SequenceName } from "@/components/shared/SequenceName"
@@ -518,6 +519,16 @@ export function BudgetPage() {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               <FileUp className="mr-1.5 size-4" /> Importer CSV
+            </Button>
+            <Button variant="outline" size="sm" disabled={items.length === 0} onClick={() => {
+              try {
+                exportBudgetXlsx({ items, model, poles: sortedPoles, sequences: sortedSeq })
+              } catch (err) {
+                console.error(err)
+                toast.error("Export impossible.")
+              }
+            }}>
+              <FileDown className="mr-1.5 size-4" /> Exporter Excel
             </Button>
             <Button size="sm" onClick={() => setSheet({ poste: "new", poleId: poleFilter && poleFilter !== NO_POLE ? poleFilter : null })}>
               <Plus className="mr-1.5 size-4" /> Nouveau poste

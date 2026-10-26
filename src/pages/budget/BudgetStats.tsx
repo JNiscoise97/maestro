@@ -172,13 +172,31 @@ export function BudgetStats({ items, model, poles, sequences }: {
                 {stats.toEstimate.length ? "Elles comptent pour 0 € : le budget estimé ci-dessus est incomplet." : "Le budget estimé couvre toutes les dépenses prévues."}
               </p>
               {stats.toEstimate.length > 0 && (
-                <ul className="max-h-40 space-y-0.5 overflow-y-auto text-xs">
-                  {stats.toEstimate.map((l) => (
-                    <li key={l.item.id} className="truncate">• {model.fullLabel(l.item.id)}
-                      <span className="text-muted-foreground"> · {poles.find((p) => p.id === l.poleId)?.name ?? "Sans pôle"}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="max-h-56 space-y-2 overflow-y-auto text-xs">
+                  {/* Regroupées par séquence, dans l'ordre des séquences ; « Sans séquence » en dernier. */}
+                  {[...sequences.map((q) => q.id), null]
+                    .map((seqId) => ({ seqId, list: stats.toEstimate.filter((l) => l.sequenceId === seqId) }))
+                    .filter((g) => g.list.length > 0)
+                    .map(({ seqId, list }) => {
+                      const seq = seqId ? sequences.find((q) => q.id === seqId) : undefined
+                      return (
+                        <div key={seqId ?? "none"}>
+                          <p className="font-semibold">
+                            <span aria-hidden className="mr-1.5 inline-block size-2 rounded-full align-middle"
+                              style={{ background: seq ? sequenceColor(seq) : "#9ca3af" }} />
+                            {seq?.name ?? "Sans séquence"} <span className="font-normal text-muted-foreground">({list.length})</span>
+                          </p>
+                          <ul className="mt-0.5 space-y-0.5 pl-3.5">
+                            {list.map((l) => (
+                              <li key={l.item.id} className="truncate">• {model.fullLabel(l.item.id)}
+                                <span className="text-muted-foreground"> · {poles.find((p) => p.id === l.poleId)?.name ?? "Sans pôle"}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )
+                    })}
+                </div>
               )}
             </div>
             <div className="space-y-2 rounded-lg border border-border p-3">

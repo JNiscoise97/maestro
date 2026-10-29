@@ -26,6 +26,23 @@ export function useUpdateBudgetItem() {
   })
 }
 
+/** Notes et étiquettes de la seconde passe : mise à jour immédiate à l'écran (on note vite, ligne après ligne). */
+export function useSetBudgetReview() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Pick<Partial<BudgetItem>, "reviewScores" | "reviewNote" | "guestDependent" | "diyPossible"> }) =>
+      budgetService.updateItem(id, patch),
+    onMutate: async ({ id, patch }) => {
+      await qc.cancelQueries({ queryKey: QK })
+      const previous = qc.getQueryData<BudgetItem[]>(QK)
+      qc.setQueryData<BudgetItem[]>(QK, (items) => items?.map((i) => (i.id === id ? { ...i, ...patch } : i)))
+      return { previous }
+    },
+    onError: (_err, _vars, ctx) => { if (ctx?.previous) qc.setQueryData(QK, ctx.previous) },
+    onSettled: () => qc.invalidateQueries({ queryKey: QK }),
+  })
+}
+
 export function useDeleteBudgetItem() {
   const qc = useQueryClient()
   return useMutation({

@@ -3,6 +3,9 @@ import * as XLSX from "xlsx"
 import {
   PAYMENT_STATUS_LABELS, PRIORITY_LABELS, effectivePriority, paymentStatus, type BudgetModel,
 } from "@/lib/budget-calc"
+import {
+  REVIEW_MAX, REVIEW_QUESTIONS, VERDICT_LABELS, costPerPoint, effectiveReview, reviewTotal, reviewVerdict,
+} from "@/lib/budget-review"
 import type { BudgetItem } from "@/services/supabase/budget"
 import type { Pole } from "@/types/domain"
 
@@ -66,6 +69,9 @@ export function exportBudgetXlsx({ items, model, poles, sequences }: {
     const allDevis = (model.linesByItem.get(item.id) ?? []).map((l) => model.devisById.get(l.devisId)).filter(Boolean)
     const prio = effectivePriority(model, item)
     const due = f.real ?? f.estimated
+    const review = effectiveReview(model, item)
+    const total = review ? reviewTotal(review.scores) : null
+    const perPoint = total == null || item.amountStatus !== "estimated" ? null : costPerPoint(due, total)
     return [
       poleName(top.poleId), top.label, item.parentId ? item.label : "", seqName(item.sequenceId),
       prio ? PRIORITY_LABELS[prio] : "Non priorisé", item.parentId && !item.priority ? "Héritée du poste" : item.priority ? "Propre" : "",
@@ -78,6 +84,11 @@ export function exportBudgetXlsx({ items, model, poles, sequences }: {
       retained?.devis.vendor ?? item.vendor ?? "", retained?.devis.title ?? "", retained?.amount ?? null,
       allDevis.map((d) => `${d!.vendor ?? d!.title ?? "?"} (${DEVIS_LABELS[d!.status]})`).join(" ; "),
       item.account ?? "", item.origin ?? "", item.notes ?? "", top.notes && item.parentId ? top.notes : "",
+      // Seconde passe
+      ...REVIEW_QUESTIONS.map((q) => review?.scores[q.key] ?? null),
+      total, perPoint === Infinity ? "∞" : perPoint,
+      item.amountStatus === "included" ? "" : VERDICT_LABELS[reviewVerdict(model, item)],
+      review?.inherited ? "Notes du poste" : review ? "Propres" : "", yesNo(item.diyPossible), item.reviewNote ?? "",
     ]
   })
 
@@ -191,7 +202,9 @@ export function exportBudgetXlsx({ items, model, poles, sequences }: {
     "Dépend du nb d'invités", "Quantité", "Prix unitaire", "Estimé", "Réel", "Payé", "Reste à payer", "Statut de paiement",
     "Acompte requis", "Acompte payé", "Mode d'achat", "Fournisseur / enseigne", "Devis retenu (intitulé)", "Part dans le devis",
     "Tous les devis", "Compte", "Origine (qui paie)", "Notes", "Notes du poste",
-  ], lineRows, { 10: EUR, 11: EUR, 12: EUR, 13: EUR, 14: EUR, 21: EUR }), "Lignes")
+    ...REVIEW_QUESTIONS.map((q) => `2e passe — ${q.short} (0-2)`), `2e passe — Note /${REVIEW_MAX}`, "2e passe — € par point",
+    "2e passe — Verdict", "2e passe — Origine des notes", "2e passe — DIY envisageable", "2e passe — Remarque",
+  ], lineRows, { 10: EUR, 11: EUR, 12: EUR, 13: EUR, 14: EUR, 21: EUR, [27 + REVIEW_QUESTIONS.length + 1]: EUR }), "Lignes")
   XLSX.utils.book_append_sheet(wb, sheet([
     "Pôle", "Poste", "Sous-postes", "Séquences", "Priorité", "Estimé", "Réel", "Payé", "Reste à payer", "Statut de paiement",
     "Lignes à estimer", "Dépend du nb d'invités", "Notes",

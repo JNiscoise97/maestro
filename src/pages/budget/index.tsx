@@ -25,6 +25,7 @@ import type { Pole } from "@/types/domain"
 import { SequenceName } from "@/components/shared/SequenceName"
 import { BudgetStats } from "./BudgetStats"
 import { DevisTab } from "./DevisTab"
+import { ReviewTab } from "./ReviewTab"
 import { PoleTable, type OptionalCol } from "./PoleTable"
 import { PosteSheet } from "./PosteSheet"
 
@@ -149,6 +150,9 @@ function parseCsvFiancailles(lines: string[]): ParsedRow[] {
       amountStatus:   "estimated",
       includedInId:   null,
       guestDependent: false,
+      reviewScores: null,
+      reviewNote: null,
+      diyPossible: false,
       label:          r.label,
       quantity:       null,
       unitPrice:      null,
@@ -204,6 +208,9 @@ function parseCsvGeneric(lines: string[]): ParsedRow[] {
       amountStatus:   "estimated",
       includedInId:   null,
       guestDependent: false,
+      reviewScores: null,
+      reviewNote: null,
+      diyPossible: false,
       label,
       quantity:       iQty    >= 0 ? parseFrNumber(cols[iQty]    ?? "") : null,
       unitPrice:      iPU     >= 0 ? parseFrNumber(cols[iPU]     ?? "") : null,
@@ -447,7 +454,7 @@ function BudgetSummary({ postes, model }: { postes: BudgetItem[]; model: BudgetM
 
 // ── Page principale ───────────────────────────────────────────────────────────
 
-type Tab = "postes" | "devis"
+type Tab = "postes" | "devis" | "passe"
 
 export function BudgetPage() {
   const { data: items = [], isLoading: lItems } = useBudgetItems()
@@ -542,7 +549,7 @@ export function BudgetPage() {
       <BudgetSummary postes={postes} model={model} />
 
       <div className="flex gap-1.5" role="tablist">
-        {([["postes", "Postes"], ["devis", `Devis (${devis.length})`]] as const).map(([id, label]) => (
+        {([["postes", "Postes"], ["devis", `Devis (${devis.length})`], ["passe", "Seconde passe"]] as const).map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
             className={`rounded-full border px-3.5 py-1 text-sm font-medium transition-colors ${tab === id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground"}`}>
             {label}
@@ -552,6 +559,8 @@ export function BudgetPage() {
 
       {tab === "devis" ? (
         <DevisTab devis={devis} model={model} items={items} poles={sortedPoles} />
+      ) : tab === "passe" ? (
+        <ReviewTab items={items} model={model} poles={sortedPoles} sequences={sortedSeq} />
       ) : (
         <>
           <div className="relative max-w-sm">

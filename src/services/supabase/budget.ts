@@ -32,8 +32,16 @@ export type BudgetItem = {
   includedInId: string | null
   /** Le montant dépend du nombre d'invités (étiquette, sans calcul). */
   guestDependent: boolean
+  /** Seconde passe : notes de 0 à 2 par question ; null = pas encore notée (un sous-poste reprend alors son poste). */
+  reviewScores: ReviewScores | null
+  reviewNote: string | null
+  /** Seconde passe : on pourrait le faire nous-mêmes (étiquette). */
+  diyPossible: boolean
   sortOrder: number
 }
+
+export type ReviewKey = "souvenir" | "signature" | "absence" | "confort" | "trace" | "duree"
+export type ReviewScores = Partial<Record<ReviewKey, 0 | 1 | 2>>
 
 export type Priority = "must" | "should" | "could"
 export type AmountStatus = "estimated" | "to_estimate" | "included"
@@ -73,6 +81,9 @@ function fromRow(r: any): BudgetItem {
     amountStatus:   r.amount_status ?? "estimated",
     includedInId:   r.included_in_id ?? null,
     guestDependent: r.guest_dependent ?? false,
+    reviewScores:   r.review_scores ?? null,
+    reviewNote:     r.review_note ?? null,
+    diyPossible:    r.diy_possible ?? false,
     sortOrder:      r.sort_order ?? 0,
   }
 }
@@ -153,6 +164,9 @@ export const budgetService = {
     if (patch.amountStatus   !== undefined) row.amount_status   = patch.amountStatus
     if (patch.includedInId   !== undefined) row.included_in_id  = patch.includedInId
     if (patch.guestDependent !== undefined) row.guest_dependent = patch.guestDependent
+    if (patch.reviewScores   !== undefined) row.review_scores   = patch.reviewScores
+    if (patch.reviewNote     !== undefined) row.review_note     = patch.reviewNote
+    if (patch.diyPossible    !== undefined) row.diy_possible    = patch.diyPossible
     if (patch.sortOrder      !== undefined) row.sort_order      = patch.sortOrder
     if (Object.keys(row).length === 0) return
     const { error } = await db.from(tbl("budget_items")).update(row).eq("id", id)

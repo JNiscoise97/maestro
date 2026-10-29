@@ -214,11 +214,13 @@ function EstimateCell({ model, lines, estimated }: { model: BudgetModel; lines: 
 /** Repères d'une ligne : « % invités » (dépend du nombre d'invités), « inclus dans … », « inclut … ». */
 function LineMarkers({ model, lines }: { model: BudgetModel; lines: BudgetItem[] }) {
   const guest = lines.some((l) => l.guestDependent)
+  const diy = lines.some((l) => l.diyPossible)
   const included = lines.length === 1 && lines[0].amountStatus === "included" ? lines[0] : null
   const includes = lines.flatMap((l) => model.includedIn(l.id))
   return (
     <>
       {guest && <span className="shrink-0 rounded bg-sky-500/10 px-1 text-[10px] font-semibold text-sky-700 dark:text-sky-400" title="Le montant dépend du nombre d'invités">% invités</span>}
+      {diy && <span className="shrink-0 rounded bg-amber-500/15 px-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400" title="On pourrait le faire nous-mêmes">DIY</span>}
       {included && (
         <span className="shrink-0 truncate text-[11px] font-normal text-muted-foreground" title={`Inclus dans ${model.fullLabel(included.includedInId)}`}>
           · inclus dans {model.fullLabel(included.includedInId)}

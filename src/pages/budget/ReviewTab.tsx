@@ -86,7 +86,7 @@ export function ReviewTab({ items, model, poles, sequences }: {
   const sumOf = (v: ReviewVerdict) => lines.filter((l) => l.verdict === v).reduce((t, l) => t + l.amount, 0)
   const rated = lines.length - counts.a_noter
 
-  const shown = lines
+  const liveShown = lines
     .filter((l) => filter === "all" || l.verdict === filter)
     .filter((l) => (!guestOnly || l.item.guestDependent) && (!diyOnly || l.item.diyPossible))
     .filter((l) => !search.trim() || lineMatches(l.item, search)
@@ -100,8 +100,24 @@ export function ReviewTab({ items, model, poles, sequences }: {
       return (b.perPoint ?? 0) - (a.perPoint ?? 0) || b.amount - a.amount
     })
 
+  // Ordre figé : noter une ligne ne la fait ni bouger ni disparaître. Il n'est recalculé que si le tri,
+  // un filtre ou la recherche changent, ou sur « Retrier ».
+  const viewKey = JSON.stringify([filter, sort, search.trim(), guestOnly, diyOnly])
+  const liveIds = liveShown.map((l) => l.item.id)
+  const [frozen, setFrozen] = useState<{ key: string; ids: string[] } | null>(null)
+  if (frozen?.key !== viewKey) setFrozen({ key: viewKey, ids: liveIds })
+  const byId = new Map(lines.map((l) => [l.item.id, l]))
+  const shown = frozen?.key === viewKey
+    ? [
+        ...frozen.ids.map((id) => byId.get(id)).filter((l): l is (typeof lines)[number] => !!l),
+        // Lignes créées depuis (ex. nouveau sous-poste) : à la fin.
+        ...liveShown.filter((l) => !frozen.ids.includes(l.item.id)),
+      ]
+    : liveShown
+  const stale = frozen?.key === viewKey && frozen.ids.join() !== liveIds.join()
+
   // Regroupement séquence → pôle (ordre des Paramètres) ; le tri choisi s'applique dans chaque groupe.
-  const groups = useMemo(() => {
+  const groups = (() => {
     if (!grouped) return [{ key: "all", title: null as string | null, seq: null as Seq | null, poles: [{ key: "all", title: null as string | null, rows: shown }] }]
     const seqIds = [...sequences.map((x) => x.id as string | null), null]
     const poleIds = [...poles.map((x) => x.id as string | null), null]
@@ -122,7 +138,7 @@ export function ReviewTab({ items, model, poles, sequences }: {
         }
       })
       .filter((g) => g.poles.length)
-  }, [grouped, shown, sequences, poles])
+  })()
   const colCount = REVIEW_QUESTIONS.length + 9
   const sum = (rows: typeof shown) => rows.reduce((t, l) => t + l.amount, 0)
 
@@ -196,6 +212,12 @@ export function ReviewTab({ items, model, poles, sequences }: {
           <input type="checkbox" checked={grouped} onChange={(e) => setGrouped(e.target.checked)} />
           Regrouper par séquence puis par pôle
         </label>
+        {stale && (
+          <button type="button" className={chip(true)} onClick={() => setFrozen({ key: viewKey, ids: liveIds })}
+            title="L'ordre reste figé pendant la notation ; cliquer pour appliquer le tri et les filtres aux nouvelles notes">
+            Retrier
+          </button>
+        )}
         {grouped && (
           <div className="flex gap-1.5">
             <button type="button" className={chip(false)} onClick={() => setCollapsed(new Set())}>

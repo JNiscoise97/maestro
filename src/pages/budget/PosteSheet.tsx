@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { useDeletePoste, useSavePoste } from "@/hooks/queries/use-budget"
 import {
   ACCOUNT_SUGGESTIONS, ORIGIN_SUGGESTIONS, PAYMENT_STATUS_LABELS, PRIORITIES, PRIORITY_COLORS, PRIORITY_HINTS,
-  PRIORITY_LABELS, amountInput, fmt, parseAmount, paymentStatus, type BudgetModel,
+  PRIORITY_LABELS, amountInput, budgetItemComparator, fmt, parseAmount, paymentStatus, type BudgetModel,
 } from "@/lib/budget-calc"
 import { cn } from "@/lib/utils"
 import type { AmountStatus, BudgetDevis, BudgetItem, DevisPlan, DevisStatus, LineDraft, PaymentDraft, Priority } from "@/services/supabase/budget"
@@ -198,11 +198,11 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
   const figures = existing ? model.poste(existing) : null
   const targets: Target[] = useMemo(() => items
     .filter((i) => i.id !== existing?.id && i.amountStatus !== "included")
+    .sort(budgetItemComparator(model, poles))
     .map((i) => {
       const top = i.parentId ? model.itemsById.get(i.parentId) : i
       return { id: i.id, label: model.fullLabel(i.id), group: poles.find((p) => p.id === top?.poleId)?.name ?? "Sans pôle" }
-    })
-    .sort((a, b) => a.group.localeCompare(b.group, "fr") || a.label.localeCompare(b.label, "fr")), [items, model, poles, existing])
+    }), [items, model, poles, existing])
   const devisOptions = [...model.devisById.values()].sort((a, b) => (a.vendor ?? "").localeCompare(b.vendor ?? "", "fr"))
   const devisLabel = (ref: string) => {
     const nd = newDevis.find((d) => d.ref === ref)

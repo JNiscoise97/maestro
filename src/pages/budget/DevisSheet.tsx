@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useDeleteDevis, useSaveDevis } from "@/hooks/queries/use-budget"
-import { amountInput, fmt, parseAmount, type BudgetModel } from "@/lib/budget-calc"
+import { amountInput, budgetItemComparator, fmt, parseAmount, type BudgetModel } from "@/lib/budget-calc"
 import type { BudgetDevis, BudgetItem, DevisStatus, PaymentDraft } from "@/services/supabase/budget"
 import type { Pole } from "@/types/domain"
 import { SearchableSelect } from "@/components/shared/SearchableSelect"
@@ -49,12 +49,12 @@ export function DevisSheet({ devis, presetItemIds = [], model, items, poles, onC
     const poleName = (id: string | null) => poles.find((p) => p.id === id)?.name ?? "Sans pôle"
     return items
       .filter((i) => i.parentId ? true : model.children(i.id).length === 0)
+      .sort(budgetItemComparator(model, poles))
       .map((i) => {
         const parent = i.parentId ? model.itemsById.get(i.parentId) : undefined
         const top = parent ?? i
         return { id: i.id, group: poleName(top.poleId), label: parent ? `${parent.label} › ${i.label}` : i.label }
       })
-      .sort((a, b) => a.group.localeCompare(b.group, "fr") || a.label.localeCompare(b.label, "fr"))
   }, [items, model, poles])
   const labelOf = (id: string) => pickable.find((p) => p.id === id)
   const chosen = new Set(lines.map((l) => l.itemId))

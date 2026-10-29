@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx"
 
 import {
-  PAYMENT_STATUS_LABELS, PRIORITY_LABELS, effectivePriority, paymentStatus, type BudgetModel,
+  PAYMENT_STATUS_LABELS, PRIORITY_LABELS, budgetItemComparator, effectivePriority, paymentStatus, type BudgetModel,
 } from "@/lib/budget-calc"
 import {
   REVIEW_MAX, REVIEW_QUESTIONS, VERDICT_LABELS, costPerPoint, effectiveReview, reviewTotal, reviewVerdict,
@@ -53,6 +53,7 @@ export function exportBudgetXlsx({ items, model, poles, sequences }: {
   const seqName = (id: string | null) => sequences.find((s) => s.id === id)?.name ?? "Sans séquence"
   const poleOrder = new Map(poles.map((p, i) => [p.id, i]))
   const seqOrder = new Map(sequences.map((s, i) => [s.id, i]))
+  const byBudget = budgetItemComparator(model, poles)
 
   // ── Lignes : postes sans sous-poste et sous-postes ──
   const leaves = items
@@ -61,7 +62,7 @@ export function exportBudgetXlsx({ items, model, poles, sequences }: {
     .sort((a, b) =>
       (poleOrder.get(a.top.poleId ?? "") ?? 99) - (poleOrder.get(b.top.poleId ?? "") ?? 99)
       || (seqOrder.get(a.item.sequenceId ?? "") ?? 99) - (seqOrder.get(b.item.sequenceId ?? "") ?? 99)
-      || a.top.label.localeCompare(b.top.label, "fr") || a.item.label.localeCompare(b.item.label, "fr"))
+      || byBudget(a.item, b.item))
 
   const lineRows: Cell[][] = leaves.map(({ item, top }) => {
     const f = model.line(item)
@@ -94,7 +95,7 @@ export function exportBudgetXlsx({ items, model, poles, sequences }: {
 
   // ── Postes ──
   const postes = items.filter((i) => !i.parentId)
-    .sort((a, b) => (poleOrder.get(a.poleId ?? "") ?? 99) - (poleOrder.get(b.poleId ?? "") ?? 99) || a.label.localeCompare(b.label, "fr"))
+    .sort(byBudget)
   const posteRows: Cell[][] = postes.map((p) => {
     const f = model.poste(p)
     const kids = model.children(p.id)

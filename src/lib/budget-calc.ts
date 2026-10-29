@@ -217,3 +217,21 @@ export function effectivePriority(model: BudgetModel, item: { priority: string |
   const parent = item.parentId ? model.itemsById.get(item.parentId) : undefined
   return (parent?.priority as (typeof PRIORITIES)[number] | null | undefined) ?? null
 }
+
+/**
+ * Ordre du budget : pôle (ordre des Paramètres), puis poste, puis sous-poste (ordre de saisie) ;
+ * un poste passe avant ses sous-postes. `poles` doit être trié comme dans les Paramètres.
+ */
+export function budgetItemComparator(model: BudgetModel, poles: { id: string }[]) {
+  const poleIndex = new Map(poles.map((p, i) => [p.id, i]))
+  const key = (i: BudgetItem) => {
+    const top = (i.parentId ? model.itemsById.get(i.parentId) : i) ?? i
+    return [poleIndex.get(top.poleId ?? "") ?? Infinity, top.sortOrder, i.parentId ? 1 : 0, i.parentId ? i.sortOrder : 0] as const
+  }
+  return (a: BudgetItem, b: BudgetItem) => {
+    const ka = key(a)
+    const kb = key(b)
+    for (let n = 0; n < ka.length; n++) if (ka[n] !== kb[n]) return ka[n] - kb[n]
+    return 0
+  }
+}

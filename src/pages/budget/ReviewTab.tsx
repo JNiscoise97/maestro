@@ -4,7 +4,7 @@ import { toast } from "sonner"
 
 import { Input } from "@/components/ui/input"
 import { useSetBudgetReview } from "@/hooks/queries/use-budget"
-import { PRIORITY_COLORS, PRIORITY_SHORT, effectivePriority, fmt, lineMatches, type BudgetModel } from "@/lib/budget-calc"
+import { PRIORITY_COLORS, PRIORITY_SHORT, budgetItemComparator, effectivePriority, fmt, lineMatches, type BudgetModel } from "@/lib/budget-calc"
 import {
   REVIEW_MAX, REVIEW_QUESTIONS, VERDICT_HINTS, VERDICT_LABELS, costPerPoint, effectiveReview, reviewAmount,
   reviewComplete, reviewTotal, reviewVerdict, type ReviewVerdict,
@@ -56,11 +56,9 @@ export function ReviewTab({ items, model, poles, sequences }: {
 
   // Lignes notables, dans l'ordre du budget (pôle, puis poste, puis sous-poste). Les lignes « incluses » valent 0 € : exclues.
   const lines = useMemo(() => {
-    const poleOrder = new Map(poles.map((p, i) => [p.id, i]))
     return items
-      .filter((i) => !i.parentId)
-      .sort((a, b) => (poleOrder.get(a.poleId ?? "") ?? Infinity) - (poleOrder.get(b.poleId ?? "") ?? Infinity) || a.sortOrder - b.sortOrder)
-      .flatMap((p) => model.leaves(p))
+      .filter((i) => i.parentId || model.children(i.id).length === 0)
+      .sort(budgetItemComparator(model, poles))
       .filter((l) => l.amountStatus !== "included")
       .map((l, index) => {
         const review = effectiveReview(model, l)

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useState } from "react"
 import { Navigate, Route, Routes, useLocation } from "react-router-dom"
 
 import { GalleryAuthProvider, useGalleryAuth } from "@/context/GalleryAuthContext"
@@ -15,6 +15,7 @@ import { GalleryNav, Notice } from "./GalleryChrome"
 import { HomeScreen } from "./HomeScreen"
 import { LoginScreen } from "./LoginScreen"
 import { PhotoViewer } from "./PhotoViewer"
+import { Presentation } from "./Presentation"
 
 const GalleryAdmin = lazy(() => import("./admin").then((m) => ({ default: m.GalleryAdmin })))
 
@@ -103,15 +104,19 @@ function GalleryContent({ memberId, settings, isAdmin, limited, mode, onToggleMo
   // Un administrateur voit aussi les photos masquées ; le parcours invité ne montre que les visibles.
   const visible = photos.filter((p) => p.status === "visible")
   const open = (list: GalleryPhoto[], index: number) => setViewer({ list, index })
+  // Mode présentation (télé) : remplace la visionneuse le temps du diaporama.
+  const [presentation, setPresentation] = useState<{ list: GalleryPhoto[]; index: number } | null>(null)
+  const present = (list: GalleryPhoto[], index = 0) => { setViewer(null); setPresentation({ list, index }) }
+  const closePresentation = useCallback(() => setPresentation(null), [])
 
   return (
     <>
       <GalleryNav mode={mode} onToggleMode={onToggleMode} />
       <Routes>
-        <Route index element={<HomeScreen photos={visible} settings={settings} limited={limited} onOpen={open} />} />
+        <Route index element={<HomeScreen photos={visible} settings={settings} limited={limited} onOpen={open} onPresent={present} />} />
         <Route path="albums" element={limited ? <Navigate to="/photos" replace /> : <CategoriesScreen photos={visible} albums={albums} onOpen={open} />} />
-        <Route path="albums/:albumId" element={limited ? <Navigate to="/photos" replace /> : <CategoryScreen photos={visible} albums={albums} onOpen={open} />} />
-        <Route path="favoris" element={<CategoryScreen photos={visible} albums={albums} favoritesOnly onOpen={open} />} />
+        <Route path="albums/:albumId" element={limited ? <Navigate to="/photos" replace /> : <CategoryScreen photos={visible} albums={albums} onOpen={open} onPresent={present} />} />
+        <Route path="favoris" element={<CategoryScreen photos={visible} albums={albums} favoritesOnly onOpen={open} onPresent={present} />} />
         {isAdmin && (
           <Route path="admin/*" element={
             <Suspense fallback={<Notice title="Chargement…" />}>
@@ -129,7 +134,12 @@ function GalleryContent({ memberId, settings, isAdmin, limited, mode, onToggleMo
           onClose={() => setViewer(null)}
           memberId={memberId}
           settings={settings}
+          onPresent={(index) => present(viewer.list.filter((p) => visible.some((v) => v.id === p.id)), index)}
         />
+      )}
+      {presentation && (
+        <Presentation photos={presentation.list.filter((p) => visible.some((v) => v.id === p.id))}
+          startIndex={presentation.index} onClose={closePresentation} />
       )}
     </>
   )

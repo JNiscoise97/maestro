@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { ArrowLeft, Heart, Search } from "lucide-react"
+import { ArrowLeft, Heart, Play, Search } from "lucide-react"
 
 import { logEvent, useFavorites, useSignedUrls, useSignedUrlsByChunks } from "@/features/gallery/api"
 import type { GalleryAlbum, GalleryPhoto } from "@/features/gallery/types"
@@ -99,12 +99,25 @@ function SearchResult({ photo, onOpen }: { photo: GalleryPhoto; onOpen: () => vo
   )
 }
 
+/** Bouton « Diaporama » : lance le mode présentation (télé, plein écran, défilement automatique). */
+export function PresentButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} title="Diaporama plein écran — idéal sur une télé"
+      className="flex items-center gap-1.5 border px-3 py-1.5 text-[11px] uppercase tracking-[0.2em]"
+      style={{ borderColor: "var(--p-accent-2, var(--p-accent))", color: "var(--p-accent-2, var(--p-accent))", borderRadius: "var(--p-radius)" }}>
+      <Play className="size-3.5" /> Diaporama
+    </button>
+  )
+}
+
 /** Une catégorie (album) ou « Mes favoris » : ses photos en ordre chronologique, chargées au défilement. */
-export function CategoryScreen({ photos, albums, favoritesOnly = false, onOpen }: {
+export function CategoryScreen({ photos, albums, favoritesOnly = false, onOpen, onPresent }: {
   photos: GalleryPhoto[]
   albums: GalleryAlbum[]
   favoritesOnly?: boolean
   onOpen: (list: GalleryPhoto[], index: number) => void
+  /** Mode présentation (télé) de toute la catégorie, depuis la première photo. */
+  onPresent?: (list: GalleryPhoto[], index?: number) => void
 }) {
   const { albumId } = useParams()
   const { data: favorites = new Set<string>() } = useFavorites()
@@ -119,9 +132,12 @@ export function CategoryScreen({ photos, albums, favoritesOnly = false, onOpen }
           <ArrowLeft className="size-3.5" /> Catégories
         </Link>
         <h2 className="mt-3 text-3xl font-light uppercase tracking-[0.15em]" style={{ fontFamily: "var(--p-heading)" }}>{title}</h2>
-        <span className="mt-1 block text-[11px] uppercase tracking-[0.25em]" style={{ color: "var(--p-gold, var(--p-muted))" }}>
-          {list.length} photo{list.length > 1 ? "s" : ""}
-        </span>
+        <div className="mt-1 flex flex-wrap items-center gap-4">
+          <span className="text-[11px] uppercase tracking-[0.25em]" style={{ color: "var(--p-gold, var(--p-muted))" }}>
+            {list.length} photo{list.length > 1 ? "s" : ""}
+          </span>
+          {onPresent && list.length > 0 && <PresentButton onClick={() => onPresent(list, 0)} />}
+        </div>
       </div>
       {list.length === 0 ? (
         <p className="px-6 py-10 text-sm" style={{ color: "var(--p-muted)" }}>

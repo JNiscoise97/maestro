@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { useSignedUrls } from "@/features/gallery/api"
 import type { GalleryPhoto, GallerySettings } from "@/features/gallery/types"
+import { PresentButton } from "./AlbumsScreen"
 import { Masthead } from "./GalleryChrome"
 import { JustifiedGrid } from "./JustifiedGrid"
 
@@ -11,12 +12,14 @@ import { JustifiedGrid } from "./JustifiedGrid"
  * Accueil (CDCF NAV-01/02/03) : texte de Sarah et Jordan puis la sélection d'au plus 50 photos,
  * dans le mode de défilement choisi en réglages. Une photo signalée disparaît sans remplacement.
  */
-export function HomeScreen({ photos, settings, limited = false, onOpen }: {
+export function HomeScreen({ photos, settings, limited = false, onOpen, onPresent }: {
   photos: GalleryPhoto[]
   settings: GallerySettings
   /** Accès limité : pas de lien vers la galerie complète, la sélection est reprise en grille. */
   limited?: boolean
   onOpen: (list: GalleryPhoto[], index: number) => void
+  /** Mode présentation (télé) de la sélection d'accueil. */
+  onPresent?: (list: GalleryPhoto[], index?: number) => void
 }) {
   const selection = photos
     .filter((p) => p.home_rank !== null && p.status === "visible")
@@ -32,6 +35,11 @@ export function HomeScreen({ photos, settings, limited = false, onOpen }: {
           style={{ color: "var(--p-muted)", fontFamily: settings.theme === "editorial" ? "var(--p-heading)" : undefined }}>
           {settings.welcome_text}
         </p>
+      )}
+      {onPresent && selection.length > 0 && (
+        <div className="flex justify-center pb-10">
+          <PresentButton onClick={() => onPresent(selection, 0)} />
+        </div>
       )}
     </>
   )

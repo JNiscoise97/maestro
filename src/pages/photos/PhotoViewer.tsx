@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { ChevronLeft, ChevronRight, Download, Flag, Heart, MessageCircle, Pencil, Trash2, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, Download, Flag, Heart, MessageCircle, Pencil, Play, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -23,13 +23,15 @@ const DOWNLOAD_ERRORS: Record<string, string> = {
  * Visionneuse plein écran (CDCF IMG-02) : photo seule, commandes discrètes masquables d'un toucher,
  * navigation clavier et balayage, une image chargée à la fois + la suivante en préchargement.
  */
-export function PhotoViewer({ photos, index, onIndex, onClose, memberId, settings }: {
+export function PhotoViewer({ photos, index, onIndex, onClose, memberId, settings, onPresent }: {
   photos: GalleryPhoto[]
   index: number
   onIndex: (i: number) => void
   onClose: () => void
   memberId: string
   settings: GallerySettings
+  /** Lance le mode présentation (télé) à partir de la photo affichée. */
+  onPresent?: (index: number) => void
 }) {
   const photo = photos[index] as GalleryPhoto | undefined
   const next = photos[index + 1]
@@ -75,9 +77,17 @@ export function PhotoViewer({ photos, index, onIndex, onClose, memberId, setting
       role="dialog" aria-modal="true" aria-label={`Photo ${photo.code}`}>
       <div className={`absolute inset-x-0 top-0 z-10 flex items-center justify-between px-4 py-3 transition-opacity duration-300 ${chrome ? "opacity-100" : "pointer-events-none opacity-0"}`}>
         <span className="text-xs uppercase tracking-[0.2em] opacity-70">{photo.code} · {index + 1} / {photos.length}</span>
-        <button type="button" onClick={onClose} aria-label="Fermer" className="rounded-full p-2 opacity-80 hover:opacity-100">
-          <X className="size-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          {onPresent && (
+            <button type="button" onClick={() => onPresent(index)} aria-label="Diaporama (mode présentation)" title="Diaporama — idéal sur une télé"
+              className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-[0.15em] opacity-80 hover:opacity-100">
+              <Play className="size-4" /> <span className="hidden sm:inline">Diaporama</span>
+            </button>
+          )}
+          <button type="button" onClick={onClose} aria-label="Fermer" className="rounded-full p-2 opacity-80 hover:opacity-100">
+            <X className="size-5" />
+          </button>
+        </div>
       </div>
 
       <div className="relative flex min-h-0 flex-1 items-center justify-center p-2 sm:p-10"

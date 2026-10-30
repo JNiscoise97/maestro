@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useDeleteDevis, useSaveDevis } from "@/hooks/queries/use-budget"
-import { amountInput, budgetItemComparator, fmt, parseAmount, type BudgetModel } from "@/lib/budget-calc"
+import { amountInput, budgetItemComparator, fmt, parseAmount, sequenceLabel, type BudgetModel } from "@/lib/budget-calc"
 import type { BudgetDevis, BudgetItem, DevisStatus, PaymentDraft } from "@/services/supabase/budget"
 import type { Pole } from "@/types/domain"
 import { SearchableSelect } from "@/components/shared/SearchableSelect"
@@ -19,7 +19,7 @@ const STATUS_LABELS: Record<DevisStatus, string> = { en_cours: "En cours", reten
  * Devis fournisseur : en-tête, lignes couvertes (postes ou sous-postes, dans n'importe quel pôle)
  * avec la part de chacune, statut et — une fois retenu — échéancier (acomptes, solde).
  */
-export function DevisSheet({ devis, presetItemIds = [], model, items, poles, onClose }: {
+export function DevisSheet({ devis, presetItemIds = [], model, items, poles, sequences, onClose }: {
   /** Devis existant, ou null pour en créer un. */
   devis: BudgetDevis | null
   /** Lignes pré-cochées à la création (depuis la fenêtre d'un poste). */
@@ -27,6 +27,7 @@ export function DevisSheet({ devis, presetItemIds = [], model, items, poles, onC
   model: BudgetModel
   items: BudgetItem[]
   poles: Pole[]
+  sequences: { id: string; name: string }[]
   onClose: () => void
 }) {
   const save = useSaveDevis()
@@ -53,9 +54,12 @@ export function DevisSheet({ devis, presetItemIds = [], model, items, poles, onC
       .map((i) => {
         const parent = i.parentId ? model.itemsById.get(i.parentId) : undefined
         const top = parent ?? i
-        return { id: i.id, group: poleName(top.poleId), label: parent ? `${parent.label} › ${i.label}` : i.label }
+        return {
+          id: i.id, group: poleName(top.poleId), label: parent ? `${parent.label} › ${i.label}` : i.label,
+          sequence: sequenceLabel(model, i, sequences),
+        }
       })
-  }, [items, model, poles])
+  }, [items, model, poles, sequences])
   const labelOf = (id: string) => pickable.find((p) => p.id === id)
   const chosen = new Set(lines.map((l) => l.itemId))
 
@@ -98,7 +102,7 @@ export function DevisSheet({ devis, presetItemIds = [], model, items, poles, onC
 
   return (
     <Sheet open onOpenChange={(o) => { if (!o) onClose() }}>
-      <SheetContent className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+      <SheetContent className="flex flex-col gap-0 overflow-hidden p-0">
         <SheetHeader className="shrink-0 border-b px-6 pb-4 pt-6">
           <SheetTitle>{devis ? "Devis" : "Nouveau devis"}</SheetTitle>
         </SheetHeader>
@@ -129,7 +133,7 @@ export function DevisSheet({ devis, presetItemIds = [], model, items, poles, onC
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm">{info?.label ?? "Ligne supprimée"}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      {info?.group}
+                      {info?.group}{info && ` · ${info.sequence}`}
                       {conflict && <span className="ml-1 text-destructive">· déjà retenue dans « {model.retained.get(l.itemId)?.devis.vendor ?? model.retained.get(l.itemId)?.devis.title} »</span>}
                     </p>
                   </div>
@@ -146,7 +150,7 @@ export function DevisSheet({ devis, presetItemIds = [], model, items, poles, onC
             <SearchableSelect value={null} clearable={false} className="h-9 text-sm" ariaLabel="Ajouter une ligne couverte"
               placeholder="+ Ajouter une ligne couverte (poste ou sous-poste)…" searchPlaceholder="Rechercher un poste, un sous-poste, un pôle…"
               empty="Aucune ligne ne correspond."
-              options={pickable.filter((p) => !chosen.has(p.id)).map((p) => ({ value: p.id, label: p.label, group: p.group }))}
+              options={pickable.filter((p) => !chosen.has(p.id)).map((p) => ({ value: p.id, label: p.label, group: p.group, hint: p.sequence }))}
               onChange={(id) => { if (id) setLines([...lines, { itemId: id, amount: "" }]) }} />
             {lines.length > 0 && (
               <p className={`flex items-center gap-1 text-xs tabular-nums ${Math.abs(gap) > 0.005 ? "text-amber-600" : "text-muted-foreground"}`}>

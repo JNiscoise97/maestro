@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { useDeletePoste, useSavePoste } from "@/hooks/queries/use-budget"
 import {
   ACCOUNT_SUGGESTIONS, ORIGIN_SUGGESTIONS, PAYMENT_STATUS_LABELS, PRIORITIES, PRIORITY_COLORS, PRIORITY_HINTS,
-  PRIORITY_LABELS, amountInput, budgetItemComparator, fmt, parseAmount, paymentStatus, type BudgetModel,
+  PRIORITY_LABELS, amountInput, budgetItemComparator, fmt, sequenceLabel, parseAmount, paymentStatus, type BudgetModel,
 } from "@/lib/budget-calc"
 import { cn } from "@/lib/utils"
 import type { AmountStatus, BudgetDevis, BudgetItem, DevisPlan, DevisStatus, LineDraft, PaymentDraft, Priority } from "@/services/supabase/budget"
@@ -68,7 +68,7 @@ const estimateOf = (l: Line) => l.amountStatus !== "estimated"
   ? null
   : l.estimatedTotal ?? (l.quantity != null && l.unitPrice != null ? l.quantity * l.unitPrice : null)
 
-type Target = { id: string; label: string; group: string }
+type Target = { id: string; label: string; group: string; sequence: string }
 
 /**
  * Poste de dépense. Création : assistant en 4 étapes (Quoi ? → Séquences → Combien ? → Achat) puis
@@ -201,8 +201,11 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
     .sort(budgetItemComparator(model, poles))
     .map((i) => {
       const top = i.parentId ? model.itemsById.get(i.parentId) : i
-      return { id: i.id, label: model.fullLabel(i.id), group: poles.find((p) => p.id === top?.poleId)?.name ?? "Sans pôle" }
-    }), [items, model, poles, existing])
+      return {
+        id: i.id, label: model.fullLabel(i.id), group: poles.find((p) => p.id === top?.poleId)?.name ?? "Sans pôle",
+        sequence: sequenceLabel(model, i, sequences),
+      }
+    }), [items, model, poles, sequences, existing])
   const devisOptions = [...model.devisById.values()].sort((a, b) => (a.vendor ?? "").localeCompare(b.vendor ?? "", "fr"))
   const devisLabel = (ref: string) => {
     const nd = newDevis.find((d) => d.ref === ref)
@@ -342,7 +345,7 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
 
   return (
     <Sheet open onOpenChange={(o) => { if (!o) requestClose() }}>
-      <SheetContent className="flex flex-col gap-0 overflow-hidden p-0 data-[side=right]:w-full data-[side=right]:sm:w-[75vw] data-[side=right]:sm:max-w-none">
+      <SheetContent className="flex flex-col gap-0 overflow-hidden p-0">
         <SheetHeader className="shrink-0 space-y-3 border-b px-6 pb-4 pt-6">
           <SheetTitle>{existing ? existing.label : "Nouveau poste de dépense"}</SheetTitle>
           {figures && (
@@ -399,7 +402,7 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
         </div>
 
         {openDevis && (
-          <DevisSheet devis={openDevis} model={model} items={items} poles={poles} onClose={() => setOpenDevis(null)} />
+          <DevisSheet devis={openDevis} model={model} items={items} poles={poles} sequences={sequences} onClose={() => setOpenDevis(null)} />
         )}
       </SheetContent>
     </Sheet>
@@ -508,7 +511,7 @@ function EstimateRow({ line, label, sequences, targets, onChange }: {
           <SearchableSelect className="min-w-0 flex-1" value={line.includedInId} ariaLabel="Ligne qui l'inclut"
             placeholder="Choisir la ligne qui l'inclut (ex. Domaine Ostara)…" searchPlaceholder="Rechercher un poste ou sous-poste…"
             empty="Aucune ligne ne correspond."
-            options={targets.map((t) => ({ value: t.id, label: t.label, group: t.group }))}
+            options={targets.map((t) => ({ value: t.id, label: t.label, group: t.group, hint: t.sequence }))}
             onChange={(v) => onChange({ includedInId: v })} />
         )}
         <label className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground" title="Le montant changera si le nombre d'invités change (traiteur, boissons…)">

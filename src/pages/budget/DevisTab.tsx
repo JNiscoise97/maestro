@@ -17,11 +17,12 @@ const GROUPS: { status: DevisStatus; label: string }[] = [
  * Onglet Devis : tous les devis par statut. C'est ici qu'on crée un devis groupé couvrant des lignes
  * de plusieurs postes ou pôles (ex. décoratrice : fleurs de la réception + arche + centres de table).
  */
-export function DevisTab({ devis, model, items, poles }: {
+export function DevisTab({ devis, model, items, poles, sequences }: {
   devis: BudgetDevis[]
   model: BudgetModel
   items: BudgetItem[]
   poles: Pole[]
+  sequences: { id: string; name: string }[]
 }) {
   const [sheet, setSheet] = useState<BudgetDevis | "new" | null>(null)
   const lineLabel = (itemId: string) => {
@@ -87,7 +88,7 @@ export function DevisTab({ devis, model, items, poles }: {
       })}
 
       {sheet && (
-        <DevisSheet devis={sheet === "new" ? null : sheet} model={model} items={items} poles={poles} onClose={() => setSheet(null)} />
+        <DevisSheet devis={sheet === "new" ? null : sheet} model={model} items={items} poles={poles} sequences={sequences} onClose={() => setSheet(null)} />
       )}
     </div>
   )

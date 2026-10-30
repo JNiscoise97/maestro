@@ -235,3 +235,11 @@ export function budgetItemComparator(model: BudgetModel, poles: { id: string }[]
     return 0
   }
 }
+
+/** Séquence(s) d'une ligne, en clair : celle de la ligne, ou celles de ses sous-postes pour un poste qui en a. */
+export function sequenceLabel(model: BudgetModel, item: BudgetItem, sequences: { id: string; name: string }[]): string {
+  const ids = model.children(item.id).length ? model.sequencesOf(item) : [item.sequenceId]
+  const names = sequences.filter((s) => ids.includes(s.id)).map((s) => s.name)
+  if (ids.includes(null)) names.push("Sans séquence")
+  return names.join(" · ") || "Sans séquence"
+}

@@ -145,10 +145,11 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, priority
                             ) : <span className="w-3.5 shrink-0" />}
                             <span className="truncate" title={p.label}>{p.label}</span>
                             <PriorityBadges priorities={(kids.length ? kids : [p]).map((l) => effectivePriority(model, l))} />
-                            <LineMarkers model={model} lines={kids.length ? kids : [p]} />
+                            <LineMarkers lines={kids.length ? kids : [p]} />
                             {kids.length > 0 && <span className="shrink-0 text-[11px] font-normal text-muted-foreground">{kids.length} sous-poste{kids.length > 1 ? "s" : ""}</span>}
                             {model.sequencesOf(p).length > 1 && <span className="shrink-0 rounded bg-muted px-1 text-[10px] font-normal text-muted-foreground" title="Ce poste a des sous-postes sur d'autres séquences">+ autres séq.</span>}
                           </div>
+                          <InclusionNote model={model} lines={kids.length ? kids : [p]} className="pl-5" />
                         </td>
                         {visibleCols.has("qty") && <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{kids.length ? "" : p.quantity ?? "—"}</td>}
                         {visibleCols.has("pu") && <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{kids.length ? "" : fmt(p.unitPrice)}</td>}
@@ -167,7 +168,10 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, priority
                         const kf = model.line(k)
                         rows.push(
                           <tr key={`${key}:${k.id}`} className="cursor-pointer bg-muted/10 text-[13px] hover:bg-muted/20" onClick={() => onOpen(p)}>
-                            <td className="px-4 py-2 pl-12 text-muted-foreground"><span className="mr-1 text-muted-foreground/40">└</span>{k.label} <PriorityBadges priorities={[effectivePriority(model, k)]} /> <LineMarkers model={model} lines={[k]} /></td>
+                            <td className="px-4 py-2 pl-12 text-muted-foreground">
+                              <span className="mr-1 text-muted-foreground/40">└</span>{k.label} <PriorityBadges priorities={[effectivePriority(model, k)]} /> <LineMarkers lines={[k]} />
+                              <InclusionNote model={model} lines={[k]} className="pl-3" />
+                            </td>
                             {visibleCols.has("qty") && <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{k.quantity ?? "—"}</td>}
                             {visibleCols.has("pu") && <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{fmt(k.unitPrice)}</td>}
                             <td className="px-3 py-2 text-right tabular-nums"><EstimateCell model={model} lines={[k]} estimated={kf.estimated} /></td>
@@ -212,26 +216,31 @@ function EstimateCell({ model, lines, estimated }: { model: BudgetModel; lines: 
 }
 
 /** Repères d'une ligne : « % invités » (dépend du nombre d'invités), « inclus dans … », « inclut … ». */
-function LineMarkers({ model, lines }: { model: BudgetModel; lines: BudgetItem[] }) {
+/** Étiquettes courtes, sur la ligne du nom. */
+function LineMarkers({ lines }: { lines: BudgetItem[] }) {
   const guest = lines.some((l) => l.guestDependent)
   const diy = lines.some((l) => l.diyPossible)
-  const included = lines.length === 1 && lines[0].amountStatus === "included" ? lines[0] : null
-  const includes = lines.flatMap((l) => model.includedIn(l.id))
   return (
     <>
       {guest && <span className="shrink-0 rounded bg-sky-500/10 px-1 text-[10px] font-semibold text-sky-700 dark:text-sky-400" title="Le montant dépend du nombre d'invités">% invités</span>}
       {diy && <span className="shrink-0 rounded bg-amber-500/15 px-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400" title="On pourrait le faire nous-mêmes">DIY</span>}
-      {included && (
-        <span className="shrink-0 truncate text-[11px] font-normal text-muted-foreground" title={`Inclus dans ${model.fullLabel(included.includedInId)}`}>
-          · inclus dans {model.fullLabel(included.includedInId)}
-        </span>
-      )}
-      {includes.length > 0 && (
-        <span className="shrink-0 truncate text-[11px] font-normal text-muted-foreground" title={includes.map((i) => model.fullLabel(i.id)).join(", ")}>
-          · inclut : {includes.map((i) => i.label).join(", ")}
-        </span>
-      )}
     </>
+  )
+}
+
+/** « Inclus dans… » / « Inclut… » : texte libre de longueur variable, sur sa propre ligne sous le nom (2 lignes max). */
+function InclusionNote({ model, lines, className = "" }: { model: BudgetModel; lines: BudgetItem[]; className?: string }) {
+  const included = lines.length === 1 && lines[0].amountStatus === "included" ? lines[0] : null
+  const includes = lines.flatMap((l) => model.includedIn(l.id))
+  if (!included && includes.length === 0) return null
+  const text = included
+    ? `Inclus dans ${model.fullLabel(included.includedInId)}`
+    : `Inclut : ${includes.map((i) => i.label).join(", ")}`
+  return (
+    <p className={`line-clamp-2 whitespace-normal text-[11px] font-normal leading-snug text-muted-foreground ${className}`}
+      title={included ? text : `Inclut : ${includes.map((i) => model.fullLabel(i.id)).join(", ")}`}>
+      {text}
+    </p>
   )
 }
 

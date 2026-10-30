@@ -578,7 +578,7 @@ function UploadSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md flex flex-col gap-4">
+      <SheetContent side="right" className="flex flex-col gap-4">
         <SheetHeader>
           <SheetTitle>Importer des photos</SheetTitle>
         </SheetHeader>

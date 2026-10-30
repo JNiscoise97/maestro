@@ -558,7 +558,7 @@ export function BudgetPage() {
       </div>
 
       {tab === "devis" ? (
-        <DevisTab devis={devis} model={model} items={items} poles={sortedPoles} />
+        <DevisTab devis={devis} model={model} items={items} poles={sortedPoles} sequences={sortedSeq} />
       ) : tab === "passe" ? (
         <ReviewTab items={items} model={model} poles={sortedPoles} sequences={sortedSeq} />
       ) : (

@@ -5,14 +5,17 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import { useSignedUrls } from "@/features/gallery/api"
 import type { GalleryPhoto, GallerySettings } from "@/features/gallery/types"
 import { Masthead } from "./GalleryChrome"
+import { JustifiedGrid } from "./JustifiedGrid"
 
 /**
  * Accueil (CDCF NAV-01/02/03) : texte de Sarah et Jordan puis la sélection d'au plus 50 photos,
  * dans le mode de défilement choisi en réglages. Une photo signalée disparaît sans remplacement.
  */
-export function HomeScreen({ photos, settings, onOpen }: {
+export function HomeScreen({ photos, settings, limited = false, onOpen }: {
   photos: GalleryPhoto[]
   settings: GallerySettings
+  /** Accès limité : pas de lien vers la galerie complète, la sélection est reprise en grille. */
+  limited?: boolean
   onOpen: (list: GalleryPhoto[], index: number) => void
 }) {
   const selection = photos
@@ -32,7 +35,7 @@ export function HomeScreen({ photos, settings, onOpen }: {
       )}
     </>
   )
-  const cta = (
+  const cta = limited ? <SelectionGrid photos={selection} onOpen={open} /> : (
     <div className="flex justify-center px-6 py-16">
       <Link to="/photos/albums" className="border px-8 py-4 text-xs uppercase tracking-[0.25em]"
         style={{ borderColor: "var(--p-accent-2, var(--p-accent))", color: "var(--p-accent-2, var(--p-accent))", borderRadius: "var(--p-radius)" }}>
@@ -68,6 +71,24 @@ export function HomeScreen({ photos, settings, onOpen }: {
       </div>
       {cta}
     </>
+  )
+}
+
+/** Accès limité : la sélection d'accueil en grille, sous le défilement (à la place de « Voir toutes les photos »). */
+function SelectionGrid({ photos, onOpen }: { photos: GalleryPhoto[]; onOpen: (i: number) => void }) {
+  const { data: urls } = useSignedUrls(photos.map((p) => p.thumb_path))
+  if (photos.length === 0) return null
+  return (
+    <section className="mx-auto max-w-6xl px-1 pb-16 pt-12 sm:px-2">
+      <p className="pb-4 text-center text-xs uppercase tracking-[0.25em]" style={{ color: "var(--p-muted)" }}>
+        {photos.length} photo{photos.length > 1 ? "s" : ""}
+      </p>
+      <JustifiedGrid items={photos} render={(p, i) => (
+        <button type="button" onClick={() => onOpen(i)} aria-label={`Ouvrir ${p.code}`} className="block size-full">
+          <Img src={urls?.get(p.thumb_path)} photo={p} className="size-full object-cover" />
+        </button>
+      )} />
+    </section>
   )
 }
 

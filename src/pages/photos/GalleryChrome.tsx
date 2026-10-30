@@ -28,10 +28,13 @@ export function GalleryNav({ mode, onToggleMode }: { mode: ColorMode; onToggleMo
     <nav className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 text-[11px] uppercase tracking-[0.12em] backdrop-blur sm:gap-6 sm:px-6 sm:text-xs sm:tracking-[0.18em]"
       style={{ background: "color-mix(in srgb, var(--p-bg) 88%, transparent)", borderBottom: "1px solid var(--p-line)" }}>
       <NavLink to="/photos" end className={link}>Accueil</NavLink>
-      <NavLink to="/photos/albums" className={link}>
-        {/* Libellé court sur mobile pour tenir sur une ligne. */}
-        <span className="sm:hidden">Photos</span><span className="hidden sm:inline">Toutes les photos</span>
-      </NavLink>
+      {/* Accès limité : seulement l'accueil (la sélection), pas de galerie complète. */}
+      {!(member?.limited && member.role !== "admin") && (
+        <NavLink to="/photos/albums" className={link}>
+          {/* Libellé court sur mobile pour tenir sur une ligne. */}
+          <span className="sm:hidden">Photos</span><span className="hidden sm:inline">Toutes les photos</span>
+        </NavLink>
+      )}
       <NavLink to="/photos/favoris" className={({ isActive }) => `${link({ isActive })} flex items-center gap-1`}>
         <span aria-hidden className="text-[11px] tracking-normal">❤️</span> Favoris
       </NavLink>

@@ -70,3 +70,11 @@ Depuis `/photos/admin` (connecté avec une adresse administrateur) :
 - 2 années incorrectes → voie bloquée 1 h, code envoyé par mail, alerte aux admins ; « Débloquer » dans l'admin.
 - Les comptes administrateurs ne sont jamais concernés (code par mail uniquement).
 - Après la migration, redéployer `gallery-identify`.
+
+## Accès limité à la sélection d'accueil (migration 0171)
+
+- Admin › Accès › colonne « Accès limité » : le compte invité ne voit que la sélection d'accueil (50 photos max).
+- Contrôle serveur : `_20260725_gal_photo_visible` (photos, réactions, commentaires, favoris) et
+  `_20260725_gal_can_read_object` (fichiers) ; `gallery-download` refuse les autres photos.
+- Côté écran : pas de « Toutes les photos », la sélection est reprise en grille sous l'accueil.
+- Après la migration, redéployer `gallery-download`.

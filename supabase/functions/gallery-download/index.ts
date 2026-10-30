@@ -41,6 +41,8 @@ export type Member = {
   last_name: string
   role: "guest" | "admin"
   status: "active" | "disabled"
+  /** Accès limité : seulement la sélection d'accueil (migration 0171). */
+  limited?: boolean
 }
 
 /** Utilisateur connecté (jeton de l'en-tête Authorization) et sa fiche de membre, ou null. */
@@ -116,7 +118,7 @@ Deno.serve(async (req) => {
 
   const [{ data: settings }, { data: photo }, { data: consentVersion }] = await Promise.all([
     db.from(t("settings")).select("*").eq("id", 1).single(),
-    db.from(t("photos")).select("id, code, status, display_path, original_path, original_filename, album:_20260725_gal_albums(hidden)").eq("id", body.photoId ?? "").maybeSingle(),
+    db.from(t("photos")).select("id, code, status, home_rank, display_path, original_path, original_filename, album:_20260725_gal_albums(hidden)").eq("id", body.photoId ?? "").maybeSingle(),
     db.from(t("consent_versions")).select("version").order("version", { ascending: false }).limit(1).maybeSingle(),
   ])
   if (!settings || !photo) return json({ error: "not_found" }, 404)
@@ -135,6 +137,8 @@ Deno.serve(async (req) => {
     // Photo signalée, en corbeille, ou dans une catégorie masquée aux invités : plus téléchargeable.
     const albumHidden = (photo as { album?: { hidden?: boolean } | null }).album?.hidden === true
     if (photo.status !== "visible" || albumHidden) return json({ error: "unavailable" }, 403)
+    // Accès limité : seulement les photos de la sélection d'accueil.
+    if (member.limited && photo.home_rank == null) return json({ error: "unavailable" }, 403)
     if (quality === "hd" ? !settings.download_hd_enabled : !settings.download_normal_enabled) {
       return json({ error: "disabled" }, 403)
     }

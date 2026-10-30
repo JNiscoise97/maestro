@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react"
-import { Route, Routes, useLocation } from "react-router-dom"
+import { Navigate, Route, Routes, useLocation } from "react-router-dom"
 
 import { GalleryAuthProvider, useGalleryAuth } from "@/context/GalleryAuthContext"
 import { useAlbums, useConsentStatus, useGallerySettings, usePhotos } from "@/features/gallery/api"
@@ -78,7 +78,8 @@ function GalleryGate() {
       <div className="mt-3"><button type="button" className="underline" onClick={() => void signOut()}>Se déconnecter</button></div>
     </Notice>
   )
-  else content = <GalleryContent memberId={member.id} settings={settings} isAdmin={member.role === "admin"} {...modeProps} />
+  else content = <GalleryContent memberId={member.id} settings={settings} isAdmin={member.role === "admin"}
+    limited={member.limited && member.role !== "admin"} {...modeProps} />
 
   return <div className="min-h-svh" style={themeStyle(theme, mode)}>{content}</div>
 }
@@ -87,10 +88,12 @@ function isOpen(s: GallerySettings, now: number): boolean {
   return s.gallery_open && (!s.opens_at || now >= Date.parse(s.opens_at)) && (!s.closes_at || now < Date.parse(s.closes_at))
 }
 
-function GalleryContent({ memberId, settings, isAdmin, mode, onToggleMode }: {
+function GalleryContent({ memberId, settings, isAdmin, limited, mode, onToggleMode }: {
   memberId: string
   settings: GallerySettings
   isAdmin: boolean
+  /** Accès limité : accueil seul (le serveur ne renvoie de toute façon que la sélection). */
+  limited: boolean
   mode: ColorMode
   onToggleMode: () => void
 }) {
@@ -105,9 +108,9 @@ function GalleryContent({ memberId, settings, isAdmin, mode, onToggleMode }: {
     <>
       <GalleryNav mode={mode} onToggleMode={onToggleMode} />
       <Routes>
-        <Route index element={<HomeScreen photos={visible} settings={settings} onOpen={open} />} />
-        <Route path="albums" element={<CategoriesScreen photos={visible} albums={albums} onOpen={open} />} />
-        <Route path="albums/:albumId" element={<CategoryScreen photos={visible} albums={albums} onOpen={open} />} />
+        <Route index element={<HomeScreen photos={visible} settings={settings} limited={limited} onOpen={open} />} />
+        <Route path="albums" element={limited ? <Navigate to="/photos" replace /> : <CategoriesScreen photos={visible} albums={albums} onOpen={open} />} />
+        <Route path="albums/:albumId" element={limited ? <Navigate to="/photos" replace /> : <CategoryScreen photos={visible} albums={albums} onOpen={open} />} />
         <Route path="favoris" element={<CategoryScreen photos={visible} albums={albums} favoritesOnly onOpen={open} />} />
         {isAdmin && (
           <Route path="admin/*" element={

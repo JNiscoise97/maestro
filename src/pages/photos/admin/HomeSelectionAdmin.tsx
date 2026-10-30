@@ -47,7 +47,10 @@ export function HomeSelectionAdmin() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Sélection d'accueil — {visibleCount} visible{visibleCount > 1 ? "s" : ""} / {selection.length} (max. 50)</CardTitle>
-        <p className="text-xs text-muted-foreground">Glissez pour réordonner. Ajoutez des photos avec l'étoile dans l'onglet Photos.</p>
+        <p className="text-xs text-muted-foreground">
+          Glissez pour réordonner. Ajoutez des photos avec l'étoile dans l'onglet Photos.
+          Les comptes en « accès limité » (onglet Accès) ne voient que ces photos.
+        </p>
       </CardHeader>
       <CardContent>
         {selection.length === 0 ? (

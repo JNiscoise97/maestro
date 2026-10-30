@@ -85,13 +85,15 @@ export function AccessAdmin() {
         <CardContent className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-xs text-muted-foreground">
-              <tr><th className="py-1">Personne</th><th>Invité lié</th><th>Origine</th><th>Dernière connexion</th><th>Statut</th><th /></tr>
+              <tr><th className="py-1">Personne</th><th>Invité lié</th><th>Origine</th><th>Dernière connexion</th><th>Statut</th>
+                <th title="Ne voit que la sélection d'accueil (50 photos max.)">Accès limité</th><th /></tr>
             </thead>
             <tbody className="divide-y divide-border">
               {shown.map((m) => (
                 <tr key={m.id}>
                   <td className="py-2">
                     <b>{memberName(m)}</b>{m.role === "admin" && <Badge className="ml-2">admin</Badge>}
+                    {m.limited && m.role !== "admin" && <Badge className="ml-2 bg-amber-500/15 text-amber-700">Accès limité</Badge>}
                     <div className="text-xs text-muted-foreground">{m.email}</div>
                   </td>
                   <td className="pr-2">
@@ -109,6 +111,18 @@ export function AccessAdmin() {
                     <Badge className={m.status === "active" ? "bg-vert-vegetal/15 text-vert-vegetal" : "bg-bordeaux/10 text-bordeaux"}>
                       {m.status === "active" ? "Actif" : "Désactivé"}
                     </Badge>
+                  </td>
+                  <td className="text-center">
+                    {m.role === "admin" ? <span className="text-xs text-muted-foreground">—</span> : (
+                      <input type="checkbox" className="size-4" checked={m.limited ?? false}
+                        aria-label={`Accès limité à la sélection d'accueil — ${memberName(m)}`}
+                        onChange={(e) => { const limited = e.target.checked; update.mutate({ match: { id: m.id }, patch: { limited } }, {
+                          onSuccess: () => toast.success(limited
+                            ? `${memberName(m)} ne voit plus que la sélection d'accueil.`
+                            : `${memberName(m)} voit de nouveau toutes les photos.`),
+                          onError: () => toast.error("Modification non enregistrée."),
+                        }) }} />
+                    )}
                   </td>
                   <td className="space-x-1 whitespace-nowrap text-right">
                     <Button size="xs" variant="ghost" onClick={() => nav.go("journal", { membre: m.id })}>Historique</Button>

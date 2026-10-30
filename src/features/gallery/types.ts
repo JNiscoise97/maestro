@@ -16,6 +16,8 @@ export type GalleryMember = {
   birth_year: number | null
   year_failures: number
   year_locked_until: string | null
+  /** Accès limité : ne voit que la sélection d'accueil (50 photos max). */
+  limited: boolean
 }
 
 export type GallerySettings = {

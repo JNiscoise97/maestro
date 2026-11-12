@@ -10,8 +10,12 @@ import type { BudgetItem } from "@/services/supabase/budget"
 import type { Pole } from "@/types/domain"
 
 type Seq = { id: string; name: string; color?: string | null; sortOrder?: number }
-type Basis = "estimated" | "real"
-type Bucket = { key: string; label: string; color: string; estimated: number; real: number }
+type Basis = "estimated" | "real" | "paid"
+type Amounts = { estimated: number; real: number; paid: number }
+type Bucket = { key: string; label: string; color: string } & Amounts
+/** « real » = engagé (devis retenus, montants réels) ; « paid » = réel (versements payés). */
+const BASIS_LABELS: Record<Basis, string> = { estimated: "estimé", real: "engagé", paid: "réel (payé)" }
+const BASIS_BUTTONS: Record<Basis, string> = { estimated: "l'estimé", real: "l'engagé", paid: "le réel (payé)" }
 
 /** Couleurs des pôles (les séquences ont déjà la leur, réglée dans Paramètres). */
 const POLE_PALETTE = ["#7a272c", "#3f6f48", "#c08a3e", "#2f6f8f", "#9c5b8f", "#d0703c", "#5a6b2e", "#8a5a3c", "#3d5a80", "#b5838d", "#6d597a", "#457b9d", "#a3a380"]
@@ -20,7 +24,7 @@ const OPEN_KEY = "sj-budget-stats-ouvert"
 
 /**
  * Statistiques du budget, dépliables en haut de la page : répartition par pôle, par séquence et
- * pôle × séquence (estimé et réel), camemberts des parts, et indicateurs utiles au pilotage
+ * pôle × séquence (estimé et engagé), camemberts des parts, et indicateurs utiles au pilotage
  * (engagement, paiements, échéances à venir, dépassements, lignes non décidées, devis en cours).
  * Les montants sont ceux des lignes : postes sans sous-poste et sous-postes.
  */
@@ -45,19 +49,19 @@ export function BudgetStats({ items, model, poles, sequences }: {
     const poleColor = new Map(poles.map((p, i) => [p.id, POLE_PALETTE[i % POLE_PALETTE.length]]))
     const byPole = new Map<string, Bucket>()
     const bySeq = new Map<string, Bucket>()
-    const cell = new Map<string, { estimated: number; real: number }>()
+    const cell = new Map<string, Amounts>()
     for (const l of lines) {
       const pk = l.poleId ?? NO_KEY
       const sk = l.sequenceId ?? NO_KEY
       const pole = poles.find((p) => p.id === l.poleId)
       const seq = sequences.find((s) => s.id === l.sequenceId)
-      const pb = byPole.get(pk) ?? { key: pk, label: pole?.name ?? "Sans pôle", color: poleColor.get(pk) ?? "#9ca3af", estimated: 0, real: 0 }
-      const sb = bySeq.get(sk) ?? { key: sk, label: seq?.name ?? "Sans séquence", color: seq ? sequenceColor(seq) : "#9ca3af", estimated: 0, real: 0 }
-      pb.estimated += l.estimated; pb.real += l.real ?? 0
-      sb.estimated += l.estimated; sb.real += l.real ?? 0
+      const pb = byPole.get(pk) ?? { key: pk, label: pole?.name ?? "Sans pôle", color: poleColor.get(pk) ?? "#9ca3af", estimated: 0, real: 0, paid: 0 }
+      const sb = bySeq.get(sk) ?? { key: sk, label: seq?.name ?? "Sans séquence", color: seq ? sequenceColor(seq) : "#9ca3af", estimated: 0, real: 0, paid: 0 }
+      pb.estimated += l.estimated; pb.real += l.real ?? 0; pb.paid += l.paid
+      sb.estimated += l.estimated; sb.real += l.real ?? 0; sb.paid += l.paid
       byPole.set(pk, pb); bySeq.set(sk, sb)
-      const c = cell.get(`${pk}|${sk}`) ?? { estimated: 0, real: 0 }
-      c.estimated += l.estimated; c.real += l.real ?? 0
+      const c = cell.get(`${pk}|${sk}`) ?? { estimated: 0, real: 0, paid: 0 }
+      c.estimated += l.estimated; c.real += l.real ?? 0; c.paid += l.paid
       cell.set(`${pk}|${sk}`, c)
     }
     // Par priorité MoSCoW (« Non priorisé » en dernier).
@@ -65,15 +69,15 @@ export function BudgetStats({ items, model, poles, sequences }: {
       const ls = lines.filter((l) => l.priority === p)
       return {
         key: p ?? NO_KEY, label: p ? PRIORITY_LABELS[p] : "Non priorisé", color: p ? PRIORITY_COLORS[p] : "#9ca3af",
-        estimated: ls.reduce((t, l) => t + l.estimated, 0), real: ls.reduce((t, l) => t + (l.real ?? 0), 0),
+        estimated: ls.reduce((t, l) => t + l.estimated, 0), real: ls.reduce((t, l) => t + (l.real ?? 0), 0), paid: ls.reduce((t, l) => t + l.paid, 0),
       }
-    }).filter((b) => b.estimated > 0 || b.real > 0)
-    // Séquence × priorité (estimé et réel).
-    const seqPrio = new Map<string, { estimated: number; real: number }>()
+    }).filter((b) => b.estimated > 0 || b.real > 0 || b.paid > 0)
+    // Séquence × priorité (estimé, engagé, payé).
+    const seqPrio = new Map<string, Amounts>()
     for (const l of lines) {
       const k = `${l.sequenceId ?? NO_KEY}|${l.priority ?? NO_KEY}`
-      const c = seqPrio.get(k) ?? { estimated: 0, real: 0 }
-      c.estimated += l.estimated; c.real += l.real ?? 0
+      const c = seqPrio.get(k) ?? { estimated: 0, real: 0, paid: 0 }
+      c.estimated += l.estimated; c.real += l.real ?? 0; c.paid += l.paid
       seqPrio.set(k, c)
     }
     // Marge de manœuvre : estimé des Could / Should pas encore engagés (ni devis retenu ni réel).
@@ -222,10 +226,10 @@ export function BudgetStats({ items, model, poles, sequences }: {
           {/* Base de calcul des camemberts et des barres empilées. */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-muted-foreground">Répartitions calculées sur :</span>
-            {(["estimated", "real"] as const).map((b) => (
+            {(["estimated", "real", "paid"] as const).map((b) => (
               <button key={b} type="button" onClick={() => setBasis(b)} aria-pressed={basis === b}
                 className={cn("rounded-full border px-3 py-0.5 text-xs font-medium", basis === b ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:border-foreground/30")}>
-                {b === "estimated" ? "l'estimé" : "le réel"}
+                {BASIS_BUTTONS[b]}
               </button>
             ))}
           </div>
@@ -238,7 +242,7 @@ export function BudgetStats({ items, model, poles, sequences }: {
                   <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: b.color }}>{b.label}</p>
                   <p className="text-xl font-bold tabular-nums">{fmt(b.estimated)}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {pct(b.estimated, stats.estimated)} % du budget · réel {fmt(b.real)}
+                    {pct(b.estimated, stats.estimated)} % du budget · engagé {fmt(b.real)} · payé {fmt(b.paid)}
                   </p>
                 </div>
               ))}
@@ -249,19 +253,19 @@ export function BudgetStats({ items, model, poles, sequences }: {
                 et <b className="text-foreground">{fmt(stats.flexibleShould)}</b> de « Should have » ne sont pas encore engagés.
               </p>
             )}
-            <Chart title={`Budget par priorité dans chaque séquence (${basis === "estimated" ? "estimé" : "réel"})`}>
+            <Chart title={`Budget par priorité dans chaque séquence (${BASIS_LABELS[basis]})`}>
               <StackedBars rows={stats.seqBuckets} segments={stats.prioBuckets} cell={stats.seqPrio} basis={basis} />
             </Chart>
             <div className="grid gap-6 lg:grid-cols-2">
-              <Chart title="Par priorité (estimé et réel)"><Bars buckets={stats.prioBuckets} /></Chart>
+              <Chart title="Par priorité (estimé et engagé)"><Bars buckets={stats.prioBuckets} /></Chart>
               <Chart title="Part de chaque priorité"><Donut buckets={stats.prioBuckets} basis={basis} /></Chart>
             </div>
           </div>
 
           {/* ── Barres par pôle et par séquence ── */}
           <div className="grid gap-6 lg:grid-cols-2">
-            <Chart title="Par pôle (estimé et réel)"><Bars buckets={stats.poleBuckets} /></Chart>
-            <Chart title="Par séquence (estimé et réel)"><Bars buckets={stats.seqBuckets} /></Chart>
+            <Chart title="Par pôle (estimé et engagé)"><Bars buckets={stats.poleBuckets} /></Chart>
+            <Chart title="Par séquence (estimé et engagé)"><Bars buckets={stats.seqBuckets} /></Chart>
           </div>
 
           {/* ── Camemberts ── */}
@@ -273,7 +277,7 @@ export function BudgetStats({ items, model, poles, sequences }: {
           </div>
 
           {/* ── Pôle × séquence ── */}
-          <Chart title="Par séquence dans chaque pôle (estimé / réel)">
+          <Chart title="Par séquence dans chaque pôle (estimé / engagé)">
             <Matrix poles={stats.poleBuckets} seqs={stats.seqBuckets} cell={stats.cell} />
           </Chart>
 
@@ -330,7 +334,7 @@ function Chart({ title, children }: { title: string; children: React.ReactNode }
   )
 }
 
-/** Barres horizontales : estimé (clair) et réel (foncé) pour chaque groupe. */
+/** Barres horizontales : estimé (clair) et engagé (foncé) pour chaque groupe. */
 function Bars({ buckets }: { buckets: Bucket[] }) {
   const max = Math.max(1, ...buckets.map((b) => Math.max(b.estimated, b.real)))
   if (!buckets.length) return <p className="text-xs text-muted-foreground">Aucune donnée.</p>
@@ -344,13 +348,13 @@ function Bars({ buckets }: { buckets: Bucket[] }) {
           </span>
           <div className="space-y-0.5">
             <Bar width={(b.estimated / max) * 100} color={b.color} opacity={0.35} value={b.estimated} title="Estimé" />
-            <Bar width={(b.real / max) * 100} color={b.color} opacity={1} value={b.real} title="Réel" />
+            <Bar width={(b.real / max) * 100} color={b.color} opacity={1} value={b.real} title="Engagé" />
           </div>
         </div>
       ))}
       <p className="flex gap-4 pl-[9rem] text-[11px] text-muted-foreground sm:pl-[11.5rem]">
         <span><span className="mr-1 inline-block h-2 w-3 rounded-sm bg-foreground/30 align-middle" />Estimé</span>
-        <span><span className="mr-1 inline-block h-2 w-3 rounded-sm bg-foreground align-middle" />Réel</span>
+        <span><span className="mr-1 inline-block h-2 w-3 rounded-sm bg-foreground align-middle" />Engagé</span>
       </p>
     </div>
   )
@@ -358,12 +362,12 @@ function Bars({ buckets }: { buckets: Bucket[] }) {
 
 /**
  * Barres empilées : une barre par séquence, découpée par priorité (Must, Should, Could, non priorisé),
- * sur l'estimé ou le réel. La longueur compare les séquences, les couleurs montrent la répartition.
+ * sur l'estimé, l'engagé ou le payé. La longueur compare les séquences, les couleurs montrent la répartition.
  */
 function StackedBars({ rows, segments, cell, basis }: {
   rows: Bucket[]
   segments: Bucket[]
-  cell: Map<string, { estimated: number; real: number }>
+  cell: Map<string, Amounts>
   basis: Basis
 }) {
   const value = (row: string, seg: string) => cell.get(`${row}|${seg}`)?.[basis] ?? 0
@@ -413,9 +417,9 @@ function Bar({ width, color, opacity, value, title }: { width: number; color: st
 
 /** Camembert (anneau) avec légende et pourcentages. */
 function Donut({ buckets, basis }: { buckets: Bucket[]; basis: Basis }) {
-  const data = buckets.map((b) => ({ ...b, value: basis === "estimated" ? b.estimated : b.real })).filter((b) => b.value > 0)
+  const data = buckets.map((b) => ({ ...b, value: b[basis] })).filter((b) => b.value > 0)
   const total = data.reduce((t, d) => t + d.value, 0)
-  if (!total) return <p className="text-xs text-muted-foreground">Aucun montant {basis === "real" ? "réel" : "estimé"} pour l'instant.</p>
+  if (!total) return <p className="text-xs text-muted-foreground">Aucun montant {BASIS_LABELS[basis]} pour l'instant.</p>
   const R = 60, r = 36, C = 70
   // Angle de départ de chaque part = somme des parts précédentes.
   const starts = data.map((_, i) => data.slice(0, i).reduce((t, d) => t + d.value, 0))
@@ -429,7 +433,7 @@ function Donut({ buckets, basis }: { buckets: Bucket[]; basis: Basis }) {
       <svg viewBox="0 0 140 140" className="size-36 shrink-0" role="img" aria-label="Répartition en pourcentage">
         {arcs.map((a) => <path key={a.key} d={a.path} fill={a.color}><title>{`${a.label} : ${a.pct.toFixed(1)} % (${fmt(a.value)})`}</title></path>)}
         <text x={C} y={C - 2} textAnchor="middle" className="fill-foreground text-[11px] font-semibold">{fmtCompact(total)}</text>
-        <text x={C} y={C + 12} textAnchor="middle" className="fill-muted-foreground text-[8px]">{basis === "estimated" ? "estimé" : "réel"}</text>
+        <text x={C} y={C + 12} textAnchor="middle" className="fill-muted-foreground text-[8px]">{BASIS_LABELS[basis].split(" ")[0]}</text>
       </svg>
       <ul className="w-full space-y-1 text-xs">
         {arcs.sort((a, b) => b.value - a.value).map((a) => (
@@ -455,8 +459,8 @@ function arcPath(cx: number, cy: number, R: number, r: number, a0: number, a1: n
   return `M ${p(R, a0)} A ${R} ${R} 0 ${large} 1 ${p(R, a1)} L ${p(r, a1)} A ${r} ${r} 0 ${large} 0 ${p(r, a0)} Z`
 }
 
-/** Tableau pôle × séquence : estimé / réel par case, teinte selon l'estimé. */
-function Matrix({ poles, seqs, cell }: { poles: Bucket[]; seqs: Bucket[]; cell: Map<string, { estimated: number; real: number }> }) {
+/** Tableau pôle × séquence : estimé / engagé par case, teinte selon l'estimé. */
+function Matrix({ poles, seqs, cell }: { poles: Bucket[]; seqs: Bucket[]; cell: Map<string, Amounts> }) {
   const max = Math.max(1, ...[...cell.values()].map((c) => c.estimated))
   return (
     <div className="overflow-x-auto">
@@ -481,7 +485,7 @@ function Matrix({ poles, seqs, cell }: { poles: Bucket[]; seqs: Bucket[]; cell: 
                 return (
                   <td key={s.key} className="px-2 py-1.5 text-right tabular-nums"
                     style={c ? { background: `color-mix(in srgb, ${p.color} ${Math.round((c.estimated / max) * 35)}%, transparent)` } : undefined}
-                    title={c ? `${p.label} · ${s.label}\nEstimé : ${fmt(c.estimated)}\nRéel : ${fmt(c.real)}` : undefined}>
+                    title={c ? `${p.label} · ${s.label}\nEstimé : ${fmt(c.estimated)}\nEngagé : ${fmt(c.real)}\nPayé : ${fmt(c.paid)}` : undefined}>
                     {c ? <>{fmtCompact(c.estimated)}<br /><span className="text-muted-foreground">{c.real ? fmtCompact(c.real) : "—"}</span></> : <span className="text-muted-foreground/40">·</span>}
                   </td>
                 )
@@ -501,7 +505,7 @@ function Matrix({ poles, seqs, cell }: { poles: Bucket[]; seqs: Bucket[]; cell: 
           </tr>
         </tbody>
       </table>
-      <p className="mt-1 text-[11px] text-muted-foreground">Dans chaque case : estimé en haut, réel en dessous. Plus la case est foncée, plus l'estimé est élevé.</p>
+      <p className="mt-1 text-[11px] text-muted-foreground">Dans chaque case : estimé en haut, engagé en dessous. Plus la case est foncée, plus l'estimé est élevé.</p>
     </div>
   )
 }

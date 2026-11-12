@@ -433,7 +433,7 @@ function BudgetSummary({ postes, model }: { postes: BudgetItem[]; model: BudgetM
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {card("Budget estimé", fmt(estimated), `${postes.length} poste${postes.length > 1 ? "s" : ""}`)}
-        {card("Engagé (réel)", fmt(real), "devis retenus et montants réels")}
+        {card("Engagé", fmt(real), "devis retenus et montants réels")}
         {card("Payé", fmt(paid))}
         {card("Reste à payer", fmt(Math.max(0, due - paid)), estimated - real >= 0 ? `marge ${fmt(estimated - real)} sur l'estimé` : "réel au-dessus de l'estimé",
           due - paid > 0 ? "" : "text-emerald-600 dark:text-emerald-400")}

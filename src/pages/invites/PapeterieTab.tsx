@@ -203,6 +203,20 @@ export function PapeterieTab() {
     return { paper: paper.length, digital: activeGuests.length - paper.length, sent: sent.length }
   }, [activeGuests])
 
+  // Compteurs croisés des filtres : chaque nombre correspond à ce qu'affichera la liste si on clique.
+  const paperCounts = useMemo(() => {
+    const list = prospectFilter === "all" ? activeGuests : activeGuests.filter((g) => effectiveStatus(g) === prospectFilter)
+    const paper = list.filter((g) => g.paperType).length
+    return { all: list.length, paper, digital: list.length - paper }
+  }, [activeGuests, prospectFilter])
+  const prospectCounts = useMemo(() => {
+    const list = paperFilter === "paper" ? activeGuests.filter((g) => g.paperType)
+      : paperFilter === "digital" ? activeGuests.filter((g) => !g.paperType) : activeGuests
+    const counts: Record<string, number> = { all: list.length }
+    for (const g of list) { const st = effectiveStatus(g); counts[st] = (counts[st] ?? 0) + 1 }
+    return counts
+  }, [activeGuests, paperFilter])
+
   const filtered = useMemo(() => {
     let list = activeGuests
     if (prospectFilter !== "all") {
@@ -286,9 +300,9 @@ export function PapeterieTab() {
         {/* Filtre papier / numérique */}
         <div className="flex flex-wrap gap-2">
           {([
-            { value: "all" as PaperFilter, label: "Tous", count: activeGuests.length },
-            { value: "paper" as PaperFilter, label: "Papier postal", count: stats.paper },
-            { value: "digital" as PaperFilter, label: "Numérique", count: stats.digital },
+            { value: "all" as PaperFilter, label: "Tous", count: paperCounts.all },
+            { value: "paper" as PaperFilter, label: "Papier postal", count: paperCounts.paper },
+            { value: "digital" as PaperFilter, label: "Numérique", count: paperCounts.digital },
           ] as const).map(({ value, label, count }) => (
             <Button key={value} variant={paperFilter === value ? "default" : "outline"} size="sm" onClick={() => setPaperFilter(value)}>
               {label}
@@ -313,6 +327,7 @@ export function PapeterieTab() {
               }`}
             >
               {label}
+              <span className="ml-1.5 tabular-nums opacity-70">{prospectCounts[value] ?? 0}</span>
             </button>
           ))}
         </div>

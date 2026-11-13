@@ -669,6 +669,17 @@ function GiftBadges({ gift }: { gift: Gift }) {
           <Mail className="size-2.5" />carte
         </span>
       )}
+      {gift.anticipated && (
+        <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 shrink-0"
+          title="Cadeau anticipé : affecté à des dépenses dans Budget › Cadeaux anticipés">
+          Anticipé · budget
+        </span>
+      )}
+      {gift.promised && (
+        <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400 shrink-0">
+          Promis
+        </span>
+      )}
     </>
   )
 }

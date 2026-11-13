@@ -3,7 +3,7 @@ import { ChevronRight, Plus } from "lucide-react"
 
 import { SequenceName } from "@/components/shared/SequenceName"
 import {
-  PAYMENT_STATUS_LABELS, PRIORITY_COLORS, PRIORITY_LABELS, PRIORITY_SHORT, effectivePriority, fmt, lineMatches, paymentStatus,
+  PAYMENT_STATUS_LABELS, PRIORITY_COLORS, PRIORITY_LABELS, PRIORITY_SHORT, effectivePriority, fmt, lineMatches, paymentStatus, remaining,
   type BudgetModel, type PaymentStatus,
 } from "@/lib/budget-calc"
 import type { BudgetItem } from "@/services/supabase/budget"
@@ -65,7 +65,7 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, priority
   const totals = postes.map((p) => model.poste(p, undefined, keepFor(p)))
   const sumOf = (k: "estimated" | "paid") => totals.reduce((t, f) => t + f[k], 0)
   const realSum = totals.reduce((t, f) => t + (f.real ?? 0), 0)
-  const cols = 5 + visibleCols.size
+  const cols = 6 + visibleCols.size
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -92,6 +92,7 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, priority
                 {visibleCols.has("pu") && <th className="w-24 px-3 py-2 text-right font-medium">P.U.</th>}
                 <th className="w-28 px-3 py-2 text-right font-medium">Estimé</th>
                 <th className="w-28 px-3 py-2 text-right font-medium">Réel</th>
+                <th className="w-28 px-3 py-2 text-right font-medium" title="Réel (sinon estimé) moins les cadeaux anticipés reçus">À notre charge</th>
                 <th className="w-36 px-3 py-2 text-left font-medium">Paiement</th>
                 <th className="w-32 px-3 py-2 text-left font-medium">Enseigne</th>
                 {visibleCols.has("account") && <th className="w-28 px-3 py-2 text-left font-medium">Compte</th>}
@@ -155,6 +156,7 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, priority
                         {visibleCols.has("pu") && <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{kids.length ? "" : fmt(p.unitPrice)}</td>}
                         <td className="px-3 py-2.5 text-right tabular-nums"><EstimateCell model={model} lines={kids.length ? kids : [p]} estimated={f.estimated} /></td>
                         <td className="px-3 py-2.5 text-right tabular-nums">{f.real == null ? "—" : fmt(f.real)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums"><ChargeCell cost={f.real ?? f.estimated} offered={f.offered} /></td>
                         <td className="px-3 py-2.5"><StatusBadge status={paymentStatus(f)} paid={f.paid} /></td>
                         <td className="truncate px-3 py-2.5 text-muted-foreground" title={vendors.join(", ")}>
                           {vendors.join(", ") || "—"}{devis && <span className="ml-1 text-[10px]">(devis)</span>}
@@ -176,6 +178,7 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, priority
                             {visibleCols.has("pu") && <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{fmt(k.unitPrice)}</td>}
                             <td className="px-3 py-2 text-right tabular-nums"><EstimateCell model={model} lines={[k]} estimated={kf.estimated} /></td>
                             <td className="px-3 py-2 text-right tabular-nums">{kf.real == null ? "—" : fmt(kf.real)}</td>
+                            <td className="px-3 py-2 text-right tabular-nums"><ChargeCell cost={kf.real ?? kf.estimated} offered={model.offered(k)} /></td>
                             <td className="px-3 py-2"><StatusBadge status={paymentStatus({ ...kf, depositRequired: k.depositRequired })} paid={kf.paid} /></td>
                             <td className="truncate px-3 py-2 text-muted-foreground">{model.retained.get(k.id)?.devis.vendor ?? k.vendor ?? "—"}</td>
                             {visibleCols.has("account") && <td className="truncate px-3 py-2 text-muted-foreground">{k.account ?? "—"}</td>}
@@ -193,6 +196,22 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, priority
         </div>
       )}
     </div>
+  )
+}
+
+/** Reste à notre charge, avec la part offerte (cadeaux anticipés reçus) en dessous. */
+function ChargeCell({ cost, offered }: { cost: number; offered: number }) {
+  if (offered <= 0.005) return <span className="text-muted-foreground">{cost ? fmt(cost) : "—"}</span>
+  const left = remaining({ estimated: cost, real: null, offered })
+  const over = offered - cost > 0.005
+  return (
+    <span className="inline-flex flex-col items-end">
+      <span className={left <= 0.005 ? "font-semibold text-emerald-600 dark:text-emerald-400" : ""}>{left <= 0.005 ? "Offert" : fmt(left)}</span>
+      <span className={`text-[10px] font-medium ${over ? "text-destructive" : "text-emerald-700 dark:text-emerald-400"}`}
+        title={over ? `L'offert dépasse le coût de ${fmt(offered - cost)}` : undefined}>
+        {left <= 0.005 && !over ? fmt(offered) : `offert ${fmt(offered)}`}{over && " ⚠"}
+      </span>
+    </span>
   )
 }
 

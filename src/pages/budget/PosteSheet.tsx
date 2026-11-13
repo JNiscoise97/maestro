@@ -9,13 +9,14 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { useDeletePoste, useSavePoste } from "@/hooks/queries/use-budget"
 import {
   ACCOUNT_SUGGESTIONS, ORIGIN_SUGGESTIONS, PAYMENT_STATUS_LABELS, PRIORITIES, PRIORITY_COLORS, PRIORITY_HINTS,
-  PRIORITY_LABELS, amountInput, budgetItemComparator, fmt, sequenceLabel, parseAmount, paymentStatus, type BudgetModel,
+  PRIORITY_LABELS, amountInput, budgetItemComparator, fmt, sequenceLabel, parseAmount, paymentStatus, remaining, type BudgetModel,
 } from "@/lib/budget-calc"
 import { cn } from "@/lib/utils"
 import type { AmountStatus, BudgetDevis, BudgetItem, DevisPlan, DevisStatus, LineDraft, PaymentDraft, Priority } from "@/services/supabase/budget"
 import type { Pole } from "@/types/domain"
 import { SearchableSelect } from "@/components/shared/SearchableSelect"
 import { DevisSheet } from "./DevisSheet"
+import { FundingNote } from "./GiftsTab"
 import { PaymentsEditor } from "./PaymentsEditor"
 
 type Seq = { id: string; name: string; color?: string | null; sortOrder?: number }
@@ -354,8 +355,13 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
               <span>Réel <b className="text-foreground">{figures.real == null ? "—" : fmt(figures.real)}</b></span>
               <span>Payé <b className="text-foreground">{fmt(figures.paid)}</b></span>
               <span className="font-medium text-foreground">{PAYMENT_STATUS_LABELS[paymentStatus(figures)]}</span>
+              {figures.offered > 0.005 && <>
+                <span>Offert <b className="text-emerald-700 dark:text-emerald-400">{fmt(figures.offered)}</b></span>
+                <span>À notre charge <b className="text-foreground">{fmt(remaining(figures))}</b></span>
+              </>}
             </div>
           )}
+          {existing && <FundingNote model={model} poste={existing} />}
           {/* Création : étapes numérotées ; modification : onglets libres. */}
           <nav className="flex flex-wrap gap-1.5" aria-label="Étapes">
             {[...STEPS, ...(creating ? [{ id: 5, title: "Récapitulatif", hint: "" }] : [])].map((s) => {

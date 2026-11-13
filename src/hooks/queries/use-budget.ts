@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { budgetService, type BudgetItem, type DevisDraft, type DevisPlan, type PosteDraft } from "@/services/supabase/budget"
+import { budgetService, type BudgetItem, type DevisDraft, type DevisPlan, type GiftAllocationDraft, type PosteDraft } from "@/services/supabase/budget"
+import { giftsService, type GiftInput } from "@/services/gifts.service"
 
 const QK        = ["budget_items"]        as const
 const QK_QUOTE  = (id: string) => ["budget_quotes", id] as const
@@ -204,4 +205,40 @@ export function useSavePoste() {
 export function useDeletePoste() {
   const invalidate = useInvalidateBudget()
   return useMutation({ mutationFn: (id: string) => budgetService.deletePoste(id), onSettled: invalidate })
+}
+
+// ── Cadeaux anticipés ────────────────────────────────────────────────────────
+
+const QK_GIFT_ALLOC = ["budget_gift_allocations"] as const
+const QK_GIFTS = ["gifts"] as const
+
+export function useGiftAllocations() {
+  return useQuery({ queryKey: QK_GIFT_ALLOC, queryFn: () => budgetService.listGiftAllocations() })
+}
+
+/**
+ * Enregistre un cadeau anticipé : le cadeau (table des cadeaux, visible dans la page Cadeaux)
+ * puis ses affectations au budget (remplacées).
+ */
+export function useSaveAnticipatedGift() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, gift, allocations }: { id: string | null; gift: GiftInput; allocations: GiftAllocationDraft[] }) => {
+      let giftId = id
+      if (giftId) await giftsService.update(giftId, gift)
+      else giftId = (await giftsService.create(gift)).id
+      await budgetService.replaceGiftAllocations(giftId, allocations)
+      return giftId
+    },
+    onSettled: () => Promise.all([QK_GIFTS, QK_GIFT_ALLOC].map((k) => qc.invalidateQueries({ queryKey: k }))),
+  })
+}
+
+/** Supprime un cadeau anticipé (ses affectations suivent en cascade). */
+export function useDeleteAnticipatedGift() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => giftsService.remove(id),
+    onSettled: () => Promise.all([QK_GIFTS, QK_GIFT_ALLOC].map((k) => qc.invalidateQueries({ queryKey: k }))),
+  })
 }

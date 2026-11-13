@@ -1,12 +1,14 @@
 import * as XLSX from "xlsx"
 
 import {
-  PAYMENT_STATUS_LABELS, PRIORITY_LABELS, budgetItemComparator, effectivePriority, paymentStatus, type BudgetModel,
+  PAYMENT_STATUS_LABELS, PRIORITY_LABELS, budgetItemComparator, effectivePriority, paymentStatus, remaining, type BudgetModel,
 } from "@/lib/budget-calc"
+import { targetLabel } from "@/lib/budget-gifts"
 import {
   REVIEW_MAX, REVIEW_QUESTIONS, VERDICT_LABELS, costPerPoint, effectiveReview, reviewTotal, reviewVerdict,
 } from "@/lib/budget-review"
 import type { BudgetItem } from "@/services/supabase/budget"
+import type { Gift } from "@/services/gifts.service"
 import type { Pole } from "@/types/domain"
 
 type Seq = { id: string; name: string }
@@ -41,13 +43,15 @@ const yesNo = (b: boolean) => (b ? "Oui" : "Non")
 /**
  * Export Excel complet du budget, sans perte de détail :
  * Synthèse · Lignes (une par poste simple / sous-poste) · Postes · Devis · Lignes de devis · Versements ·
- * Pôle × séquence.
+ * Pôle × séquence · Cadeaux anticipés.
  */
-export function exportBudgetXlsx({ items, model, poles, sequences }: {
+export function exportBudgetXlsx({ items, model, poles, sequences, gifts = [] }: {
   items: BudgetItem[]
   model: BudgetModel
   poles: Pole[]
   sequences: Seq[]
+  /** Cadeaux anticipés (et cadeaux affectés au budget), avec le nom des donateurs. */
+  gifts?: { gift: Gift; donors: string }[]
 }): void {
   const poleName = (id: string | null) => poles.find((p) => p.id === id)?.name ?? "Sans pôle"
   const seqName = (id: string | null) => sequences.find((s) => s.id === id)?.name ?? "Sans séquence"
@@ -90,6 +94,8 @@ export function exportBudgetXlsx({ items, model, poles, sequences }: {
       total, perPoint === Infinity ? "∞" : perPoint,
       item.amountStatus === "included" ? "" : VERDICT_LABELS[reviewVerdict(model, item)],
       review?.inherited ? "Notes du poste" : review ? "Propres" : "", yesNo(item.diyPossible), item.reviewNote ?? "",
+      // Cadeaux anticipés
+      model.offered(item), remaining({ ...f, offered: model.offered(item) }),
     ]
   })
 
@@ -105,7 +111,7 @@ export function exportBudgetXlsx({ items, model, poles, sequences }: {
       p.priority ? PRIORITY_LABELS[p.priority] : "Non priorisé",
       f.estimated, f.real, f.paid, Math.max(0, (f.real ?? f.estimated) - f.paid), PAYMENT_STATUS_LABELS[paymentStatus(f)],
       leavesOf.filter((l) => l.amountStatus === "to_estimate").length, yesNo(leavesOf.some((l) => l.guestDependent)),
-      p.notes ?? "",
+      p.notes ?? "", f.offered, remaining(f),
     ]
   })
 
@@ -151,8 +157,13 @@ export function exportBudgetXlsx({ items, model, poles, sequences }: {
     }
     return map
   }
-  const total = { est: 0, real: 0, paid: 0 }
-  for (const l of leaves) { const f = model.line(l.item); total.est += f.estimated; total.real += f.real ?? 0; total.paid += f.paid }
+  const total = { est: 0, real: 0, paid: 0, offered: 0, ours: 0 }
+  for (const l of leaves) {
+    const f = model.line(l.item)
+    const offered = model.offered(l.item)
+    total.est += f.estimated; total.real += f.real ?? 0; total.paid += f.paid
+    total.offered += offered; total.ours += remaining({ ...f, offered })
+  }
   const block = (title: string, map: Map<string, { est: number; real: number; paid: number; n: number; toEst: number }>, order: string[]): Cell[][] => [
     [title, "Estimé", "Réel", "Payé", "% du budget estimé", "Lignes", "Dont à estimer"],
     ...order.filter((k) => map.has(k)).map((k) => {
@@ -168,6 +179,7 @@ export function exportBudgetXlsx({ items, model, poles, sequences }: {
     ["Budget du mariage", "", "", "", "", "", ""],
     ["Exporté le", new Date(), "", "", "", "", ""],
     ["Total estimé", total.est], ["Total réel (engagé)", total.real], ["Total payé", total.paid],
+    ["Offert (cadeaux anticipés reçus)", total.offered], ["Reste à notre charge", total.ours],
     ["Lignes pas encore estimées", leaves.filter((l) => l.item.amountStatus === "to_estimate").length],
     ["Montant dépendant du nombre d'invités", leaves.filter((l) => l.item.guestDependent).reduce((t, l) => t + model.line(l.item).estimated, 0)],
     [],
@@ -177,7 +189,7 @@ export function exportBudgetXlsx({ items, model, poles, sequences }: {
   ]
   const summary = XLSX.utils.aoa_to_sheet(summaryRows, { cellDates: true })
   // Formats : montants (colonnes 2 à 4, sauf le compteur de lignes à estimer), pourcentage (colonne 5), date.
-  const countRow = 5
+  const countRow = 7
   for (const [addr, cell] of Object.entries(summary)) {
     if (addr.startsWith("!") || typeof cell !== "object") continue
     const { r, c } = XLSX.utils.decode_cell(addr)
@@ -205,11 +217,15 @@ export function exportBudgetXlsx({ items, model, poles, sequences }: {
     "Tous les devis", "Compte", "Origine (qui paie)", "Notes", "Notes du poste",
     ...REVIEW_QUESTIONS.map((q) => `2e passe — ${q.short} (0-2)`), `2e passe — Note /${REVIEW_MAX}`, "2e passe — € par point",
     "2e passe — Verdict", "2e passe — Origine des notes", "2e passe — DIY envisageable", "2e passe — Remarque",
-  ], lineRows, { 10: EUR, 11: EUR, 12: EUR, 13: EUR, 14: EUR, 21: EUR, [27 + REVIEW_QUESTIONS.length + 1]: EUR }), "Lignes")
+    "Offert (cadeaux reçus)", "Reste à notre charge",
+  ], lineRows, {
+    10: EUR, 11: EUR, 12: EUR, 13: EUR, 14: EUR, 21: EUR, [27 + REVIEW_QUESTIONS.length + 1]: EUR,
+    [27 + REVIEW_QUESTIONS.length + 6]: EUR, [27 + REVIEW_QUESTIONS.length + 7]: EUR,
+  }), "Lignes")
   XLSX.utils.book_append_sheet(wb, sheet([
     "Pôle", "Poste", "Sous-postes", "Séquences", "Priorité", "Estimé", "Réel", "Payé", "Reste à payer", "Statut de paiement",
-    "Lignes à estimer", "Dépend du nb d'invités", "Notes",
-  ], posteRows, { 5: EUR, 6: EUR, 7: EUR, 8: EUR }), "Postes")
+    "Lignes à estimer", "Dépend du nb d'invités", "Notes", "Offert (cadeaux reçus)", "Reste à notre charge",
+  ], posteRows, { 5: EUR, 6: EUR, 7: EUR, 8: EUR, 13: EUR, 14: EUR }), "Postes")
   XLSX.utils.book_append_sheet(wb, sheet([
     "Fournisseur", "Intitulé", "Statut", "Date du devis", "Valable jusqu'au", "Montant total", "Somme des parts", "Écart",
     "Payé", "Lignes couvertes", "Détail des lignes", "Lien", "Notes",
@@ -222,6 +238,20 @@ export function exportBudgetXlsx({ items, model, poles, sequences }: {
     paymentRows, { 5: EUR, 6: DATE, 8: DATE }), "Versements")
   XLSX.utils.book_append_sheet(wb, sheet(matrixHeaders, matrixRows,
     Object.fromEntries(matrixHeaders.slice(1).map((_, i) => [i + 1, EUR]))), "Pôle × séquence")
+
+  // ── Cadeaux anticipés : une ligne par affectation (ou une seule si le cadeau n'est pas encore affecté) ──
+  if (gifts.length) {
+    const giftRows: Cell[][] = gifts.flatMap(({ gift, donors }) => {
+      const head: Cell[] = [donors, gift.description, gift.amount, gift.promised ? "Promis" : "Reçu", date(gift.receivedOn),
+        gift.account ?? "", yesNo(gift.thankyouSent)]
+      const allocs = model.allocations.filter((a) => a.giftId === gift.id)
+      if (!allocs.length) return [[...head, "Non affecté", "", null]]
+      return allocs.map((a) => [...head, a.devisId ? "Devis" : "Ligne / poste", targetLabel(model, a), a.amount])
+    })
+    XLSX.utils.book_append_sheet(wb, sheet(
+      ["Donateurs", "Description", "Montant du cadeau", "État", "Reçu le", "Compte", "Remercié", "Affecté à", "Cible", "Montant affecté"],
+      giftRows, { 2: EUR, 4: DATE, 9: EUR }), "Cadeaux anticipés")
+  }
 
   XLSX.writeFile(wb, `budget-${new Date().toISOString().slice(0, 10)}.xlsx`, { cellDates: true })
 }

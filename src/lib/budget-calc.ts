@@ -1,4 +1,4 @@
-import type { BudgetDevis, BudgetItem, BudgetPayment, DevisLine } from "@/services/supabase/budget"
+import type { BudgetDevis, BudgetItem, BudgetPayment, DevisLine, GiftAllocation } from "@/services/supabase/budget"
 
 /**
  * Règles de calcul du budget (postes, sous-postes, devis groupés, échéanciers).
@@ -8,7 +8,14 @@ import type { BudgetDevis, BudgetItem, BudgetPayment, DevisLine } from "@/servic
  *   · Réel d'une ligne : sa part dans le devis retenu qui la couvre, sinon le montant réel saisi.
  *   · Payé d'une ligne : couverte par un devis retenu → versements payés du devis au prorata de sa part ;
  *     sinon ses propres versements payés (achat direct). Paiements : devis retenu OU ligne, jamais ailleurs.
+ *   · Offert d'une ligne (cadeaux anticipés reçus, indépendant du paiement) : affectations directes à la
+ *     ligne + part des affectations à son poste (au prorata du coût des sous-postes) + part des
+ *     affectations aux devis qui la couvrent (au prorata de sa part dans le devis).
+ *   · Coût d'une ligne = réel s'il est connu, sinon estimé. Reste à charge = coût − offert (min. 0).
  */
+
+/** Cadeaux anticipés : affectations, et cadeaux qui comptent (reçus, pas seulement promis). */
+export type Funding = { allocations: GiftAllocation[]; countedGiftIds: Set<string> }
 
 export function fmt(n: number | null | undefined): string {
   if (n == null) return "—"
@@ -43,8 +50,14 @@ export class BudgetModel {
   readonly linesByItem: Map<string, DevisLine[]>
   readonly paymentsByItem: Map<string, BudgetPayment[]>
   readonly paymentsByDevis: Map<string, BudgetPayment[]>
+  /** Affectations des cadeaux reçus, par ligne / poste et par devis. */
+  readonly allocationsByItem: Map<string, GiftAllocation[]>
+  readonly allocationsByDevis: Map<string, GiftAllocation[]>
+  readonly allocations: GiftAllocation[]
+  private readonly source: { items: BudgetItem[]; devis: BudgetDevis[]; lines: DevisLine[]; payments: BudgetPayment[]; funding?: Funding }
 
-  constructor(items: BudgetItem[], devis: BudgetDevis[], lines: DevisLine[], payments: BudgetPayment[]) {
+  constructor(items: BudgetItem[], devis: BudgetDevis[], lines: DevisLine[], payments: BudgetPayment[], funding?: Funding) {
+    this.source = { items, devis, lines, payments, funding }
     this.itemsById = new Map(items.map((i) => [i.id, i]))
     this.childrenOf = new Map()
     for (const i of items) {
@@ -62,6 +75,72 @@ export class BudgetModel {
       const d = this.devisById.get(l.devisId)
       if (d?.status === "retenu" && !this.retained.has(l.itemId)) this.retained.set(l.itemId, { devis: d, amount: l.amount })
     }
+    this.allocations = funding?.allocations ?? []
+    const counted = this.allocations.filter((a) => funding?.countedGiftIds.has(a.giftId))
+    this.allocationsByItem = groupBy(counted.filter((a) => a.itemId), (a) => a.itemId!)
+    this.allocationsByDevis = groupBy(counted.filter((a) => a.devisId), (a) => a.devisId!)
+  }
+
+  /** Le même budget sans les affectations d'un cadeau (pour calculer ce qu'il reste à couvrir). */
+  withoutGift(giftId: string | null): BudgetModel {
+    if (!giftId || !this.source.funding) return this
+    const { items, devis, lines, payments, funding } = this.source
+    return new BudgetModel(items, devis, lines, payments, { ...funding, allocations: funding.allocations.filter((a) => a.giftId !== giftId) })
+  }
+
+  /** Reste à charge d'une cible d'affectation : ligne, poste entier (ses lignes) ou devis (ses lignes, à hauteur de leur part). */
+  remainingFor(target: { itemId: string | null; devisId: string | null }): number {
+    if (target.itemId) {
+      const item = this.itemsById.get(target.itemId)
+      if (!item) return 0
+      return sum(this.leaves(item).map((l) => Math.max(0, this.cost(l) - this.offered(l))))
+    }
+    if (target.devisId) {
+      const d = this.devisById.get(target.devisId)
+      const lines = this.linesByDevis.get(target.devisId) ?? []
+      if (!lines.length) return d?.totalAmount ?? 0
+      return sum(lines.map((l) => {
+        const it = this.itemsById.get(l.itemId)
+        if (!it) return 0
+        const share = l.amount ?? this.cost(it)
+        // Part de la ligne dans le devis, moins ce que d'autres cadeaux financent déjà sur cette ligne.
+        return Math.max(0, Math.min(share, this.cost(it) - this.offered(it)))
+      }))
+    }
+    return 0
+  }
+
+  /** Coût d'une ligne : réel s'il est connu, sinon estimé. */
+  cost(item: BudgetItem): number {
+    const f = this.line(item)
+    return f.real ?? f.estimated
+  }
+
+  /** Part des cadeaux anticipés reçus qui finance une ligne (poste sans sous-poste ou sous-poste). */
+  offered(item: BudgetItem): number {
+    let total = sum((this.allocationsByItem.get(item.id) ?? []).map((a) => a.amount))
+    // Affectation au poste : répartie sur ses sous-postes au prorata de leur coût (à parts égales si aucun coût).
+    if (item.parentId) {
+      const onPoste = sum((this.allocationsByItem.get(item.parentId) ?? []).map((a) => a.amount))
+      if (onPoste) {
+        const kids = this.children(item.parentId)
+        const base = sum(kids.map((k) => this.cost(k)))
+        total += onPoste * (base > 0 ? this.cost(item) / base : 1 / kids.length)
+      }
+    }
+    // Affectation à un devis : répartie sur ses lignes au prorata de leur part (ou de leur coût si part non saisie).
+    for (const l of this.linesByItem.get(item.id) ?? []) {
+      const onDevis = sum((this.allocationsByDevis.get(l.devisId) ?? []).map((a) => a.amount))
+      if (!onDevis) continue
+      const devisLines = this.linesByDevis.get(l.devisId) ?? []
+      const weight = (dl: DevisLine) => {
+        const it = this.itemsById.get(dl.itemId)
+        return dl.amount ?? (it ? this.cost(it) : 0)
+      }
+      const base = sum(devisLines.map(weight))
+      total += onDevis * (base > 0 ? weight(l) / base : 1 / devisLines.length)
+    }
+    return total
   }
 
   children(posteId: string): BudgetItem[] {
@@ -102,7 +181,7 @@ export class BudgetModel {
   }
 
   /** Chiffres d'un poste, éventuellement limités aux sous-postes d'une séquence et/ou filtrés. */
-  poste(poste: BudgetItem, sequenceId?: string | null, keep?: (line: BudgetItem) => boolean): LineFigures & { depositRequired: boolean } {
+  poste(poste: BudgetItem, sequenceId?: string | null, keep?: (line: BudgetItem) => boolean): LineFigures & { depositRequired: boolean; offered: number } {
     const kids = this.children(poste.id)
     const leaves = (kids.length
       ? (sequenceId === undefined ? kids : kids.filter((k) => k.sequenceId === sequenceId))
@@ -118,6 +197,7 @@ export class BudgetModel {
       paid,
       hasPaidDeposit,
       depositRequired: poste.depositRequired || leaves.some((l) => l.depositRequired),
+      offered: sum(leaves.map((l) => this.offered(l))),
     }
   }
 
@@ -242,4 +322,9 @@ export function sequenceLabel(model: BudgetModel, item: BudgetItem, sequences: {
   const names = sequences.filter((s) => ids.includes(s.id)).map((s) => s.name)
   if (ids.includes(null)) names.push("Sans séquence")
   return names.join(" · ") || "Sans séquence"
+}
+
+/** Reste à notre charge : coût (réel sinon estimé) moins la part offerte, jamais négatif. */
+export function remaining(f: { estimated: number; real: number | null; offered: number }): number {
+  return Math.max(0, (f.real ?? f.estimated) - f.offered)
 }

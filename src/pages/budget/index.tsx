@@ -14,10 +14,11 @@ import {
 } from "@/components/ui/select"
 import { useEventSequences } from "@/hooks/queries/use-event-sequences"
 import {
-  useBudgetDevis, useBudgetDevisLines, useBudgetItems, useBudgetPayments, useImportBudgetItems,
+  useBudgetDevis, useBudgetDevisLines, useBudgetItems, useBudgetPayments, useImportBudgetItems, useGiftAllocations,
 } from "@/hooks/queries/use-budget"
+import { useGifts } from "@/hooks/queries/use-gifts"
 import { usePoles } from "@/hooks/queries/use-poles"
-import { BudgetModel, PRIORITIES, PRIORITY_LABELS, effectivePriority, fmt, fmtCompact, lineMatches } from "@/lib/budget-calc"
+import { BudgetModel, PRIORITIES, PRIORITY_LABELS, effectivePriority, fmt, fmtCompact, lineMatches, remaining } from "@/lib/budget-calc"
 import { poleIdForCategory } from "@/lib/budget-poles"
 import { exportBudgetXlsx } from "@/lib/budget-export"
 import type { BudgetItem } from "@/services/supabase/budget"
@@ -25,6 +26,9 @@ import type { Pole } from "@/types/domain"
 import { SequenceName } from "@/components/shared/SequenceName"
 import { BudgetStats } from "./BudgetStats"
 import { DevisTab } from "./DevisTab"
+import { GiftsTab } from "./GiftsTab"
+import { giftDonors } from "@/lib/budget-gifts"
+import { useGuests } from "@/hooks/queries/use-guests"
 import { ReviewTab } from "./ReviewTab"
 import { PoleTable, type OptionalCol } from "./PoleTable"
 import { PosteSheet } from "./PosteSheet"
@@ -407,6 +411,9 @@ function BudgetSummary({ postes, model }: { postes: BudgetItem[]; model: BudgetM
   const paid = figs.reduce((t, f) => t + f.paid, 0)
   // Reste à payer : sur le réel quand il est connu, sinon sur l'estimé.
   const due = figs.reduce((t, f) => t + (f.real ?? f.estimated), 0)
+  // Cadeaux anticipés reçus affectés au budget, et ce qu'il reste à financer nous-mêmes.
+  const offered = figs.reduce((t, f) => t + f.offered, 0)
+  const ourShare = figs.reduce((t, f) => t + remaining(f), 0)
 
   // Payé par compte : versements payés des devis retenus et des lignes.
   const byAccount = new Map<string, number>()
@@ -431,12 +438,14 @@ function BudgetSummary({ postes, model }: { postes: BudgetItem[]; model: BudgetM
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         {card("Budget estimé", fmt(estimated), `${postes.length} poste${postes.length > 1 ? "s" : ""}`)}
         {card("Engagé", fmt(real), "devis retenus et montants réels")}
         {card("Payé", fmt(paid))}
         {card("Reste à payer", fmt(Math.max(0, due - paid)), estimated - real >= 0 ? `marge ${fmt(estimated - real)} sur l'estimé` : "réel au-dessus de l'estimé",
           due - paid > 0 ? "" : "text-emerald-600 dark:text-emerald-400")}
+        {card("Offert", fmt(offered), "cadeaux anticipés reçus", offered > 0 ? "text-emerald-600 dark:text-emerald-400" : undefined)}
+        {card("Reste à notre charge", fmt(ourShare), "réel (sinon estimé) moins l'offert")}
       </div>
       {byAccount.size > 0 && (
         <div className="flex flex-wrap items-center gap-2">
@@ -454,7 +463,7 @@ function BudgetSummary({ postes, model }: { postes: BudgetItem[]; model: BudgetM
 
 // ── Page principale ───────────────────────────────────────────────────────────
 
-type Tab = "postes" | "devis" | "passe"
+type Tab = "postes" | "devis" | "cadeaux" | "passe"
 
 export function BudgetPage() {
   const { data: items = [], isLoading: lItems } = useBudgetItems()
@@ -466,7 +475,14 @@ export function BudgetPage() {
 
   const sortedSeq = useMemo(() => [...sequences].sort((a, b) => a.sortOrder - b.sortOrder), [sequences])
   const sortedPoles = useMemo(() => [...poles].sort((a, b) => a.sortOrder - b.sortOrder), [poles])
-  const model = useMemo(() => new BudgetModel(items, devis, devisLines, payments), [items, devis, devisLines, payments])
+  const { data: gifts = [] } = useGifts()
+  const { data: allocations = [] } = useGiftAllocations()
+  const { data: guests = [] } = useGuests()
+  const guestsById = useMemo(() => new Map(guests.map((g) => [g.id, g])), [guests])
+  // Cadeaux anticipés : seuls les cadeaux reçus comptent dans « Offert ».
+  const model = useMemo(() => new BudgetModel(items, devis, devisLines, payments, {
+    allocations, countedGiftIds: new Set(gifts.filter((g) => !g.promised).map((g) => g.id)),
+  }), [items, devis, devisLines, payments, gifts, allocations])
 
   const [tab, setTab] = useState<Tab>("postes")
   const [seqFilter, setSeqFilter] = useState<string | null>(null)
@@ -529,7 +545,11 @@ export function BudgetPage() {
             </Button>
             <Button variant="outline" size="sm" disabled={items.length === 0} onClick={() => {
               try {
-                exportBudgetXlsx({ items, model, poles: sortedPoles, sequences: sortedSeq })
+                exportBudgetXlsx({
+                  items, model, poles: sortedPoles, sequences: sortedSeq,
+                  gifts: gifts.filter((g) => g.anticipated || model.allocations.some((a) => a.giftId === g.id))
+                    .map((g) => ({ gift: g, donors: giftDonors(g, guestsById) })),
+                })
               } catch (err) {
                 console.error(err)
                 toast.error("Export impossible.")
@@ -549,7 +569,7 @@ export function BudgetPage() {
       <BudgetSummary postes={postes} model={model} />
 
       <div className="flex gap-1.5" role="tablist">
-        {([["postes", "Postes"], ["devis", `Devis (${devis.length})`], ["passe", "Seconde passe"]] as const).map(([id, label]) => (
+        {([["postes", "Postes"], ["devis", `Devis (${devis.length})`], ["cadeaux", "Cadeaux anticipés"], ["passe", "Seconde passe"]] as const).map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
             className={`rounded-full border px-3.5 py-1 text-sm font-medium transition-colors ${tab === id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground"}`}>
             {label}
@@ -559,6 +579,8 @@ export function BudgetPage() {
 
       {tab === "devis" ? (
         <DevisTab devis={devis} model={model} items={items} poles={sortedPoles} sequences={sortedSeq} />
+      ) : tab === "cadeaux" ? (
+        <GiftsTab gifts={gifts} model={model} items={items} poles={sortedPoles} sequences={sortedSeq} />
       ) : tab === "passe" ? (
         <ReviewTab items={items} model={model} poles={sortedPoles} sequences={sortedSeq} />
       ) : (

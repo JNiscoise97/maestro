@@ -6,7 +6,8 @@ const KEY = ["gifts"] as const
 
 function useInvalidate() {
   const qc = useQueryClient()
-  return () => qc.invalidateQueries({ queryKey: KEY })
+  // Les affectations au budget dépendent des cadeaux (suppression en cascade, montant, réception).
+  return () => Promise.all([KEY, ["budget_gift_allocations"]].map((k) => qc.invalidateQueries({ queryKey: k })))
 }
 
 export function useGifts() {

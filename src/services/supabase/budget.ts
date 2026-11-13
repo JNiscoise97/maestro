@@ -377,6 +377,29 @@ export const budgetService = {
     return id!
   },
 
+  // ── Cadeaux anticipés : affectations d'un cadeau à des lignes ou des devis ───
+
+  async listGiftAllocations(): Promise<GiftAllocation[]> {
+    const { data, error } = await db.from(tbl("budget_gift_allocations")).select("*")
+      .order("sort_order", { ascending: true }).order("created_at", { ascending: true })
+    if (error) throw error
+    return (data ?? []).map((r: any) => ({
+      id: r.id, giftId: r.gift_id, itemId: r.item_id ?? null, devisId: r.devis_id ?? null, amount: Number(r.amount),
+    }))
+  },
+
+  /** Remplace les affectations d'un cadeau. */
+  async replaceGiftAllocations(giftId: string, allocations: GiftAllocationDraft[]): Promise<void> {
+    const { error } = await db.from(tbl("budget_gift_allocations")).delete().eq("gift_id", giftId)
+    if (error) throw error
+    const rows = allocations.filter((a) => a.amount > 0 && (a.itemId || a.devisId))
+    if (!rows.length) return
+    const { error: e2 } = await db.from(tbl("budget_gift_allocations")).insert(rows.map((a, i) => ({
+      gift_id: giftId, item_id: a.itemId, devis_id: a.itemId ? null : a.devisId, amount: a.amount, sort_order: i,
+    })))
+    if (e2) throw e2
+  },
+
   async deleteDevis(id: string): Promise<void> {
     const { error } = await db.from(tbl("budget_devis")).delete().eq("id", id)
     if (error) throw error
@@ -472,6 +495,10 @@ export type BudgetDevis = {
 }
 
 export type DevisLine = { devisId: string; itemId: string; amount: number | null }
+
+/** Part d'un cadeau anticipé affectée à une ligne (poste ou sous-poste) ou à un devis. */
+export type GiftAllocation = { id: string; giftId: string; itemId: string | null; devisId: string | null; amount: number }
+export type GiftAllocationDraft = Omit<GiftAllocation, "id" | "giftId">
 
 export type PaymentKind = "acompte" | "solde" | "paiement"
 

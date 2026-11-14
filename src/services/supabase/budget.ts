@@ -359,8 +359,9 @@ export const budgetService = {
     }
     let id = devis.id
     if (id) {
-      const { error } = await db.from(tbl("budget_devis")).update(row).eq("id", id)
+      const { data, error } = await db.from(tbl("budget_devis")).update(row).eq("id", id).select("id")
       if (error) throw error
+      if (!data?.length) throw new Error("Ce devis a été supprimé entre-temps : fermez la fenêtre et recréez-le si besoin.")
     } else {
       const { data, error } = await db.from(tbl("budget_devis")).insert(row).select("id").single()
       if (error) throw error
@@ -455,9 +456,16 @@ export const budgetService = {
     const lineIds = Object.values(idsByKey)
     const { error: e1 } = await db.from(tbl("budget_devis_lines")).delete().in("item_id", lineIds)
     if (e1) throw e1
-    const rows = plan.links
+    let rows = plan.links
       .filter((l) => idsByKey[l.lineKey])
       .map((l) => ({ devis_id: refToId.get(l.devisRef) ?? l.devisRef, item_id: idsByKey[l.lineKey], amount: l.amount }))
+    // Rattachements vers un devis supprimé entre-temps (autre onglet, autre appareil) : ignorés.
+    if (rows.length) {
+      const { data: existing, error: e2 } = await db.from(tbl("budget_devis")).select("id").in("id", [...new Set(rows.map((r) => r.devis_id))])
+      if (e2) throw e2
+      const ids = new Set((existing ?? []).map((r: { id: string }) => r.id))
+      rows = rows.filter((r) => ids.has(r.devis_id))
+    }
     if (rows.length) {
       const { error } = await db.from(tbl("budget_devis_lines")).insert(rows)
       if (error) throw error

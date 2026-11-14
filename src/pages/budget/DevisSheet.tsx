@@ -89,7 +89,7 @@ export function DevisSheet({ devis, presetItemIds = [], model, items, poles, seq
       onClose()
     } catch (err) {
       console.error(err)
-      toast.error("Erreur lors de l'enregistrement du devis.")
+      toast.error(err instanceof Error ? err.message : "Erreur lors de l'enregistrement du devis.")
     }
   }
 

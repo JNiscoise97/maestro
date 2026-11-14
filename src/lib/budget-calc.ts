@@ -118,29 +118,34 @@ export class BudgetModel {
 
   /** Part des cadeaux anticipés reçus qui finance une ligne (poste sans sous-poste ou sous-poste). */
   offered(item: BudgetItem): number {
-    let total = sum((this.allocationsByItem.get(item.id) ?? []).map((a) => a.amount))
+    return sum(this.offeredBy(item).map((x) => x.amount))
+  }
+
+  /** Détail de l'offert d'une ligne par cadeau (reçus seulement), montants cumulés par cadeau. */
+  offeredBy(item: BudgetItem): { giftId: string; amount: number }[] {
+    const acc = new Map<string, number>()
+    const add = (allocs: GiftAllocation[] | undefined, ratio: number) => {
+      for (const a of allocs ?? []) acc.set(a.giftId, (acc.get(a.giftId) ?? 0) + a.amount * ratio)
+    }
+    add(this.allocationsByItem.get(item.id), 1)
     // Affectation au poste : répartie sur ses sous-postes au prorata de leur coût (à parts égales si aucun coût).
-    if (item.parentId) {
-      const onPoste = sum((this.allocationsByItem.get(item.parentId) ?? []).map((a) => a.amount))
-      if (onPoste) {
-        const kids = this.children(item.parentId)
-        const base = sum(kids.map((k) => this.cost(k)))
-        total += onPoste * (base > 0 ? this.cost(item) / base : 1 / kids.length)
-      }
+    if (item.parentId && this.allocationsByItem.get(item.parentId)?.length) {
+      const kids = this.children(item.parentId)
+      const base = sum(kids.map((k) => this.cost(k)))
+      add(this.allocationsByItem.get(item.parentId), base > 0 ? this.cost(item) / base : 1 / kids.length)
     }
     // Affectation à un devis : répartie sur ses lignes au prorata de leur part (ou de leur coût si part non saisie).
     for (const l of this.linesByItem.get(item.id) ?? []) {
-      const onDevis = sum((this.allocationsByDevis.get(l.devisId) ?? []).map((a) => a.amount))
-      if (!onDevis) continue
+      if (!this.allocationsByDevis.get(l.devisId)?.length) continue
       const devisLines = this.linesByDevis.get(l.devisId) ?? []
       const weight = (dl: DevisLine) => {
         const it = this.itemsById.get(dl.itemId)
         return dl.amount ?? (it ? this.cost(it) : 0)
       }
       const base = sum(devisLines.map(weight))
-      total += onDevis * (base > 0 ? weight(l) / base : 1 / devisLines.length)
+      add(this.allocationsByDevis.get(l.devisId), base > 0 ? weight(l) / base : 1 / devisLines.length)
     }
-    return total
+    return [...acc].map(([giftId, amount]) => ({ giftId, amount })).filter((x) => x.amount > 0)
   }
 
   children(posteId: string): BudgetItem[] {

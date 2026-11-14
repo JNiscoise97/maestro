@@ -17,6 +17,8 @@ import type { Pole } from "@/types/domain"
 import { SearchableSelect } from "@/components/shared/SearchableSelect"
 import { DevisSheet } from "./DevisSheet"
 import { FundingNote } from "./GiftsTab"
+import { useGiftDonorNames } from "@/hooks/use-gift-donor-names"
+import { fundingOf } from "@/lib/budget-gifts"
 import { PaymentsEditor } from "./PaymentsEditor"
 
 type Seq = { id: string; name: string; color?: string | null; sortOrder?: number }
@@ -117,6 +119,13 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
   const [newDevis, setNewDevis] = useState<NewDevis[]>([])
   const [step, setStep] = useState<Step>(1)
   const [openDevis, setOpenDevis] = useState<BudgetDevis | null>(null)
+  const donorNames = useGiftDonorNames()
+  // Cadeaux anticipés reçus qui financent une ligne déjà enregistrée.
+  const fundingFor = (l: Line): Funding | null => {
+    const item = l.id ? model.itemsById.get(l.id) : undefined
+    const f = item ? fundingOf(model, [item], donorNames) : null
+    return f && f.donors.length ? f : null
+  }
 
   const lines: Line[] = multiple ? subs : [main]
   const setLine = (key: string, patch: Partial<Line>) => {
@@ -162,13 +171,15 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
     }
     // Rattachements : nouveaux devis référencés seulement.
     const usedNew = new Set(lines.flatMap((l) => l.purchase === "devis" ? l.links.map((x) => x.devisRef) : []))
+    // Un devis supprimé depuis l'ouverture du poste (brouillon figé) ne peut plus être rattaché.
+    const knownRef = (ref: string) => model.devisById.has(ref) || newDevis.some((d) => d.ref === ref)
     const plan: DevisPlan = {
       newDevis: newDevis.filter((d) => usedNew.has(d.ref)).map((d) => ({
         ref: d.ref, vendor: d.vendor.trim() || null, title: d.title.trim() || null,
         totalAmount: parseAmount(d.totalAmount), status: d.status,
       })),
       links: lines.flatMap((l) => l.purchase === "devis" && l.amountStatus !== "included"
-        ? l.links.map((x) => ({ lineKey: l.key, devisRef: x.devisRef, amount: parseAmount(x.amount) }))
+        ? l.links.filter((x) => knownRef(x.devisRef)).map((x) => ({ lineKey: l.key, devisRef: x.devisRef, amount: parseAmount(x.amount) }))
         : []),
     }
     // Une ligne sous devis n'a pas de versements propres ; « pas encore décidé » n'en a pas non plus.
@@ -329,7 +340,7 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
                 <span className="text-muted-foreground"> · inclus dans {model.fullLabel(l.includedInId)} : rien à acheter ni à payer.</span>
               </div>
             ) : <PurchaseCard key={l.key} line={l} label={multiple ? l.label : name} sequences={sequences}
-              devisOptions={devisOptions} newDevis={newDevis} devisLabel={devisLabel}
+              devisOptions={devisOptions} newDevis={newDevis} devisLabel={devisLabel} funding={fundingFor(l)}
               onChange={(p) => setLine(l.key, p)}
               onCreateDevis={(d) => setNewDevis([...newDevis, d])}
               onOpenDevis={(id) => { const d = model.devisById.get(id); if (d) setOpenDevis(d) }} />
@@ -532,13 +543,17 @@ function EstimateRow({ line, label, sequences, targets, onChange }: {
   )
 }
 
-function PurchaseCard({ line, label, sequences, devisOptions, newDevis, devisLabel, onChange, onCreateDevis, onOpenDevis }: {
+type Funding = ReturnType<typeof fundingOf>
+
+function PurchaseCard({ line, label, sequences, devisOptions, newDevis, devisLabel, funding, onChange, onCreateDevis, onOpenDevis }: {
   line: Line
   label: string
   sequences: Seq[]
   devisOptions: BudgetDevis[]
   newDevis: NewDevis[]
   devisLabel: (ref: string) => string
+  /** Financement par les cadeaux anticipés reçus (ligne enregistrée seulement). */
+  funding: Funding | null
   onChange: (p: Partial<Line>) => void
   onCreateDevis: (d: NewDevis) => void
   onOpenDevis: (id: string) => void
@@ -546,6 +561,11 @@ function PurchaseCard({ line, label, sequences, devisOptions, newDevis, devisLab
   const [creating, setCreating] = useState<NewDevis | null>(null)
   const seq = sequences.find((s) => s.id === line.sequenceId)
   const estimate = estimateOf(line)
+  // Reste à notre charge : coût saisi dans la fenêtre pour un achat direct, sinon celui du budget (devis).
+  const cost = line.purchase === "direct" ? (line.actualTotal ?? estimate ?? 0) : (funding?.cost ?? 0)
+  const rest = funding ? Math.max(0, cost - funding.offered) : null
+  const fullyOffered = rest != null && rest <= 0.005
+  const donorList = funding?.donors.map((d) => d.name).join(", ") ?? ""
 
   function setPurchase(p: Purchase) {
     if (p === line.purchase) return
@@ -570,13 +590,33 @@ function PurchaseCard({ line, label, sequences, devisOptions, newDevis, devisLab
         ))}
       </div>
 
+      {funding && (
+        <div className="rounded-lg border border-emerald-600/30 bg-emerald-50 px-3 py-2 text-xs dark:bg-emerald-950/30">
+          <p>
+            🎁 Offert par{" "}
+            {funding.donors.map((d, i) => <span key={d.name}>{i > 0 && " · "}<b>{d.name}</b> {fmt(d.amount)}</span>)}
+            <span className="text-muted-foreground"> · À notre charge : </span>
+            <b className={fullyOffered ? "text-emerald-700 dark:text-emerald-400" : ""}>{fullyOffered ? "rien" : fmt(rest)}</b>
+          </p>
+          <p className="mt-0.5 text-muted-foreground">
+            Le cadeau finance la dépense ; les versements ci-dessous restent les paiements au fournisseur.
+          </p>
+        </div>
+      )}
+
       {line.purchase === "direct" && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <Field label="Enseigne"><Input value={line.vendor ?? ""} onChange={(e) => onChange({ vendor: e.target.value || null })} /></Field>
             <Field label="Montant réel €"><Input className="font-mono" inputMode="decimal" defaultValue={amountInput(line.actualTotal)} onChange={(e) => onChange({ actualTotal: parseAmount(e.target.value) })} /></Field>
             <Field label="Compte"><Input list="budget-accounts-p" value={line.account ?? ""} onChange={(e) => onChange({ account: e.target.value || null })} /></Field>
-            <Field label="Origine (qui paie)"><Input list="budget-origins-p" value={line.origin ?? ""} onChange={(e) => onChange({ origin: e.target.value || null })} /></Field>
+            {fullyOffered ? (
+              <Field label="Origine (qui paie)"><Input disabled value={donorList} title="Déduite du cadeau anticipé" /></Field>
+            ) : (
+              <Field label={funding ? "Qui paie le reste" : "Origine (qui paie)"}>
+                <Input list="budget-origins-p" value={line.origin ?? ""} onChange={(e) => onChange({ origin: e.target.value || null })} />
+              </Field>
+            )}
           </div>
           <datalist id="budget-accounts-p">{ACCOUNT_SUGGESTIONS.map((a) => <option key={a} value={a} />)}</datalist>
           <datalist id="budget-origins-p">{ORIGIN_SUGGESTIONS.map((a) => <option key={a} value={a} />)}</datalist>

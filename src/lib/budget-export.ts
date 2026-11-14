@@ -3,7 +3,7 @@ import * as XLSX from "xlsx"
 import {
   PAYMENT_STATUS_LABELS, PRIORITY_LABELS, budgetItemComparator, effectivePriority, paymentStatus, remaining, type BudgetModel,
 } from "@/lib/budget-calc"
-import { targetLabel } from "@/lib/budget-gifts"
+import { effectiveOrigin, targetLabel } from "@/lib/budget-gifts"
 import {
   REVIEW_MAX, REVIEW_QUESTIONS, VERDICT_LABELS, costPerPoint, effectiveReview, reviewTotal, reviewVerdict,
 } from "@/lib/budget-review"
@@ -58,6 +58,7 @@ export function exportBudgetXlsx({ items, model, poles, sequences, gifts = [] }:
   const poleOrder = new Map(poles.map((p, i) => [p.id, i]))
   const seqOrder = new Map(sequences.map((s, i) => [s.id, i]))
   const byBudget = budgetItemComparator(model, poles)
+  const donorsByGift = new Map(gifts.map(({ gift, donors }) => [gift.id, donors]))
 
   // ── Lignes : postes sans sous-poste et sous-postes ──
   const leaves = items
@@ -88,7 +89,7 @@ export function exportBudgetXlsx({ items, model, poles, sequences, gifts = [] }:
       retained ? "Devis retenu" : (model.paymentsByItem.get(item.id)?.length || item.actualTotal != null) ? "Achat direct" : "Pas encore décidé",
       retained?.devis.vendor ?? item.vendor ?? "", retained?.devis.title ?? "", retained?.amount ?? null,
       allDevis.map((d) => `${d!.vendor ?? d!.title ?? "?"} (${DEVIS_LABELS[d!.status]})`).join(" ; "),
-      item.account ?? "", item.origin ?? "", item.notes ?? "", top.notes && item.parentId ? top.notes : "",
+      item.account ?? "", effectiveOrigin(model, item, donorsByGift) ?? "", item.notes ?? "", top.notes && item.parentId ? top.notes : "",
       // Seconde passe
       ...REVIEW_QUESTIONS.map((q) => review?.scores[q.key] ?? null),
       total, perPoint === Infinity ? "∞" : perPoint,

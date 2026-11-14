@@ -368,8 +368,11 @@ function GuestMultiPicker({ guests, value, onChange }: { guests: Guest[]; value:
   const { data: groups = [] } = useGuestGroups()
   const [open, setOpen] = useState(false)
   const byId = new Map(guests.map((g) => [g.id, g]))
-  const familyOf = (g: Guest) => groups.find((x) => x.id === g.groupId)?.familyName ?? "Sans famille"
-  const families = [...new Set(guests.map(familyOf))].sort((a, b) => a.localeCompare(b, "fr"))
+  // Familles dans l'ordre défini dans les réglages des groupes (sortOrder), « Sans famille » en dernier.
+  const families = [...groups].sort((a, b) => a.sortOrder - b.sortOrder || a.familyName.localeCompare(b.familyName, "fr"))
+    .map((grp) => ({ key: grp.id, label: grp.familyName, guests: guests.filter((g) => g.groupId === grp.id) }))
+  const knownIds = new Set(groups.map((grp) => grp.id))
+  families.push({ key: "__none__", label: "Sans famille", guests: guests.filter((g) => !g.groupId || !knownIds.has(g.groupId)) })
   const toggle = (id: string) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id])
 
   return (
@@ -395,10 +398,10 @@ function GuestMultiPicker({ guests, value, onChange }: { guests: Guest[]; value:
             <CommandInput placeholder="Rechercher un invité…" />
             <CommandList>
               <CommandEmpty>Aucun invité ne correspond.</CommandEmpty>
-              {families.map((fam) => (
-                <CommandGroup key={fam} heading={fam}>
-                  {guests.filter((g) => familyOf(g) === fam).sort((a, b) => a.fullName.localeCompare(b.fullName, "fr")).map((g) => (
-                    <CommandItem key={g.id} value={`${g.fullName} ${fam} ${g.id}`} onSelect={() => toggle(g.id)}>
+              {families.filter((fam) => fam.guests.length > 0).map((fam) => (
+                <CommandGroup key={fam.key} heading={fam.label}>
+                  {[...fam.guests].sort((a, b) => a.fullName.localeCompare(b.fullName, "fr")).map((g) => (
+                    <CommandItem key={g.id} value={`${g.fullName} ${fam.label} ${g.id}`} onSelect={() => toggle(g.id)}>
                       <Check className={cn("size-3.5", value.includes(g.id) ? "opacity-100" : "opacity-0")} />
                       {g.fullName}
                     </CommandItem>

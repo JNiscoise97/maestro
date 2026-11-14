@@ -183,9 +183,16 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
         : []),
     }
     // Une ligne sous devis n'a pas de versements propres ; « pas encore décidé » n'en a pas non plus.
+    // Revenir de « Achat direct » retire aussi l'enseigne (sinon la ligne se rouvre en achat direct) ;
+    // « Pas encore décidé » retire en plus compte, origine et acompte requis.
     const clean = (l: Line): LineDraft => {
       const direct = l.purchase === "direct" && l.amountStatus !== "included"
-      return { ...l, payments: direct ? l.payments : [], actualTotal: direct ? l.actualTotal : null }
+      if (direct) return l
+      const undecided = l.purchase === "undecided" || l.amountStatus === "included"
+      return {
+        ...l, payments: [], actualTotal: null, vendor: null,
+        ...(undecided ? { account: null, origin: null, depositRequired: false } : {}),
+      }
     }
     try {
       await save.mutateAsync({
@@ -569,8 +576,8 @@ function PurchaseCard({ line, label, sequences, devisOptions, newDevis, devisLab
 
   function setPurchase(p: Purchase) {
     if (p === line.purchase) return
-    const hasDirectData = line.payments.length > 0 || line.actualTotal != null
-    if (line.purchase === "direct" && hasDirectData && !confirm("Les versements et le montant réel saisis pour cet achat direct seront retirés. Continuer ?")) return
+    const hasDirectData = line.payments.length > 0 || line.actualTotal != null || !!line.vendor || !!line.account || !!line.origin
+    if (line.purchase === "direct" && hasDirectData && !confirm("Ce qui a été saisi pour cet achat direct (enseigne, montant réel, versements…) sera retiré à l'enregistrement. Continuer ?")) return
     onChange({ purchase: p })
   }
 

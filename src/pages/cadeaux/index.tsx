@@ -725,6 +725,47 @@ function ExternalGiftRow({ gift, onEdit, onToggle }: { gift: Gift; onEdit: (g: G
   )
 }
 
+// ── Ligne de la liste par cadeau ──────────────────────────────────────────────
+
+function GiftListRow({ gift, donors, onEdit, onToggle }: { gift: Gift; donors: string | null; onEdit: (g: Gift) => void; onToggle: (g: Gift) => void }) {
+  const update = useUpdateGift()
+  const date = gift.receivedOn ?? gift.createdAt.slice(0, 10)
+  return (
+    <div className="flex items-start gap-2 py-2.5 pr-2" id={`gift-row-${gift.id}`}>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className={cn("text-sm font-medium", !donors && "text-amber-700 dark:text-amber-400")}>{donors ?? "Donateur à attribuer"}</span>
+          <span className="text-[11px] text-muted-foreground/70 tabular-nums">{new Date(date + "T00:00:00").toLocaleDateString("fr-FR")}</span>
+        </div>
+        <div className="mt-0.5 flex items-center gap-2 flex-wrap">
+          {gift.description && <span className="text-sm text-muted-foreground">{gift.description}</span>}
+          {gift.amount != null && (
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground shrink-0">
+              <Euro className="size-2.5" />{amountLabel(gift.amount)}
+            </span>
+          )}
+          <GiftBadges gift={gift} />
+        </div>
+        {gift.notes && <p className="text-xs text-muted-foreground/60 mt-0.5">{gift.notes}</p>}
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <Button
+          variant={gift.thankyouSent ? "outline" : "default"}
+          size="sm"
+          className={cn("h-7 text-xs px-2.5", gift.thankyouSent && "text-green-600 border-green-300 hover:text-green-700")}
+          onClick={() => onToggle(gift)}
+          disabled={update.isPending}
+        >
+          {gift.thankyouSent ? "✓" : "Remercier"}
+        </Button>
+        <Button variant="ghost" size="icon-sm" onClick={() => onEdit(gift)}>
+          <Pencil className="size-3.5" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 // ── Ligne cadeau non attribué ─────────────────────────────────────────────────
 
 function UnattributedGiftRow({ gift, onEdit }: { gift: Gift; onEdit: (g: Gift) => void }) {
@@ -1086,6 +1127,8 @@ export function CadeauxPage() {
   const [editGift, setEditGift]     = useState<Gift | null>(null)
   const [breakdownOpen, setBreakdownOpen] = useState(false)
   const [searchQuery, setSearchQuery]     = useState("")
+  // Vue : liste des cadeaux (par défaut) ou invités avec leurs cadeaux.
+  const [view, setView] = useState<"gifts" | "guests">("gifts")
 
   const { data: gifts = [], isLoading: giftsLoading }   = useGifts()
   const { data: guests = [], isLoading: guestsLoading } = useGuests()
@@ -1109,8 +1152,8 @@ export function CadeauxPage() {
   const sortedGroups = useMemo(() => [...groups].sort((a, b) => a.sortOrder - b.sortOrder), [groups])
 
   const confirmedGuests = useMemo(
-    () => guests.filter((g) => g.rsvpStatus === "confirmed" || g.rsvpStatus === "no_show"),
-    [guests]
+    () => guests.filter((g) => g.rsvpStatus === "confirmed" || g.rsvpStatus === "no_show" || giftsByGuestId.has(g.id)),
+    [guests, giftsByGuestId]
   )
   const confirmedAdults = useMemo(() => confirmedGuests.filter((g) => !isUnder18(g)), [confirmedGuests])
 
@@ -1126,6 +1169,15 @@ export function CadeauxPage() {
     return externalGifts
   }, [externalGifts, filter])
 
+  const guestsById = useMemo(() => new Map(guests.map((g) => [g.id, g])), [guests])
+  const donorsOf = (gift: Gift): string | null => {
+    const names = gift.guestIds.map((id) => guestsById.get(id)?.fullName).filter(Boolean)
+    return names.length ? names.join(", ") : gift.externalGiverName
+  }
+  const giftList = useMemo(() => gifts
+    .filter((g) => filter === "all" || (filter === "pending" ? !g.thankyouSent : g.thankyouSent))
+    .sort((a, b) => (b.receivedOn ?? b.createdAt).localeCompare(a.receivedOn ?? a.createdAt)),
+  [gifts, filter])
   const totalGifts  = gifts.length
   const totalAmount = gifts.reduce((s, g) => s + (g.amount ?? 0), 0)
 
@@ -1183,6 +1235,15 @@ export function CadeauxPage() {
     const lq = q.trim().toLowerCase()
 
     const candidates: { id: string; text: string }[] = []
+
+    if (view === "gifts") {
+      for (const g of giftList) {
+        candidates.push({ id: `gift-row-${g.id}`, text: `${donorsOf(g) ?? ""} ${g.description}`.toLowerCase() })
+      }
+      const m = candidates.find((c) => c.text.includes(lq))
+      if (m) document.getElementById(m.id)?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+      return
+    }
 
     if (filter === "all") {
       for (const g of unattributedGifts) {
@@ -1266,9 +1327,10 @@ export function CadeauxPage() {
         </div>
       )}
 
+      <div className="flex flex-wrap items-center justify-between gap-2">
       <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
         <TabsList>
-          <TabsTrigger value="all">Tous les invités</TabsTrigger>
+          <TabsTrigger value="all">{view === "gifts" ? "Tous les cadeaux" : "Tous les invités"}</TabsTrigger>
           <TabsTrigger value="pending">
             À remercier
             {aRemercier > 0 && (
@@ -1280,6 +1342,13 @@ export function CadeauxPage() {
           <TabsTrigger value="done">Remerciés ({remercies})</TabsTrigger>
         </TabsList>
       </Tabs>
+      <Tabs value={view} onValueChange={(v) => setView(v as "gifts" | "guests")}>
+        <TabsList>
+          <TabsTrigger value="gifts">Par cadeau</TabsTrigger>
+          <TabsTrigger value="guests">Par invité</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      </div>
 
       {/* Recherche par nom — scroll vers la personne, sans filtrer */}
       <div className="relative">
@@ -1292,6 +1361,28 @@ export function CadeauxPage() {
         />
       </div>
 
+      {view === "gifts" && (
+        giftList.length === 0 ? (
+          filter === "all" ? (
+            <EmptyState icon={GiftIcon} title="Aucun cadeau noté" description="Les cadeaux reçus apparaîtront ici."
+              action={<Button size="sm" onClick={() => setAddOpen(true)}>Ajouter un cadeau</Button>} />
+          ) : (
+            <p className="text-center text-sm text-muted-foreground py-10">
+              {filter === "pending" ? "Tous les remerciements sont envoyés ✓" : "Aucun remerciement enregistré"}
+            </p>
+          )
+        ) : (
+          <div className="rounded-2xl border bg-card overflow-hidden">
+            <div className="px-3 divide-y divide-border/40">
+              {giftList.map((gift) => (
+                <GiftListRow key={gift.id} gift={gift} donors={donorsOf(gift)} onEdit={setEditGift} onToggle={handleToggle} />
+              ))}
+            </div>
+          </div>
+        )
+      )}
+
+      {view === "guests" && <>
       {/* Cadeaux non attribués */}
       {filter === "all" && unattributedGifts.length > 0 && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 overflow-hidden">
@@ -1362,6 +1453,7 @@ export function CadeauxPage() {
           ))}
         </div>
       )}
+      </>}
 
       <AddGiftDialog open={addOpen} onClose={() => setAddOpen(false)} confirmedAdults={confirmedAdults} sortedGroups={sortedGroups} />
       <EditGiftDialog gift={editGift} onClose={() => setEditGift(null)} confirmedAdults={confirmedAdults} sortedGroups={sortedGroups} />

@@ -52,10 +52,19 @@ export function DiscardedSection({ lines, model, poles, sequences }: {
         {[...lines].sort((a, b) => (b.discardedOn ?? "").localeCompare(a.discardedOn ?? "")).map((i) => (
           <li key={i.id} className="flex flex-wrap items-start gap-x-4 gap-y-1 px-4 py-2.5">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-muted-foreground line-through decoration-muted-foreground/50">{model.fullLabel(i.id)}</p>
+              {/* Sous-poste : « Poste › Sous-poste » ; poste entier : signalé comme tel, avec ses sous-postes. */}
+              <p className="text-sm">
+                {i.parentId && <span className="text-muted-foreground">{model.itemsById.get(i.parentId)?.label} › </span>}
+                <span className="font-medium">{i.label}</span>
+                {model.children(i.id).length > 0 && <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">poste entier</span>}
+              </p>
+              {model.children(i.id).length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {model.children(i.id).length} sous-poste{model.children(i.id).length > 1 ? "s" : ""} : {model.children(i.id).map((k) => k.label).join(", ")}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
                 {poleOf(i)} · {seqNames(i)}
-                {model.children(i.id).length > 0 && ` · ${model.children(i.id).length} sous-poste${model.children(i.id).length > 1 ? "s" : ""}`}
                 {i.discardedOn && ` · écarté le ${new Date(i.discardedOn + "T00:00:00").toLocaleDateString("fr-FR")}`}
               </p>
               {i.discardedReason && <p className="mt-0.5 text-xs italic text-muted-foreground">« {i.discardedReason} »</p>}

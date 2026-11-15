@@ -93,8 +93,13 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
   const updateItem = useUpdateBudgetItem()
 
   /** Écarte une ligne enregistrée (étudiée puis non retenue) : hors des totaux, réintégrable. */
-  async function discard(id: string, label: string): Promise<boolean> {
-    const reason = prompt(`Écarter « ${label} » ?
+  async function discard(id: string, label: string, kids: string[] = []): Promise<boolean> {
+    const what = kids.length
+      ? `le poste ENTIER « ${label} » et ses ${kids.length} éléments (${kids.join(", ")}) ?
+
+Pour n'écarter qu'un élément, utilisez l'icône ⊘ à côté de lui (étape 2).`
+      : `« ${label} » ?`
+    const reason = prompt(`Écarter ${what}
 
 Il sort de tous les totaux et statistiques mais reste consultable (« Afficher les écartés ») et réintégrable.
 
@@ -444,8 +449,8 @@ Pourquoi l'écartez-vous ? (facultatif)`)
           )}
           {existing && (
             <Button variant="ghost" size="sm" title="Étudié puis non retenu : hors de tous les totaux, gardé pour mémoire et réintégrable"
-              onClick={async () => { if (await discard(existing.id, existing.label)) onClose() }}>
-              <Ban className="size-3.5" /> Écarter
+              onClick={async () => { if (await discard(existing.id, existing.label, initial.subs.map((x) => x.label))) onClose() }}>
+              <Ban className="size-3.5" /> {initial.subs.length ? "Écarter tout le poste" : "Écarter"}
             </Button>
           )}
           <div className="ml-auto flex gap-2">

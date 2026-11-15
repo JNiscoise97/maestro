@@ -21,9 +21,9 @@ export const HERO = {
 
 export const INVITATION = {
   /** Parents de la mariée, un nom par ligne. */
-  brideParents: ["M. Fida Aly Hassanaly", "Mme Marie Rasoanandrasana"],
+  brideParents: ["M. Fida Aly HASSANALY", "Mme Marie RASOANANDRASANA"],
   /** Parents du marié, un nom par ligne. */
-  groomParents: ["M. Georges Nisçoise", "Mme Corine Nisçoise"],
+  groomParents: ["M. Georges NISÇOISE", "Mme Corine NISÇOISE"],
   /** Texte d'annonce, entre les parents et les prénoms. */
   announce: "ont la joie de vous faire part du mariage de leurs enfants",
   /** Texte sous les prénoms. */
@@ -97,15 +97,15 @@ export const DAYS: Day[] = [
   },
   {
     date: "2027-06-27", label: "Dimanche 27 juin", moments: [
-      { sequenceId: "493c6164-7ff2-4c87-a037-b59c6bcfe008", time: "15 h", title: "Bénédiction au khane", text: "Bénédiction en tenue indienne", placeId: "khane", dressCode: "tenue indienne", limited: true },
+      { sequenceId: "493c6164-7ff2-4c87-a037-b59c6bcfe008", time: "15 h", title: "Nikkah", text: "Bénédiction religieuse indienne selon la tradition musulmane ismaélienne", placeId: "khane", dressCode: "tenue indienne", limited: true },
     ],
   },
   {
     date: "2027-06-28", label: "Lundi 28 juin", moments: [
-      { sequenceId: "19eb750b-88d2-471e-b06d-749da2ee40c6", time: "Matinée", title: "Préparation des mariés", text: "Coiffure, maquillage, habillage", placeId: "villas" },
-      { sequenceId: "baf9abc9-74fb-4273-a9ff-cd60a64bf5ec", time: "16 h", title: "Bénédiction à l'église", text: "Bénédiction religieuse", placeId: "eglise" },
+      { sequenceId: "19eb750b-88d2-471e-b06d-749da2ee40c6", time: "Matinée", title: "Préparation des mariés", text: "Brunch, coiffure, habillage", placeId: "villas" },
+      { sequenceId: "baf9abc9-74fb-4273-a9ff-cd60a64bf5ec", time: "16 h", title: "Bénédiction à l'église", text: "Bénédiction religieuse selon la tradition catholique", placeId: "eglise" },
       { sequenceId: "e19ecc45-67ae-4319-9887-6d67b39ed24e", time: "17 h 30", title: "Séance photo", text: "Portraits et photos de groupe", placeId: "photo" },
-      { sequenceId: "c14a9820-2d9f-466f-9d19-1b732b2733c1", time: "19 h – fin de nuit", title: "Célébration de mariage", text: "Dîner, spectacle et soirée", placeId: "ostara" },
+      { sequenceId: "c14a9820-2d9f-466f-9d19-1b732b2733c1", time: "19 h – fin de nuit", title: "Célébration de mariage", text: "Cocktail et dîner dansant", placeId: "ostara" },
     ],
   },
 ]
@@ -144,7 +144,7 @@ export const AMBIANCE = {
   avoid: "Merci d'éviter les tenues trop décontractées.",
   /** Précisions par moment : chacune ne s'affiche que si l'invité est convié à l'un des moments indiqués. */
   notes: [
-    { text: "Bénédiction au khane : tenue indienne.", sequenceIds: ["493c6164-7ff2-4c87-a037-b59c6bcfe008"] },
+    { text: "Nikkah : tenue indienne.", sequenceIds: ["493c6164-7ff2-4c87-a037-b59c6bcfe008"] },
     { text: "Pique-nique : tenue décontractée.", sequenceIds: ["52990fa4-fc1e-4b99-b51d-50b1efef38a9"] },
     { text: "Soirée entre amis : tenue décontractée.", sequenceIds: ["5347d0f2-31b0-4e69-9a8f-f6f3d10c0969"] },
     { text: "Célébration au domaine : prévoyez des chaussures confortables pour danser et une petite laine pour la nuit.", sequenceIds: ["c14a9820-2d9f-466f-9d19-1b732b2733c1"] },
@@ -231,4 +231,13 @@ export const RSVP = {
     help: "Certaines personnes ont-elles des allergies ou restrictions alimentaires ? Si oui, merci de préciser lesquelles et pour qui.",
   },
   message: { label: "Un petit mot pour nous ?", help: "Message libre (facultatif)." },
+}
+
+// ── Remerciement (polaroïd et petit mot, en bas de page) ──────────────────────
+
+export const THANKS = {
+  title: "Merci !",
+  text: "Votre présence rendra notre mariage encore plus beau. Nous avons tellement hâte de vivre ces moments avec vous.",
+  closing: "Avec tout notre amour,",
+  signature: "Sarah & Jordan",
 }

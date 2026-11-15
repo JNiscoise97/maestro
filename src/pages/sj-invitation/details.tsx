@@ -8,13 +8,17 @@ import type { GalleryMember } from "@/features/gallery/types"
 import { Masthead } from "@/pages/photos/GalleryChrome"
 import { rsvpService, type RsvpResponse } from "@/services/rsvp.service"
 import {
-  AMBIANCE, CORTEGE, DAYS, FAQ, GIFTS, HERO, INVITATION, OUR_WORD, PLACES, PROGRAMME, RSVP, TRAVEL, isTodo, type Day,
+  AMBIANCE, CORTEGE, DAYS, FAQ, GIFTS, HERO, INVITATION, OUR_WORD, PLACES, PROGRAMME, RSVP, THANKS, TRAVEL, isTodo, type Day,
 } from "./content"
 import {
   findGuest, loadGuestIdsWithSequences, loadProgramme, loadWeddingGuests, momentsInWords, visibleDays, weddingTable,
   type Programme, type WeddingGuest,
 } from "./guest-programme"
 import { INVITATION_ROUTES, INVITATION_SUBTITLE } from "./paths"
+import { PinNumber, PlacesMap } from "./places-map"
+import { hasPin } from "./places-map-data"
+import { Carte, Fleuron, FlowerCluster, Picto, Polaroid, RecordPlayer, Reveal, Ribbon, Rings } from "./decor"
+import { PAPER_STYLE, TABLE_STYLE, iconForMoment, pictoForTravel, type PictoName } from "./decor-styles"
 
 /**
  * 5. Invitation complète : une seule page qu'on fait défiler, avec une barre de navigation collée en haut
@@ -60,7 +64,7 @@ function scrollToId(id: string) {
 export function DetailsScreen({ member }: { member: GalleryMember }) {
   const view = useGuestView(member)
   return (
-    <div className="min-h-svh" style={{ color: "#2e2a25" }}>
+    <div className="min-h-svh overflow-x-clip" style={{ ...TABLE_STYLE, color: "#2e2a25" }}>
       <Hero member={member} />
       {member.role === "admin" && <PreviewBar view={view} />}
       <Nav />
@@ -75,6 +79,7 @@ export function DetailsScreen({ member }: { member: GalleryMember }) {
         <GiftsSection />
         <FaqSection />
         <RsvpSection member={member} days={view.days} guestId={view.guestId} />
+        <ThanksSection />
       </main>
       <Footer />
     </div>
@@ -168,7 +173,7 @@ function PreviewBar({ view }: { view: GuestView }) {
 
 function Hero({ member }: { member: GalleryMember }) {
   return (
-    <header className="flex flex-col items-center px-6 pb-14 pt-6 text-center sm:pb-20">
+    <header className="relative flex flex-col items-center px-6 pb-14 pt-6 text-center sm:pb-20">
       <Masthead subtitle={INVITATION_SUBTITLE} gilded />
       <p className="-mt-4 text-lg sm:text-xl" style={heading}><T>{HERO.dates}</T></p>
       <p className="mt-1 text-[11px] uppercase tracking-[0.3em]" style={{ color: MATTE_GOLD }}>{HERO.place}</p>
@@ -249,43 +254,58 @@ function Nav() {
 
 // ── Gabarit de rubrique ───────────────────────────────────────────────────────
 
-function Section({ id, eyebrow, title, children, tinted = false, narrow = false }: {
-  id: SectionId; eyebrow?: string; title: string; children: React.ReactNode; tinted?: boolean; narrow?: boolean
+/**
+ * Une rubrique = une carte posée sur la table (papier, ombre portée), qui apparaît en descendant.
+ * picto : pictogramme doré au-dessus du titre · decor : ornements placés autour de la carte (fleurs, ruban…)
+ * · carte : carte de faire-part aux coins échancrés au lieu de la feuille simple.
+ */
+function Section({ id, eyebrow, title, children, narrow = false, picto, decor, carte = false }: {
+  id: SectionId; eyebrow?: string; title: string; children: React.ReactNode; narrow?: boolean
+  picto?: PictoName; decor?: React.ReactNode; carte?: boolean
 }) {
+  const body = (
+    <div className="px-6 py-12 sm:px-12 sm:py-16">
+      <div className="mb-10 text-center sm:mb-12">
+        {picto && <Picto name={picto} className="mb-4 h-11 gap-1" />}
+        {eyebrow && <p className="text-[10px] uppercase tracking-[0.35em]" style={{ color: MATTE_GOLD }}>{eyebrow}</p>}
+        <h2 id={`${id}-title`} className="mt-3 text-4xl font-light sm:text-5xl" style={heading}>{title}</h2>
+        <Fleuron className="mt-5" />
+      </div>
+      {children}
+    </div>
+  )
   return (
-    <section id={id} aria-labelledby={`${id}-title`} className="px-6 py-16 sm:py-24"
-      style={{ scrollMarginTop: NAV_HEIGHT, background: tinted ? "#faf8f4" : undefined }}>
-      <div className={`mx-auto ${narrow ? "max-w-2xl" : "max-w-4xl"}`}>
-        <div className="mb-10 text-center sm:mb-14">
-          {eyebrow && <p className="text-[10px] uppercase tracking-[0.35em]" style={{ color: MATTE_GOLD }}>{eyebrow}</p>}
-          <h2 id={`${id}-title`} className="mt-3 text-4xl font-light sm:text-5xl" style={heading}>{title}</h2>
-          <Ornament />
-        </div>
-        {children}
+    <section id={id} aria-labelledby={`${id}-title`} className="px-4 py-8 sm:px-6 sm:py-12" style={{ scrollMarginTop: NAV_HEIGHT }}>
+      <div className={`relative mx-auto ${narrow ? "max-w-2xl" : "max-w-4xl"}`}>
+        <Reveal>
+          {carte ? <Carte>{body}</Carte> : (
+            <div style={{ ...PAPER_STYLE, backgroundColor: PAPER_STYLE.backgroundColor }}>{body}</div>
+          )}
+        </Reveal>
+        {decor}
       </div>
     </section>
   )
 }
 
-function Ornament() {
-  return (
-    <span aria-hidden className="mt-5 flex items-center justify-center gap-3" style={{ color: MATTE_GOLD }}>
-      <span className="h-px w-10 bg-current opacity-55" />
-      <span className="text-[8px]">◆</span>
-      <span className="h-px w-10 bg-current opacity-55" />
-    </span>
-  )
+/** Ornement autour d'une carte : positionné en absolu, apparaît un peu après la carte. */
+function Deco({ className, children, delay = 300, from = "zoom" }: {
+  className: string; children: React.ReactNode; delay?: number; from?: "zoom" | "left" | "right" | "up"
+}) {
+  return <Reveal from={from} delay={delay} className={`pointer-events-none absolute z-10 ${className}`}>{children}</Reveal>
 }
 
 // ── 1. Invitation ─────────────────────────────────────────────────────────────
 
 function InvitationSection() {
   return (
-    <Section id="invitation" eyebrow="Faire-part" title="L'invitation" narrow>
+    <Section id="invitation" eyebrow="Faire-part" title="L'invitation" carte decor={
+      <Deco className="-right-8 -top-10 w-36 sm:-right-24 sm:-top-14 sm:w-52"><FlowerCluster kind="couronne" className="w-full" /></Deco>
+    }>
       <div className="text-center" style={heading}>
-        <div className="grid gap-8 text-lg sm:grid-cols-2 sm:text-xl">
-          <ul className="space-y-1">{INVITATION.brideParents.map((p) => <li key={p}><T>{p}</T></li>)}</ul>
-          <ul className="space-y-1">{INVITATION.groomParents.map((p) => <li key={p}><T>{p}</T></li>)}</ul>
+        <div className="grid gap-x-12 gap-y-8 text-base sm:grid-cols-2 sm:text-xl">
+          <ul className="space-y-1">{INVITATION.brideParents.map((p) => <li key={p} className="whitespace-nowrap"><T>{p}</T></li>)}</ul>
+          <ul className="space-y-1">{INVITATION.groomParents.map((p) => <li key={p} className="whitespace-nowrap"><T>{p}</T></li>)}</ul>
         </div>
         <p className="mt-8 text-lg italic sm:text-xl">{INVITATION.announce}</p>
         <p className="my-6 text-4xl font-light uppercase tracking-[0.18em] sm:text-5xl" style={{ color: MATTE_GOLD }}>
@@ -301,10 +321,14 @@ function InvitationSection() {
 
 function OurWordSection() {
   return (
-    <Section id="mot" eyebrow="De tout cœur" title="Un mot de nous" tinted narrow>
+    <Section id="mot" eyebrow="De tout cœur" title="Un mot de nous" narrow picto="coeurs">
       <div className="space-y-5 text-center text-xl leading-relaxed sm:text-2xl" style={heading}>
         {OUR_WORD.paragraphs.map((p) => <p key={p}><T>{p}</T></p>)}
         <p className="pt-4 text-2xl italic" style={{ color: MATTE_GOLD }}>{OUR_WORD.signature}</p>
+      </div>
+      <div className="mx-auto mt-12 flex max-w-md justify-center">
+        <Reveal from="left" delay={150} className="relative z-10 w-1/2"><Polaroid src="/sj-invitation/polaroid-1.webp" rotate={-6} className="translate-x-3" /></Reveal>
+        <Reveal from="right" delay={350} className="w-1/2"><Polaroid src="/sj-invitation/polaroid-2.webp" rotate={5} caption="À nous !" className="-translate-x-3 translate-y-4" /></Reveal>
       </div>
     </Section>
   )
@@ -323,7 +347,9 @@ function ProgrammeSection({ view }: { view: GuestView }) {
   const title = mode === "all" ? PROGRAMME.titleAll : count ? PROGRAMME.titleSome.replace("{n}", momentsInWords(count)) : "Le programme"
   const eyebrow = days.length > 1 ? `${["", "Un jour", "Deux jours", "Trois jours", "Quatre jours"][days.length] ?? `${days.length} jours`}` : days[0]?.label ?? "Programme"
   return (
-    <Section id="programme" eyebrow={eyebrow} title={loading ? "Votre programme" : title}>
+    <Section id="programme" eyebrow={eyebrow} title={loading ? "Votre programme" : title} decor={
+      <Deco className="-bottom-10 -right-8 w-32 sm:-right-20 sm:w-48"><FlowerCluster kind="arums" className="w-full" /></Deco>
+    }>
       {loading ? (
         <p className="text-center text-sm" style={muted} role="status">Chargement de votre programme…</p>
       ) : (
@@ -347,7 +373,10 @@ function ProgrammeSection({ view }: { view: GuestView }) {
                 <ol className="space-y-8">
                   {day.moments.map((m) => (
                     <li key={m.sequenceId} className="grid gap-x-8 gap-y-1 sm:grid-cols-[9rem_1fr]">
-                      <p className="text-sm sm:pt-1.5 sm:text-right" style={muted}><T>{m.time}</T></p>
+                      <div className="flex items-center gap-3 sm:flex-col sm:items-end sm:gap-1">
+                        <img src={iconForMoment(m.title)} alt="" aria-hidden loading="lazy" decoding="async" className="size-16 shrink-0 object-contain sm:size-20" />
+                        <p className="text-sm sm:text-right" style={muted}><T>{m.time}</T></p>
+                      </div>
                       <div>
                         <h4 className="text-2xl" style={heading}>
                           <span className="mr-2 text-base italic" style={{ color: MATTE_GOLD }}>{toRoman(number.get(m.sequenceId) ?? 0)}.</span>{m.title}
@@ -394,20 +423,23 @@ function toRoman(n: number): string {
 function PlacesSection({ days }: { days: Day[] }) {
   // Seuls les lieux des moments de l'invité, dans l'ordre du programme.
   const places = PLACES.filter((p) => days.some((d) => d.moments.some((m) => m.placeId === p.id)))
+  // Numéro de chaque lieu présent sur le plan (dans l'ordre du programme).
+  const number = new Map(places.filter((p) => hasPin(p.id)).map((p, i) => [p.id, i + 1]))
   return (
-    <Section id="lieux" eyebrow="Où nous retrouver" title="Les lieux" tinted>
-      <div className="grid gap-6 sm:grid-cols-2">
+    <Section id="lieux" eyebrow="Où nous retrouver" title="Les lieux" picto="pin">
+      <PlacesMap placeIds={places.map((p) => p.id)} number={number} />
+      <div className="grid gap-x-12 gap-y-10 sm:grid-cols-2">
         {places.map((place) => {
           const moments = days.flatMap((d) => d.moments.filter((m) => m.placeId === place.id).map((m) => ({ day: d.label, ...m })))
           return (
-            <article key={place.id} id={`lieu-${place.id}`} className="border bg-white p-6 sm:p-8"
-              style={{ borderColor: "var(--p-line)", scrollMarginTop: NAV_HEIGHT + 16 }}>
-              <h3 className="text-2xl" style={heading}><T>{place.name}</T></h3>
+            <article key={place.id} id={`lieu-${place.id}`} className="text-center sm:text-left"
+              style={{ scrollMarginTop: NAV_HEIGHT + 16 }}>
+              <h3 className="text-2xl" style={heading}>{number.has(place.id) && <PinNumber n={number.get(place.id)!} />}<T>{place.name}</T></h3>
               <p className="mt-2 text-sm" style={muted}><T>{place.address}</T></p>
               {place.access && <p className="mt-2 text-sm" style={muted}><T>{place.access}</T></p>}
               <ul className="mt-5 space-y-2 border-t pt-4 text-sm" style={{ borderColor: "var(--p-line)" }}>
                 {moments.map((m) => (
-                  <li key={m.sequenceId} className="flex flex-wrap gap-x-2">
+                  <li key={m.sequenceId} className="flex flex-wrap justify-center gap-x-2 sm:justify-start">
                     <span style={{ color: MATTE_GOLD }}>{m.day}</span>
                     <span style={muted}>·</span>
                     <T>{m.time}</T>
@@ -436,7 +468,8 @@ function AmbianceSection({ days }: { days: Day[] }) {
   const ids = new Set(days.flatMap((d) => d.moments.map((m) => m.sequenceId)))
   const notes = AMBIANCE.notes.filter((n) => n.sequenceIds.some((id) => ids.has(id)))
   return (
-    <Section id="ambiance" eyebrow="Ambiance & tenues" title="Comment s'habiller ?" narrow>
+    <Section id="ambiance" eyebrow="Ambiance & tenues" title="Comment s'habiller ?" narrow picto="robe">
+      <Reveal from="zoom" className="mx-auto -mt-2 mb-10 w-48 sm:w-56"><RecordPlayer className="w-full" /></Reveal>
       <div className="space-y-6 text-center">
         <p className="text-xl leading-relaxed sm:text-2xl" style={heading}>
           <T>{AMBIANCE.text}</T>{" "}
@@ -447,7 +480,7 @@ function AmbianceSection({ days }: { days: Day[] }) {
             </span>
           ))}
         </p>
-        <Ornament />
+        <Fleuron />
         <p className="text-lg leading-relaxed" style={heading}>
           <T>{AMBIANCE.dress}</T> <span className="italic" style={{ color: MATTE_GOLD }}><T>{AMBIANCE.examples}</T></span>
         </p>
@@ -466,7 +499,7 @@ function AmbianceSection({ days }: { days: Day[] }) {
 
 function CortegeSection() {
   return (
-    <Section id="cortege" eyebrow="À nos côtés" title="Le cortège" tinted>
+    <Section id="cortege" eyebrow="À nos côtés" title="Le cortège" picto="coeurs">
       <p className="mx-auto mb-12 max-w-xl text-center text-sm leading-relaxed" style={muted}><T>{CORTEGE.intro}</T></p>
       <div className="grid gap-10 text-center sm:grid-cols-2">
         {CORTEGE.groups.map((g) => (
@@ -491,16 +524,18 @@ function CortegeSection() {
 
 function TravelSection() {
   return (
-    <Section id="venir" eyebrow="Infos pratiques" title="Venir & se loger" tinted={!CORTEGE.show}>
+    <Section id="venir" eyebrow="Infos pratiques" title="Venir & se loger">
       <div className="grid gap-8 sm:grid-cols-3">
         {TRAVEL.getting.map((g) => (
-          <div key={g.title} className="text-center sm:text-left">
+          <div key={g.title} className="text-center">
+            <Picto name={pictoForTravel(g.title)} className="mb-3 h-11 gap-1" />
             <h3 className="text-2xl" style={heading}>{g.title}</h3>
             <p className="mt-2 text-sm leading-relaxed" style={muted}><T>{g.text}</T></p>
           </div>
         ))}
       </div>
-      <h3 className="mb-6 mt-16 border-b pb-3 text-center text-[11px] uppercase tracking-[0.3em] sm:text-left"
+      <div className="mt-16 text-center"><Picto name="hotel" className="h-11 gap-1" /></div>
+      <h3 className="mb-6 mt-3 border-b pb-3 text-center text-[11px] uppercase tracking-[0.3em]"
         style={{ color: MATTE_GOLD, borderColor: "var(--p-line)" }}>Où dormir</h3>
       <ul className="grid gap-6 sm:grid-cols-2">
         {TRAVEL.stays.map((s) => (
@@ -519,7 +554,7 @@ function TravelSection() {
 
 function GiftsSection() {
   return (
-    <Section id="liste" eyebrow="Si le cœur vous en dit" title="Liste de mariage" tinted={CORTEGE.show} narrow>
+    <Section id="liste" eyebrow="Si le cœur vous en dit" title="Liste de mariage" narrow picto="cadeau">
       <p className="text-center text-lg leading-relaxed sm:text-xl" style={heading}><T>{GIFTS.text}</T></p>
       {GIFTS.url && (
         <p className="mt-8 text-center">
@@ -534,7 +569,7 @@ function GiftsSection() {
 
 function FaqSection() {
   return (
-    <Section id="faq" eyebrow="Vos questions" title="Questions fréquentes" tinted={!CORTEGE.show} narrow>
+    <Section id="faq" eyebrow="Vos questions" title="Questions fréquentes" narrow picto="question">
       <div className="border-t" style={{ borderColor: "var(--p-line)" }}>
         {FAQ.map((f) => (
           <details key={f.q} className="group border-b" style={{ borderColor: "var(--p-line)" }}>
@@ -651,7 +686,9 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
   const previousCount = previous?.partySize ?? previous?.adults ?? null
 
   return (
-    <Section id="reponse" eyebrow="Confirmation de présence" title="Serez-vous des nôtres ?" tinted={CORTEGE.show} narrow>
+    <Section id="reponse" eyebrow="Confirmation de présence" title="Serez-vous des nôtres ?" narrow picto="enveloppe" decor={
+      <Deco className="-right-10 -top-10 w-36 sm:-right-28 sm:w-52"><FlowerCluster flip kind="coin-hortensia" className="w-full" /></Deco>
+    }>
       <div className="-mt-4 mb-10 space-y-3 text-center text-sm leading-relaxed" style={muted}>
         <p><T>{RSVP.intro}</T></p>
         <p>Merci de nous répondre avant le <strong style={{ color: "#2e2a25" }}>{RSVP.deadline}</strong>.</p>
@@ -802,12 +839,40 @@ function Counter({ label: text, value, min, onChange, hideLabel = false }: {
   )
 }
 
+// ── 10. Merci (polaroïd et petit mot, comme sur le mood board) ─────────────────
+
+const script = { fontFamily: "'Nickainley', var(--p-heading)", color: MATTE_GOLD }
+
+function ThanksSection() {
+  return (
+    <section aria-label="Merci" className="px-4 pb-6 pt-14 sm:pt-20">
+      <div className="relative mx-auto max-w-sm sm:max-w-md">
+        <Deco className="-left-4 -top-8 w-24 sm:-left-20 sm:w-32" from="left"><Rings className="w-full" /></Deco>
+        {/* Ruban derrière le polaroïd et le mot (pas de z-index), comme posé dessous. */}
+        <Reveal from="up" delay={200} className="pointer-events-none absolute -right-8 -top-6 h-[96%] sm:-right-24"><Ribbon className="h-full w-auto" /></Reveal>
+        <Reveal from="zoom" className="relative">
+          <Polaroid src="/sj-invitation/polaroid-merci.webp" rotate={3} square className="mx-auto w-[80%]" />
+        </Reveal>
+        <Reveal delay={350} className="relative z-20 -mt-14 ml-auto w-[78%] sm:-mr-8">
+          <div className="px-6 py-6 text-center sm:px-8" style={{ ...PAPER_STYLE, transform: "rotate(-1.5deg)" }}>
+            <p className="text-4xl sm:text-5xl" style={script}>{THANKS.title}</p>
+            <p className="mt-3 text-base leading-relaxed sm:text-lg" style={heading}>{THANKS.text}</p>
+            <p className="mt-3 text-sm italic" style={{ ...heading, ...muted }}>{THANKS.closing}</p>
+            <p className="mt-1 text-3xl sm:text-4xl" style={script}>{THANKS.signature}</p>
+          </div>
+        </Reveal>
+        <Deco className="-bottom-12 -left-12 w-40 sm:-left-28 sm:w-52" delay={500}><FlowerCluster flip kind="bouquet-roses" className="w-full" /></Deco>
+      </div>
+    </section>
+  )
+}
+
 // ── Pied de page ──────────────────────────────────────────────────────────────
 
 function Footer() {
   const { member, signOut } = useGalleryAuth()
   return (
-    <footer className="border-t px-6 py-12 text-center" style={{ borderColor: "var(--p-line)" }}>
+    <footer className="px-6 pb-12 pt-6 text-center">
       <p className="text-3xl font-light uppercase tracking-[0.18em]" style={{ ...heading, color: MATTE_GOLD }}>
         S <span className="text-[0.6em] normal-case italic tracking-normal">&amp;</span> J
       </p>
@@ -816,6 +881,10 @@ function Footer() {
         {member?.role === "admin" && <Link to={INVITATION_ROUTES.admin} className="underline">Administration</Link>}
         <button type="button" className="underline" onClick={() => void signOut()}>Se déconnecter</button>
       </div>
+      <p className="mt-6 text-[10px]" style={muted}>
+        Alliances : <a href="https://pngimg.com" target="_blank" rel="noreferrer" className="underline">pngimg.com</a>, licence{" "}
+        <a href="https://creativecommons.org/licenses/by-nc/4.0/deed.fr" target="_blank" rel="noreferrer" className="underline">CC BY-NC 4.0</a>
+      </p>
     </footer>
   )
 }

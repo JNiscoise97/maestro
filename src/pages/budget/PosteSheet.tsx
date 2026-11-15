@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react"
-import { Check, ExternalLink, FileText, Plus, Trash2, X } from "lucide-react"
+import { Ban, Check, ExternalLink, FileText, Plus, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { useDeletePoste, useSavePoste } from "@/hooks/queries/use-budget"
+import { useDeletePoste, useSavePoste, useUpdateBudgetItem } from "@/hooks/queries/use-budget"
 import {
   ACCOUNT_SUGGESTIONS, ORIGIN_SUGGESTIONS, PAYMENT_STATUS_LABELS, PRIORITIES, PRIORITY_COLORS, PRIORITY_HINTS,
   PRIORITY_LABELS, amountInput, budgetItemComparator, fmt, sequenceLabel, parseAmount, paymentStatus, remaining, type BudgetModel,
@@ -90,6 +90,26 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
 }) {
   const save = useSavePoste()
   const remove = useDeletePoste()
+  const updateItem = useUpdateBudgetItem()
+
+  /** Écarte une ligne enregistrée (étudiée puis non retenue) : hors des totaux, réintégrable. */
+  async function discard(id: string, label: string): Promise<boolean> {
+    const reason = prompt(`Écarter « ${label} » ?
+
+Il sort de tous les totaux et statistiques mais reste consultable (« Afficher les écartés ») et réintégrable.
+
+Pourquoi l'écartez-vous ? (facultatif)`)
+    if (reason === null) return false
+    try {
+      await updateItem.mutateAsync({ id, patch: { discardedOn: new Date().toLocaleDateString("sv-SE"), discardedReason: reason.trim() || null } })
+      toast.success(`« ${label} » est écarté.`)
+      return true
+    } catch (err) {
+      console.error(err)
+      toast.error("Impossible d'écarter cette ligne.")
+      return false
+    }
+  }
   const existing = poste !== "new" ? poste : null
   const creating = !existing
 
@@ -303,6 +323,12 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
                     onChange={(e) => setLine(x.key, { label: e.target.value })} />
                   <div className="w-44"><SeqSelect value={x.sequenceId} sequences={sequences} onChange={(v) => setLine(x.key, { sequenceId: v })} /></div>
                   <PrioritySelect value={x.priority} inherited={main.priority} onChange={(v) => setLine(x.key, { priority: v })} />
+                  {x.id && (
+                    <button type="button" aria-label="Écarter l'élément" title="Écarter (étudié, non retenu) : hors des totaux, réintégrable"
+                      className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" onClick={async () => {
+                        if (await discard(x.id!, x.label || name)) setSubs(subs.filter((y) => y.key !== x.key))
+                      }}><Ban className="size-4" /></button>
+                  )}
                   <button type="button" aria-label="Retirer l'élément" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive" onClick={() => {
                     if (x.id) setRemoved([...removed, x.id])
                     setSubs(subs.filter((y) => y.key !== x.key))
@@ -414,6 +440,12 @@ export function PosteSheet({ poste, defaultPoleId, defaultSequenceId, poles, seq
               onClose()
             }}>
               <Trash2 className="size-3.5" /> Supprimer
+            </Button>
+          )}
+          {existing && (
+            <Button variant="ghost" size="sm" title="Étudié puis non retenu : hors de tous les totaux, gardé pour mémoire et réintégrable"
+              onClick={async () => { if (await discard(existing.id, existing.label)) onClose() }}>
+              <Ban className="size-3.5" /> Écarter
             </Button>
           )}
           <div className="ml-auto flex gap-2">

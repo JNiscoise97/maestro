@@ -13,7 +13,7 @@ export function useBudgetItems() {
 export function useCreateBudgetItem() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (item: Omit<BudgetItem, "id" | "sortOrder">) => budgetService.createItem(item),
+    mutationFn: (item: Omit<BudgetItem, "id" | "sortOrder" | "discardedOn" | "discardedReason">) => budgetService.createItem(item),
     onSuccess: () => qc.invalidateQueries({ queryKey: QK }),
   })
 }
@@ -81,7 +81,7 @@ export function useRenameBudgetCategory() {
 export function useImportBudgetItems() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (items: Omit<BudgetItem, "id" | "sortOrder">[]) => budgetService.importItems(items),
+    mutationFn: (items: Omit<BudgetItem, "id" | "sortOrder" | "discardedOn" | "discardedReason">[]) => budgetService.importItems(items),
     onSuccess: () => qc.invalidateQueries({ queryKey: QK }),
   })
 }

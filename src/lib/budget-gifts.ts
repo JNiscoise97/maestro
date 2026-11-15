@@ -17,7 +17,7 @@ export const parseTarget = (key: string) => (key.startsWith("i:") ? { itemId: ke
 export function targetLabel(model: BudgetModel, a: { itemId: string | null; devisId: string | null }): string {
   if (a.itemId) {
     const it = model.itemsById.get(a.itemId)
-    if (!it) return "Ligne supprimée"
+    if (!it) return "Ligne écartée ou supprimée"
     return model.children(it.id).length ? `${it.label} (tout le poste)` : model.fullLabel(it.id)
   }
   const d = a.devisId ? model.devisById.get(a.devisId) : undefined

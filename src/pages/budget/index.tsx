@@ -32,6 +32,7 @@ import { useGuests } from "@/hooks/queries/use-guests"
 import { ReviewTab } from "./ReviewTab"
 import { PoleTable, type OptionalCol } from "./PoleTable"
 import { PosteSheet } from "./PosteSheet"
+import { DiscardedSection } from "./DiscardedSection"
 
 const NONE = "__none__"
 
@@ -77,7 +78,7 @@ function parseCsvLine(line: string): string[] {
   return result
 }
 
-type ParsedRow = Omit<BudgetItem, "id" | "sortOrder">
+type ParsedRow = Omit<BudgetItem, "id" | "sortOrder" | "discardedOn" | "discardedReason">
 
 // ── Format "Inventaire fiançailles" ──────────────────────────────────────────
 // Colonnes : Item | Argent reçu | Argent à débourser | Déjà versé | Reste à payer | Provenance
@@ -466,10 +467,26 @@ function BudgetSummary({ postes, model }: { postes: BudgetItem[]; model: BudgetM
 type Tab = "postes" | "devis" | "cadeaux" | "passe"
 
 export function BudgetPage() {
-  const { data: items = [], isLoading: lItems } = useBudgetItems()
+  const { data: allItems = [], isLoading: lItems } = useBudgetItems()
   const { data: devis = [] } = useBudgetDevis()
-  const { data: devisLines = [] } = useBudgetDevisLines()
-  const { data: payments = [] } = useBudgetPayments()
+  const { data: allDevisLines = [] } = useBudgetDevisLines()
+  const { data: allPayments = [] } = useBudgetPayments()
+  // Postes écartés : un poste écarté (ou dont le poste est écarté) sort de tout — totaux, statistiques,
+  // devis, cadeaux, export. Seule la section « Écartés » les montre, chiffrés sur le modèle complet.
+  const { items, devisLines, payments, discarded } = useMemo(() => {
+    const byId = new Map(allItems.map((i) => [i.id, i]))
+    const out = (i: BudgetItem) => !!i.discardedOn || !!(i.parentId && byId.get(i.parentId)?.discardedOn)
+    const keptIds = new Set(allItems.filter((i) => !out(i)).map((i) => i.id))
+    return {
+      items: allItems.filter((i) => keptIds.has(i.id)),
+      devisLines: allDevisLines.filter((l) => keptIds.has(l.itemId)),
+      payments: allPayments.filter((p) => !p.itemId || keptIds.has(p.itemId)),
+      // Lignes écartées elles-mêmes (un sous-poste d'un poste écarté suit son poste).
+      discarded: allItems.filter((i) => i.discardedOn && !(i.parentId && byId.get(i.parentId)?.discardedOn)),
+    }
+  }, [allItems, allDevisLines, allPayments])
+  const fullModel = useMemo(() => new BudgetModel(allItems, devis, allDevisLines, allPayments), [allItems, devis, allDevisLines, allPayments])
+  const [showDiscarded, setShowDiscarded] = useState(false)
   const { data: sequences = [], isLoading: lSeq } = useEventSequences()
   const { data: poles = [] } = usePoles()
 
@@ -626,6 +643,14 @@ export function BudgetPage() {
                 % invités
               </button>
             </div>
+            {discarded.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button className={chip(showDiscarded)} onClick={() => setShowDiscarded((v) => !v)}
+                  title="Postes étudiés puis écartés : hors de tous les totaux, réintégrables">
+                  {showDiscarded ? "Masquer" : "Afficher"} les écartés ({discarded.length})
+                </button>
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">Colonnes :</span>
               {(Object.keys(COL_LABELS) as OptionalCol[]).map((key) => (
@@ -669,6 +694,10 @@ export function BudgetPage() {
                   onAdd={(sequenceId) => setSheet({ poste: "new", poleId: g.poleId, sequenceId })} />
               ))}
             </div>
+          )}
+
+          {showDiscarded && discarded.length > 0 && (
+            <DiscardedSection lines={discarded} model={fullModel} poles={sortedPoles} sequences={sortedSeq} />
           )}
         </>
       )}

@@ -38,6 +38,9 @@ export type BudgetItem = {
   /** Seconde passe : on pourrait le faire nous-mêmes (étiquette). */
   diyPossible: boolean
   sortOrder: number
+  /** Écarté (étudié puis non retenu) le … ; null = dans le budget. Hors de tous les totaux. */
+  discardedOn: string | null
+  discardedReason: string | null
 }
 
 export type ReviewKey = "souvenir" | "signature" | "absence" | "confort" | "trace" | "duree"
@@ -85,6 +88,8 @@ function fromRow(r: any): BudgetItem {
     reviewNote:     r.review_note ?? null,
     diyPossible:    r.diy_possible ?? false,
     sortOrder:      r.sort_order ?? 0,
+    discardedOn:    r.discarded_on ?? null,
+    discardedReason: r.discarded_reason ?? null,
   }
 }
 
@@ -115,7 +120,7 @@ export const budgetService = {
     return (data ?? []).map(fromRow)
   },
 
-  async createItem(item: Omit<BudgetItem, "id" | "sortOrder">): Promise<BudgetItem> {
+  async createItem(item: Omit<BudgetItem, "id" | "sortOrder" | "discardedOn" | "discardedReason">): Promise<BudgetItem> {
     const { data, error } = await db
       .from(tbl("budget_items"))
       .insert({
@@ -168,6 +173,8 @@ export const budgetService = {
     if (patch.reviewNote     !== undefined) row.review_note     = patch.reviewNote
     if (patch.diyPossible    !== undefined) row.diy_possible    = patch.diyPossible
     if (patch.sortOrder      !== undefined) row.sort_order      = patch.sortOrder
+    if (patch.discardedOn    !== undefined) row.discarded_on    = patch.discardedOn
+    if (patch.discardedReason !== undefined) row.discarded_reason = patch.discardedReason
     if (Object.keys(row).length === 0) return
     const { error } = await db.from(tbl("budget_items")).update(row).eq("id", id)
     if (error) throw error
@@ -300,7 +307,7 @@ export const budgetService = {
     if (error) throw error
   },
 
-  async importItems(items: Omit<BudgetItem, "id" | "sortOrder">[]): Promise<void> {
+  async importItems(items: Omit<BudgetItem, "id" | "sortOrder" | "discardedOn" | "discardedReason">[]): Promise<void> {
     const rows = items.map((item, i) => ({
       sequence_id:     item.sequenceId,
       pole_id:         item.poleId,

@@ -34,6 +34,7 @@ import { GaleriePage } from "@/pages/galerie"
 import { GaleriePrototypePage } from "@/pages/photos/prototype"
 import { GalleryPage } from "@/pages/photos"
 import { ConducteurPage } from "@/pages/conducteur"
+import { SjInvitationPage } from "@/pages/sj-invitation"
 
 export function AppRoutes() {
   return (
@@ -44,6 +45,7 @@ export function AppRoutes() {
       <Route path="/galerie" element={<GaleriePage />} />
       <Route path="/photos/prototype" element={<GaleriePrototypePage />} />
       <Route path="/photos/*" element={<GalleryPage />} />
+      <Route path="/Sarah-Jordan-2027/invitation/*" element={<SjInvitationPage />} />
       <Route path="/connexion" element={<LoginPage />} />
 
       <Route element={<ProtectedLayout />}>

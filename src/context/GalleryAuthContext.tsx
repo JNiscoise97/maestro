@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import type { Session } from "@supabase/supabase-js"
 
 import { galleryClient, gt } from "@/features/gallery/client"
-import { logEvent, logVisit, markVisited } from "@/features/gallery/api"
+import { logEvent, logVisit, markVisited, type GallerySource } from "@/features/gallery/api"
 import type { GalleryMember } from "@/features/gallery/types"
 
 /**
@@ -19,7 +19,11 @@ type GalleryAuth = {
 
 const Ctx = createContext<GalleryAuth | null>(null)
 
-export function GalleryAuthProvider({ children }: { children: ReactNode }) {
+/**
+ * `source` : interface qui utilise la session (galerie ou invitation). Elle est jointe aux événements
+ * de connexion et de visite, pour que les alertes e-mail des administrateurs nomment la bonne page.
+ */
+export function GalleryAuthProvider({ children, source = "photos" }: { children: ReactNode; source?: GallerySource }) {
   const [session, setSession] = useState<Session | null>(null)
   const [member, setMember] = useState<GalleryMember | null>(null)
   // Sans client configuré, rien à charger.
@@ -47,7 +51,7 @@ export function GalleryAuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session)
       userRef.current = data.session?.user.id ?? null
       // Retour sur la galerie avec une session déjà ouverte : « visite ».
-      if (data.session) logVisit()
+      if (data.session) logVisit(source)
       await loadMember(data.session)
       setLoading(false)
     })
@@ -60,20 +64,20 @@ export function GalleryAuthProvider({ children }: { children: ReactNode }) {
         void loadMember(s)
         // Connexion par code : seulement si personne n'était connecté juste avant.
         if (event === "SIGNED_IN" && s && previous !== s.user.id) {
-          logEvent("login")
-          markVisited()
+          logEvent("login", undefined, { source })
+          markVisited(source)
         }
       }, 0)
     })
     // Retour sur l'onglet après une absence : nouvelle visite (limitée à une toutes les 30 min).
-    const onVisible = () => { if (document.visibilityState === "visible" && userRef.current) logVisit() }
+    const onVisible = () => { if (document.visibilityState === "visible" && userRef.current) logVisit(source) }
     document.addEventListener("visibilitychange", onVisible)
     return () => {
       active = false
       sub.subscription.unsubscribe()
       document.removeEventListener("visibilitychange", onVisible)
     }
-  }, [loadMember])
+  }, [loadMember, source])
 
   const value: GalleryAuth = {
     session,
@@ -81,7 +85,7 @@ export function GalleryAuthProvider({ children }: { children: ReactNode }) {
     loading: loading || (!!session && loadedFor !== session.user.id),
     refreshMember: () => loadMember(session),
     signOut: async () => {
-      logEvent("logout")
+      logEvent("logout", undefined, { source })
       await galleryClient?.auth.signOut()
     },
   }

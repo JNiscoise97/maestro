@@ -249,22 +249,27 @@ export function logEvent(event: "login" | "logout" | "visit" | "photo_open" | "s
   })
 }
 
+/** Interface d'où l'invité se connecte : galerie (/photos) ou invitation. Mêmes comptes, même session. */
+export type GallerySource = "photos" | "invitation"
+
 const VISIT_KEY = "sj-galerie-derniere-visite"
 const VISIT_INTERVAL = 30 * 60 * 1000
+// Une clé par interface : une visite de la galerie ne masque pas celle de l'invitation (et inversement).
+const visitKey = (source: GallerySource) => (source === "invitation" ? `${VISIT_KEY}-invitation` : VISIT_KEY)
 
-/** Retour sur la galerie avec une session déjà active : « visite », au plus une fois toutes les 30 min par appareil. */
-export function logVisit() {
+/** Retour avec une session déjà active : « visite », au plus une fois toutes les 30 min par appareil et par interface. */
+export function logVisit(source: GallerySource = "photos") {
   try {
-    const last = Number(localStorage.getItem(VISIT_KEY) ?? 0)
+    const last = Number(localStorage.getItem(visitKey(source)) ?? 0)
     if (Date.now() - last < VISIT_INTERVAL) return
-    localStorage.setItem(VISIT_KEY, String(Date.now()))
+    localStorage.setItem(visitKey(source), String(Date.now()))
   } catch { /* stockage indisponible : on journalise quand même */ }
-  logEvent("visit")
+  logEvent("visit", undefined, { source })
 }
 
 /** Après une connexion par code : la visite est déjà comptée comme connexion. */
-export function markVisited() {
-  try { localStorage.setItem(VISIT_KEY, String(Date.now())) } catch { /* stockage indisponible */ }
+export function markVisited(source: GallerySource = "photos") {
+  try { localStorage.setItem(visitKey(source), String(Date.now())) } catch { /* stockage indisponible */ }
 }
 
 // ── Engagement de confidentialité ─────────────────────────────────────────────

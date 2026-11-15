@@ -4,6 +4,7 @@ import { toast } from "sonner"
 
 import type { Attendance, RsvpResponse, Wave } from "@/services/rsvp.service"
 import { useRsvpResponses, useMarkRsvpProcessed } from "@/hooks/queries/use-rsvp"
+import { useEventSequences } from "@/hooks/queries/use-event-sequences"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
@@ -41,6 +42,8 @@ function formatDate(iso: string) {
 
 function RsvpRow({ response }: { response: RsvpResponse }) {
   const mark = useMarkRsvpProcessed()
+  const { data: sequences } = useEventSequences()
+  const sequenceName = (id: string) => sequences?.find((s) => s.id === id)?.name ?? "Séquence inconnue"
 
   async function toggle() {
     await mark.mutateAsync({ id: response.id, processed: !response.processed })
@@ -66,6 +69,25 @@ function RsvpRow({ response }: { response: RsvpResponse }) {
           </p>
         )}
 
+        {response.partySize != null && (
+          <p className="text-sm text-muted-foreground">
+            {response.partySize} personne{response.partySize > 1 ? "s" : ""}
+            {response.partyNames && ` : ${response.partyNames.split("\n").filter(Boolean).join(", ")}`}
+          </p>
+        )}
+
+        {response.sequencesAttending && response.sequencesAttending.length > 0 && (
+          <p className="text-sm text-muted-foreground">
+            Moments : {response.sequencesAttending.map(sequenceName).join(" · ")}
+          </p>
+        )}
+
+        {response.arrivalAck && (
+          <p className={`text-sm ${response.arrivalAck === "late" ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+            Horaire : {response.arrivalAck === "ok" ? "c'est bien noté" : "risque d'arriver plus tard"}
+          </p>
+        )}
+
         {response.cityOfOrigin && (
           <p className="text-sm text-muted-foreground">Vient de : {response.cityOfOrigin}</p>
         )}
@@ -76,7 +98,7 @@ function RsvpRow({ response }: { response: RsvpResponse }) {
           </p>
         )}
 
-        {response.daysAttending && response.daysAttending.length > 0 && (
+        {!response.sequencesAttending?.length && response.daysAttending && response.daysAttending.length > 0 && (
           <p className="text-sm text-muted-foreground">
             Jours : {response.daysAttending.join(", ")}
           </p>

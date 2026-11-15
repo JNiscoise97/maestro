@@ -18,9 +18,17 @@ export interface RsvpResponse {
   daysAttending: string[] | null
   dietaryConstraints: string | null
   guestId: string | null
+  /** Invitation en ligne : nombre de personnes, leurs noms (une ligne chacune), confirmation horaire, séquences. */
+  partySize: number | null
+  partyNames: string | null
+  arrivalAck: ArrivalAck | null
+  sequencesAttending: string[] | null
   processed: boolean
   createdAt: string
 }
+
+/** Confirmation horaire : « C'est bien noté » ou « Nous risquons d'arriver plus tard ». */
+export type ArrivalAck = "ok" | "late"
 
 export interface RsvpInput {
   wave: Wave
@@ -33,6 +41,12 @@ export interface RsvpInput {
   needsAccommodation?: boolean | null
   daysAttending?: string[] | null
   dietaryConstraints?: string | null
+  /** Invité de la liste : réponse envoyée depuis l'invitation en ligne, compte connecté. */
+  guestId?: string | null
+  partySize?: number | null
+  partyNames?: string | null
+  arrivalAck?: ArrivalAck | null
+  sequencesAttending?: string[] | null
 }
 
 interface RsvpRow {
@@ -48,6 +62,10 @@ interface RsvpRow {
   days_attending: string[] | null
   dietary_constraints: string | null
   guest_id: string | null
+  party_size?: number | null
+  party_names?: string | null
+  arrival_ack?: string | null
+  sequences_attending?: string[] | null
   processed: boolean
   created_at: string
 }
@@ -68,13 +86,18 @@ function rowToRsvp(row: RsvpRow): RsvpResponse {
     daysAttending: row.days_attending,
     dietaryConstraints: row.dietary_constraints,
     guestId: row.guest_id,
+    partySize: row.party_size ?? null,
+    partyNames: row.party_names ?? null,
+    arrivalAck: (row.arrival_ack as ArrivalAck | null) ?? null,
+    sequencesAttending: row.sequences_attending ?? null,
     processed: row.processed,
     createdAt: row.created_at,
   }
 }
 
 export const rsvpService = {
-  async create(input: RsvpInput): Promise<RsvpResponse> {
+  /** table : table complète, pour écrire dans un autre déploiement (ex. l'invitation en ligne → appli mariage). */
+  async create(input: RsvpInput, table = tbl("rsvp_responses")): Promise<RsvpResponse> {
     const withCount = input.attendance === "yes" || input.attendance === "probably"
 
     const payload = {
@@ -90,12 +113,33 @@ export const rsvpService = {
       dietary_constraints:  input.dietaryConstraints ?? null,
     }
 
+    // Colonnes ajoutées par la migration 0177 : envoyées seulement si renseignées.
+    const extra = Object.fromEntries(Object.entries({
+      guest_id:            input.guestId,
+      party_size:          input.partySize,
+      party_names:         input.partyNames,
+      arrival_ack:         input.arrivalAck,
+      sequences_attending: input.sequencesAttending,
+    }).filter(([, v]) => v != null))
+
     if (USE_SUPABASE) {
-      const { data, error } = await (supabase! as any)
-        .from(tbl("rsvp_responses") as any)
-        .insert(payload)
+      const insert = (p: object) => (supabase! as any)
+        .from(table as any)
+        .insert(p)
         .select()
         .single()
+      let { data, error } = await insert({ ...payload, ...extra })
+      // Colonnes absentes (migration 0177 pas encore appliquée) : on enregistre quand même la réponse,
+      // les informations supplémentaires recopiées dans le message pour ne rien perdre.
+      if (error && /guest_id|party_|arrival_ack|sequences_attending/.test(error.message ?? "")) {
+        const notes = [
+          input.partySize != null && `Personnes : ${input.partySize}`,
+          input.partyNames && `Noms : ${input.partyNames.replace(/\n+/g, ", ")}`,
+          input.arrivalAck && `Horaire : ${input.arrivalAck === "ok" ? "bien noté" : "risque d'arriver plus tard"}`,
+        ].filter(Boolean).join(" · ")
+        const message = [payload.message, notes && `[${notes}]`].filter(Boolean).join("\n\n") || null
+        ;({ data, error } = await insert({ ...payload, message }))
+      }
       if (error) throw error
       return rowToRsvp(data as RsvpRow)
     }
@@ -103,7 +147,11 @@ export const rsvpService = {
     const row: RsvpRow = {
       id: crypto.randomUUID(),
       ...payload,
-      guest_id: null,
+      guest_id: input.guestId ?? null,
+      party_size: input.partySize ?? null,
+      party_names: input.partyNames ?? null,
+      arrival_ack: input.arrivalAck ?? null,
+      sequences_attending: input.sequencesAttending ?? null,
       processed: false,
       created_at: new Date().toISOString(),
     }
@@ -134,6 +182,24 @@ export const rsvpService = {
       return
     }
     await mockRsvp.update(id, { processed })
+  },
+
+  /** Dernière réponse « invitation » d'un invité (pour la réafficher sur l'invitation en ligne). */
+  async latestForGuest(guestId: string, table = tbl("rsvp_responses")): Promise<RsvpResponse | null> {
+    if (USE_SUPABASE) {
+      const { data, error } = await (supabase! as any)
+        .from(table as any)
+        .select("*")
+        .eq("guest_id", guestId)
+        .eq("wave", "invitation")
+        .order("created_at", { ascending: false })
+        .limit(1)
+      if (error) return null
+      return data?.[0] ? rowToRsvp(data[0] as RsvpRow) : null
+    }
+    const rows = (await mockRsvp.getAll()).filter((r) => r.guest_id === guestId && r.wave === "invitation")
+    rows.sort((a, b) => b.created_at.localeCompare(a.created_at))
+    return rows[0] ? rowToRsvp(rows[0]) : null
   },
 
   async list(): Promise<RsvpResponse[]> {

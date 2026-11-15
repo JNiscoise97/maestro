@@ -349,7 +349,10 @@ export interface Guest {
   paperSent: boolean
   /** Adresse postale complète pour l'envoi papeterie. */
   postalAddress?: string | null
+  /** Nom sur l'invitation (ex. « Tatie Monique ») ; null = surnom, sinon prénom — voir 0176_invitations_foyers.sql. */
+  invitationName?: string | null
 }
+
 
 export type IdeaSource = "us" | "pinterest" | "social" | "other"
 export type IdeaStatus = "to_study" | "keeping" | "discarded" | "in_progress"

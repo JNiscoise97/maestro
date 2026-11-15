@@ -59,6 +59,22 @@ export function galleryUrl(): string {
   return (Deno.env.get("GALLERY_PUBLIC_URL") ?? "").replace(/\/$/, "") + "/photos"
 }
 
+/** Interface d'où vient une demande d'accès : galerie (/photos) ou invitation. Même base de comptes. */
+export type Source = "photos" | "invitation"
+export const sourceOf = (s: unknown): Source => (s === "invitation" ? "invitation" : "photos")
+
+/** Adresse publique de l'interface d'origine, pour les liens des e-mails. */
+export function sourceUrl(source: unknown): string {
+  return sourceOf(source) === "invitation"
+    ? (Deno.env.get("GALLERY_PUBLIC_URL") ?? "").replace(/\/$/, "") + "/Sarah-Jordan-2027/invitation"
+    : galleryUrl()
+}
+
+export const SOURCE_LABEL: Record<Source, { object: string }> = {
+  photos: { object: "la galerie" },
+  invitation: { object: "l'invitation" },
+}
+
 /**
  * Envoi d'un e-mail transactionnel via l'API Resend (secrets RESEND_API_KEY et MAIL_FROM).
  * Sans clé configurée, l'envoi est ignoré sans erreur : l'alerte reste visible dans l'administration.
@@ -134,11 +150,13 @@ Deno.serve(async (req) => {
         .update({ status: "approved", decided_at: new Date().toISOString(), decided_by: admin.id })
         .eq("id", request.id)
       await log("admin_request_approved", { request_id: request.id, member_id: id })
-      await sendMail([request.email], "Votre accès à la galerie est ouvert",
+      // Lien vers l'interface d'où vient la demande (le compte donne accès aux deux).
+      const url = sourceUrl(request.source)
+      await sendMail([request.email], `Votre accès à ${SOURCE_LABEL[sourceOf(request.source)].object} est ouvert`,
         mailLayout("Bienvenue !",
           `Bonjour ${escapeHtml(request.first_name)},<br><br>Sarah et Jordan ont accepté votre demande. ` +
           `Vous pouvez dès maintenant vous connecter avec votre adresse e-mail :<br><br>` +
-          `<a href="${galleryUrl()}" style="color:#7a1f2b;">${galleryUrl()}</a>`))
+          `<a href="${url}" style="color:#7a1f2b;">${url}</a>`))
       return json({ ok: true, memberId: id })
     }
 
@@ -149,7 +167,7 @@ Deno.serve(async (req) => {
         .update({ status: "rejected", decided_at: new Date().toISOString(), decided_by: admin.id })
         .eq("id", request.id)
       await log("admin_request_rejected", { request_id: request.id })
-      await sendMail([request.email], "Votre demande d'accès à la galerie",
+      await sendMail([request.email], `Votre demande d'accès à ${SOURCE_LABEL[sourceOf(request.source)].object}`,
         mailLayout("Votre demande",
           `Bonjour ${escapeHtml(request.first_name)},<br><br>Votre demande d'accès n'a pas pu être acceptée. ` +
           `Si vous pensez qu'il s'agit d'une erreur, contactez directement Sarah ou Jordan.`))

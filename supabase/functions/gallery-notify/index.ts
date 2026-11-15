@@ -4,6 +4,8 @@
 // pour les alertes nées dans la base : signalements, connexions d'invités et connexions inhabituelles.
 // (Demandes d'accès, rattachements automatiques et volumes de téléchargement sont déjà
 //  envoyés par gallery-identify / gallery-download.)
+// Connexions et visites : payload.source = « photos » (/photos) ou « invitation » (/Sarah-Jordan-2027/invitation),
+// même base de comptes ; l'e-mail nomme la page concernée. Sans source (anciennes alertes) : galerie.
 // Sécurité : en-tête « x-webhook-secret » égal au secret GALLERY_WEBHOOK_SECRET.
 //
 // Fichier autonome : à coller tel quel dans l'éditeur Edge Functions du tableau de bord Supabase
@@ -100,6 +102,29 @@ export function normalizeName(s: string): string {
   return s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[^a-z]+/g, " ").trim()
 }
 
+/** Adresse publique de l'invitation (même base de comptes que la galerie). */
+export function invitationUrl(): string {
+  return (Deno.env.get("GALLERY_PUBLIC_URL") ?? "").replace(/\/$/, "") + "/Sarah-Jordan-2027/invitation"
+}
+
+type Source = "photos" | "invitation"
+const sourceOf = (s: unknown): Source => (s === "invitation" ? "invitation" : "photos")
+
+/** Libellés et liens des alertes de connexion selon l'interface d'origine. */
+const SOURCE: Record<Source, {
+  subject: string; object: string; back: string; linkLabel: string; link: () => string; accessLink: () => string
+}> = {
+  photos: {
+    subject: "Galerie", object: "la galerie", back: "est revenu(e) voir les photos",
+    linkLabel: "Voir le journal", link: () => `${galleryUrl()}/admin/journal`, accessLink: () => `${galleryUrl()}/admin/acces`,
+  },
+  // L'administration de l'invitation n'a pas (encore) de journal : lien vers ses comptes.
+  invitation: {
+    subject: "Invitation", object: "l'invitation", back: "est revenu(e) sur l'invitation",
+    linkLabel: "Voir les comptes", link: () => `${invitationUrl()}/admin/acces`, accessLink: () => `${invitationUrl()}/admin/acces`,
+  },
+}
+
 // ── Fonction ─────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -128,23 +153,27 @@ Deno.serve(async (req) => {
         `<a href="${galleryUrl()}/admin/moderation">Examiner le signalement</a>`))
   } else if (record.kind === "login") {
     const name = String(p.name || p.email)
-    await sendMail(await adminEmails(db), `Galerie : ${name} vient de se connecter`,
-      mailLayout(p.first_login ? "Première connexion" : "Connexion à la galerie",
-        `<b>${escapeHtml(name)}</b> (${escapeHtml(String(p.email))}) s'est connecté(e) à la galerie le ${when}` +
+    const s = SOURCE[sourceOf(p.source)]
+    await sendMail(await adminEmails(db), `${s.subject} : ${name} vient de se connecter`,
+      mailLayout(p.first_login ? "Première connexion" : `Connexion à ${s.object}`,
+        `<b>${escapeHtml(name)}</b> (${escapeHtml(String(p.email))}) s'est connecté(e) à ${s.object} le ${when}` +
         `${p.first_login ? ", pour la première fois" : ` (connexion n°${p.login_count})`}.<br><br>` +
-        `<a href="${galleryUrl()}/admin/journal">Voir le journal</a>`))
+        `<a href="${s.link()}">${s.linkLabel}</a>`))
   } else if (record.kind === "visit") {
     const name = String(p.name || p.email)
-    await sendMail(await adminEmails(db), `Galerie : ${name} est revenu(e) voir les photos`,
-      mailLayout("Retour sur la galerie",
-        `<b>${escapeHtml(name)}</b> (${escapeHtml(String(p.email))}) est revenu(e) sur la galerie le ${when}.<br>` +
+    const s = SOURCE[sourceOf(p.source)]
+    await sendMail(await adminEmails(db), `${s.subject} : ${name} ${s.back}`,
+      mailLayout(`Retour sur ${s.object}`,
+        `<b>${escapeHtml(name)}</b> (${escapeHtml(String(p.email))}) est revenu(e) sur ${s.object} le ${when}.<br>` +
         `Un seul e-mail de ce type par personne et par jour.<br><br>` +
-        `<a href="${galleryUrl()}/admin/journal">Voir le journal</a>`))
+        `<a href="${s.link()}">${s.linkLabel}</a>`))
   } else if (record.kind === "unusual_login") {
-    await sendMail(await adminEmails(db), "Galerie : connexions inhabituelles",
+    const s = SOURCE[sourceOf(p.source)]
+    await sendMail(await adminEmails(db), `${s.subject} : connexions inhabituelles`,
       mailLayout("Connexions inhabituelles",
-        `${escapeHtml(String(p.name || p.email))} s'est connecté(e) depuis ${p.devices_24h} appareils différents en 24 h. ` +
-        `Aucune mesure automatique n'a été prise.<br><br><a href="${galleryUrl()}/admin/acces">Gérer les accès</a>`))
+        `${escapeHtml(String(p.name || p.email))} s'est connecté(e) depuis ${p.devices_24h} appareils différents en 24 h ` +
+        `(dernière connexion depuis ${s.object}). Aucune mesure automatique n'a été prise.<br><br>` +
+        `<a href="${s.accessLink()}">Gérer les accès</a>`))
   }
   return json({ ok: true })
 })

@@ -3,17 +3,42 @@ import { LogOut, Moon, Settings, Sun } from "lucide-react"
 
 import { useGalleryAuth } from "@/context/GalleryAuthContext"
 import type { ColorMode } from "@/features/gallery/theme"
+import { GOLD_TEXT } from "@/features/gallery/gilded"
 
 /** Titre de la galerie, commun à tous les écrans. */
-export function Masthead({ compact = false }: { compact?: boolean }) {
+/** Sous-titre par défaut (galerie) ; l'invitation passe le sien. */
+export const GALLERY_SUBTITLE = "Fiançailles · 25 juillet 2026"
+
+export function Masthead({ compact = false, subtitle = GALLERY_SUBTITLE, gilded = false }: {
+  compact?: boolean
+  subtitle?: string
+  /** Style de l'invitation : « Sarah & Jordan » en or mat, capitales fines, « & » italique entre deux filets. */
+  gilded?: boolean
+}) {
   return (
     <header className={`relative px-6 text-center ${compact ? "py-4" : "py-12 sm:py-20"}`}>
       <p className="text-[10px] uppercase tracking-[0.35em]" style={{ color: "var(--p-gold, var(--p-accent))" }}>
-        Fiançailles · 25 juillet 2026
+        {subtitle}
       </p>
-      <h1 className={`mt-2 leading-none ${compact ? "text-5xl" : "text-6xl sm:text-8xl"}`}
+      <h1 className={`mt-2 leading-none ${gilded
+        // Invitation : capitales très espacées, plus larges ; tailles réduites pour tenir sur téléphone.
+        ? (compact ? "text-4xl sm:text-5xl" : "text-5xl sm:text-7xl")
+        : (compact ? "text-5xl" : "text-6xl sm:text-8xl")}`}
         style={{ fontFamily: "var(--p-names-font, var(--p-heading))", color: "var(--p-names-color, inherit)" }}>
-        Sarah &amp; Jordan
+        {gilded ? (
+          // Invitation (piste « or mat uni ») : capitales fines très espacées, prénoms empilés,
+          // « & » en italique entre deux filets fins (même esperluette que l'accueil).
+          <span className="flex flex-col items-center font-light uppercase" style={GOLD_TEXT}>
+            <span style={{ letterSpacing: "0.22em", paddingLeft: "0.22em" }}>Sarah</span>
+            <span aria-hidden className="my-3 flex items-center gap-3.5 normal-case">
+              <span className="h-px w-10 bg-current opacity-55" />
+              <span className="text-[0.45em] italic tracking-normal">&amp;</span>
+              <span className="h-px w-10 bg-current opacity-55" />
+            </span>
+            <span className="sr-only">&amp;</span>
+            <span style={{ letterSpacing: "0.22em", paddingLeft: "0.22em" }}>Jordan</span>
+          </span>
+        ) : <>Sarah &amp; Jordan</>}
       </h1>
     </header>
   )
@@ -65,10 +90,10 @@ export function ModeToggle({ mode, onToggle, className = "" }: { mode: ColorMode
 }
 
 /** Écran simple centré (galerie fermée, compte désactivé, chargement…). */
-export function Notice({ title, children }: { title: string; children?: React.ReactNode }) {
+export function Notice({ title, children, subtitle, gilded }: { title: string; children?: React.ReactNode; subtitle?: string; gilded?: boolean }) {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center px-6 text-center">
-      <Masthead compact />
+      <Masthead compact subtitle={subtitle} gilded={gilded} />
       <p className="mt-4 text-lg" style={{ fontFamily: "var(--p-heading)" }}>{title}</p>
       {children && <div className="mt-3 max-w-sm text-sm" style={{ color: "var(--p-muted)" }}>{children}</div>}
     </div>

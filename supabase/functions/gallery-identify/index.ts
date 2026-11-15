@@ -1,6 +1,9 @@
 // gallery-identify — étape d'identification de la galerie privée (CDCF ACC-02, ACC-06).
 //
-// Entrée : { email, firstName?, lastName? }  ou  { email, birthYear }  (connexion par année, liste blanche)
+// Entrée : { email, firstName?, lastName?, source? }  ou  { email, birthYear, source? }  (connexion par année)
+//   source : "photos" (défaut, /photos) ou "invitation" (/Sarah-Jordan-2027/invitation) — même base de comptes.
+//   L'origine est notée dans user_metadata.login_source (lue par le modèle d'e-mail du code) et sur la
+//   demande d'accès, et adapte les e-mails envoyés aux administrateurs.
 // Sortie : { status: "ready", yearLogin? } → le navigateur demande le code (signInWithOtp, shouldCreateUser: false),
 //                                            ou l'année de naissance si yearLogin
 //          { status: "signed", tokenHash } → année correcte : session ouverte par verifyOtp(token_hash), sans mail
@@ -62,6 +65,21 @@ export function galleryUrl(): string {
   return (Deno.env.get("GALLERY_PUBLIC_URL") ?? "").replace(/\/$/, "") + "/photos"
 }
 
+export type Source = "photos" | "invitation"
+
+/** Adresse publique de l'interface d'origine (galerie ou invitation), pour les liens des e-mails. */
+export function sourceUrl(source: Source): string {
+  return source === "invitation"
+    ? (Deno.env.get("GALLERY_PUBLIC_URL") ?? "").replace(/\/$/, "") + "/Sarah-Jordan-2027/invitation"
+    : galleryUrl()
+}
+
+/** Libellés des e-mails selon l'interface d'origine. */
+export const SOURCE_LABEL: Record<Source, { subject: string; object: string }> = {
+  photos: { subject: "Galerie", object: "la galerie" },
+  invitation: { subject: "Invitation", object: "l'invitation" },
+}
+
 /**
  * Envoi d'un e-mail transactionnel via l'API Resend (secrets RESEND_API_KEY et MAIL_FROM).
  * Sans clé configurée, l'envoi est ignoré sans erreur : l'alerte reste visible dans l'administration.
@@ -115,18 +133,21 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
   if (req.method !== "POST") return json({ error: "method" }, 405)
 
-  let body: { email?: string; firstName?: string; lastName?: string; birthYear?: number | string }
+  let body: { email?: string; firstName?: string; lastName?: string; birthYear?: number | string; source?: string }
   try { body = await req.json() } catch { return json({ error: "invalid_body" }, 400) }
 
   const email = (body.email ?? "").trim().toLowerCase()
   const firstName = (body.firstName ?? "").trim().slice(0, 80)
   const lastName = (body.lastName ?? "").trim().slice(0, 80)
   if (!EMAIL_RE.test(email) || email.length > 200) return json({ error: "invalid_email" }, 400)
+  const source: Source = body.source === "invitation" ? "invitation" : "photos"
+  const label = SOURCE_LABEL[source]
+  const adminUrl = `${sourceUrl(source)}/admin/acces`
 
   const db = serviceClient()
 
   // 0. Connexion par année de naissance (liste blanche).
-  if (body.birthYear != null) return yearLogin(db, email, Number(body.birthYear))
+  if (body.birthYear != null) return yearLogin(db, email, Number(body.birthYear), source)
 
   // 1. Compte existant : actif → code (ou année si liste blanche) ; désactivé → même réponse qu'une demande en attente.
   const { data: member } = await db.from(t("members"))
@@ -134,13 +155,14 @@ Deno.serve(async (req) => {
   if (member) {
     if (member.status !== "active") return json({ status: "pending" })
     const locked = member.year_locked_until && new Date(member.year_locked_until) > new Date()
+    await markSource(db, member.id, source)
     return json({ status: "ready", yearLogin: member.role === "guest" && member.birth_year != null && !locked })
   }
 
   // 2. Administrateur déclaré : ouverture de son compte à la première connexion.
   const { data: adminRow } = await db.from(t("admin_emails")).select("email").eq("email", email).maybeSingle()
   if (adminRow) {
-    const id = await ensureAuthUser(db, email)
+    const id = await ensureAuthUser(db, email, source)
     if (!id) return json({ error: "server" }, 500)
     await db.from(t("members")).insert({
       id, email, first_name: firstName, last_name: lastName, role: "admin", linked_by: "admin_bootstrap",
@@ -158,16 +180,19 @@ Deno.serve(async (req) => {
 
   // 4. Rapprochement avec la liste des invités des fiançailles (correspondance unique exigée).
   // Liste complète (quelques centaines de lignes) : la comparaison ignore accents et casse.
-  const { data: guests } = await db.from("_20260725_guests")
-    .select("id, first_name, last_name, is_active")
-    .range(0, 4999)
+  // Puis, à défaut, avec celle du mariage (mêmes identifiants pour les invités repris des fiançailles).
   const wantedFirst = normalizeName(firstName)
   const wantedLast = normalizeName(lastName)
-  const matches = (guests ?? []).filter((g: { first_name: string | null; last_name: string | null; is_active: boolean | null }) =>
-    g.is_active !== false
-    && normalizeName(g.first_name ?? "") === wantedFirst
-    && normalizeName(g.last_name ?? "") === wantedLast)
-  const matched = matches.length === 1 ? matches[0] as { id: string } : null
+  const findIn = async (table: string) => {
+    const { data: guests } = await db.from(table).select("id, first_name, last_name, is_active").range(0, 4999)
+    return (guests ?? []).filter((g: { first_name: string | null; last_name: string | null; is_active: boolean | null }) =>
+      g.is_active !== false
+      && normalizeName(g.first_name ?? "") === wantedFirst
+      && normalizeName(g.last_name ?? "") === wantedLast) as { id: string }[]
+  }
+  let matches = await findIn("_20260725_guests")
+  if (matches.length === 0) matches = await findIn("_20270628_guests")
+  const matched = matches.length === 1 ? matches[0] : null
 
   const { data: settings } = await db.from(t("settings")).select("auto_link_known_names").eq("id", 1).single()
 
@@ -180,28 +205,29 @@ Deno.serve(async (req) => {
 
   if (matched && guestFree && settings?.auto_link_known_names) {
     // Arbitrage 1 : approbation automatique + alerte aux administrateurs (déclencheur SQL + e-mail).
-    const id = await ensureAuthUser(db, email)
+    const id = await ensureAuthUser(db, email, source)
     if (!id) return json({ error: "server" }, 500)
     const { error } = await db.from(t("members")).insert({
       id, email, first_name: firstName, last_name: lastName, guest_id: matched.id, linked_by: "auto_name_match",
     })
     if (error) { console.error("[identify] member insert", error); return json({ error: "server" }, 500) }
-    await sendMail(await adminEmails(db), "Galerie : accès ouvert automatiquement",
+    await sendMail(await adminEmails(db), `${label.subject} : accès ouvert automatiquement`,
       mailLayout("Nouvel accès automatique",
-        `${escapeHtml(firstName)} ${escapeHtml(lastName)} (${escapeHtml(email)}) a été rattaché(e) automatiquement à la liste des invités.<br><br>` +
-        `Si ce n'est pas la bonne personne, désactivez ce compte depuis l'administration : <a href="${galleryUrl()}/admin/acces">${galleryUrl()}/admin/acces</a>`))
+        `${escapeHtml(firstName)} ${escapeHtml(lastName)} (${escapeHtml(email)}) s'est identifié(e) depuis ${label.object} ` +
+        `et a été rattaché(e) automatiquement à la liste des invités.<br><br>` +
+        `Si ce n'est pas la bonne personne, désactivez ce compte depuis l'administration : <a href="${adminUrl}">${adminUrl}</a>`))
     return json({ status: "ready" })
   }
 
   // 5. Sinon : demande en attente de validation (notification par déclencheur SQL).
   const { error } = await db.from(t("access_requests")).insert({
-    email, first_name: firstName, last_name: lastName, matched_guest_id: matched?.id ?? null,
+    email, first_name: firstName, last_name: lastName, matched_guest_id: matched?.id ?? null, source,
   })
   if (error) { console.error("[identify] request insert", error); return json({ error: "server" }, 500) }
-  await sendMail(await adminEmails(db), "Galerie : nouvelle demande d'accès",
+  await sendMail(await adminEmails(db), `${label.subject} : nouvelle demande d'accès`,
     mailLayout("Nouvelle demande d'accès",
-      `${escapeHtml(firstName)} ${escapeHtml(lastName)} (${escapeHtml(email)}) demande l'accès à la galerie.<br><br>` +
-      `<a href="${galleryUrl()}/admin/acces">Voir les demandes</a>`))
+      `${escapeHtml(firstName)} ${escapeHtml(lastName)} (${escapeHtml(email)}) demande l'accès à ${label.object}.<br><br>` +
+      `<a href="${adminUrl}">Voir les demandes</a>`))
   return json({ status: "pending" })
 })
 
@@ -210,7 +236,7 @@ Deno.serve(async (req) => {
  * Année correcte : jeton de connexion à usage unique généré côté serveur (aucun mail envoyé),
  * que le navigateur échange contre une session avec verifyOtp({ token_hash }).
  */
-async function yearLogin(db: SupabaseClient, email: string, year: number): Promise<Response> {
+async function yearLogin(db: SupabaseClient, email: string, year: number, source: Source): Promise<Response> {
   if (!Number.isInteger(year) || year < 1900 || year > 2100) return json({ status: "wrong_year", remaining: 1 })
   const { data, error } = await db.rpc("_20260725_gal_year_attempt", { p_email: email, p_year: year })
   if (error) { console.error("[identify] year_attempt", error); return json({ error: "server" }, 500) }
@@ -224,11 +250,13 @@ async function yearLogin(db: SupabaseClient, email: string, year: number): Promi
   if (row.result === "locked") {
     await db.from(t("activity")).insert({ member_id: row.member_id, event: "year_login_locked", details: {} })
     const { data: m } = await db.from(t("members")).select("first_name, last_name").eq("id", row.member_id).maybeSingle()
-    await sendMail(await adminEmails(db), "Galerie : connexion par année bloquée",
+    // Repli sur le code par mail : le modèle d'e-mail doit parler de la bonne interface.
+    await markSource(db, row.member_id, source)
+    await sendMail(await adminEmails(db), `${SOURCE_LABEL[source].subject} : connexion par année bloquée`,
       mailLayout("Connexion par année bloquée",
         `Deux années de naissance incorrectes ont été saisies pour ${escapeHtml(`${m?.first_name ?? ""} ${m?.last_name ?? ""}`.trim() || email)} ` +
         `(${escapeHtml(email)}). La connexion par année est bloquée pendant 1 heure ; la personne a reçu un code par mail à la place.<br><br>` +
-        `Si ce n'est pas elle, vérifiez son compte : <a href="${galleryUrl()}/admin/acces">${galleryUrl()}/admin/acces</a>`))
+        `Si ce n'est pas elle, vérifiez son compte : <a href="${sourceUrl(source)}/admin/acces">${sourceUrl(source)}/admin/acces</a>`))
     return json({ status: "locked" })
   }
 
@@ -238,16 +266,27 @@ async function yearLogin(db: SupabaseClient, email: string, year: number): Promi
   return json({ status: "signed", tokenHash })
 }
 
+/**
+ * Note l'interface d'origine de la connexion en cours dans user_metadata.login_source :
+ * le modèle d'e-mail du code (Supabase Auth, « Magic Link ») l'utilise pour adapter son texte.
+ * Fusionnée avec les autres métadonnées ; un échec n'empêche pas la connexion (texte « galerie » par défaut).
+ */
+async function markSource(db: SupabaseClient, userId: string | null, source: Source): Promise<void> {
+  if (!userId) return
+  const { error } = await db.auth.admin.updateUserById(userId, { user_metadata: { login_source: source } })
+  if (error) console.error("[identify] login_source", error)
+}
+
 /** Crée l'utilisateur Supabase Auth (adresse confirmée) ou retrouve celui qui existe déjà. */
-async function ensureAuthUser(db: ReturnType<typeof serviceClient>, email: string): Promise<string | null> {
-  const { data, error } = await db.auth.admin.createUser({ email, email_confirm: true })
+async function ensureAuthUser(db: ReturnType<typeof serviceClient>, email: string, source: Source): Promise<string | null> {
+  const { data, error } = await db.auth.admin.createUser({ email, email_confirm: true, user_metadata: { login_source: source } })
   if (data?.user) return data.user.id
   // Déjà présent (ex. test d'envoi fait à la main) : on le retrouve par son adresse.
   if (error) {
     for (let page = 1; page <= 20; page++) {
       const { data: list } = await db.auth.admin.listUsers({ page, perPage: 200 })
       const found = list?.users.find((u) => u.email?.toLowerCase() === email)
-      if (found) return found.id
+      if (found) { await markSource(db, found.id, source); return found.id }
       if (!list || list.users.length < 200) break
     }
     console.error("[identify] createUser", error)

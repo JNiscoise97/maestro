@@ -4,6 +4,7 @@ import { callGalleryFunction, galleryClient } from "@/features/gallery/client"
 import { useResetZoomOn } from "@/features/gallery/zoom"
 import type { ColorMode } from "@/features/gallery/theme"
 import { Masthead, ModeToggle } from "./GalleryChrome"
+import { INVITATION_SUBTITLE } from "@/pages/sj-invitation/paths"
 
 type Step = "email" | "name" | "year" | "code" | "pending"
 
@@ -14,19 +15,30 @@ type IdentifyResult =
   | { status: "wrong_year"; remaining: number }
 
 const input = "w-full border-b bg-transparent py-2 text-base outline-none sm:text-sm focus:border-[var(--p-accent)]"
-const primary = "w-full py-3 text-xs uppercase tracking-[0.2em] text-white disabled:opacity-40"
+const primary = "w-full py-3 text-xs uppercase tracking-[0.2em] disabled:opacity-40"
 
 /**
  * Identification (CDCF ACC-01..03) : e-mail → (prénom/nom si inconnu) → code à 6 chiffres.
  * Liste blanche : e-mail → année de naissance au lieu du code (2 erreurs → code par mail).
  * Aucun compte n'est créé par le navigateur (shouldCreateUser: false) : c'est gallery-identify qui décide.
  */
-export function LoginScreen({ mode, onToggleMode, compact = false }: {
+export function LoginScreen({ mode, onToggleMode, compact = false, source = "photos" }: {
   mode: ColorMode
   onToggleMode: () => void
+  /**
+   * Interface d'où l'invité se connecte (mêmes comptes) : adapte l'e-mail du code
+   * et les e-mails envoyés aux administrateurs (gallery-identify).
+   */
+  source?: "photos" | "invitation"
   /** Encart (Paramètres) : hauteur réduite, sans bascule clair / sombre. */
   compact?: boolean
 }) {
+  // Invitation : bouton à contour or mat (rempli au survol), comme les autres écrans ; galerie : bouton plein.
+  const outlined = source === "invitation"
+  const btnClass = outlined ? `${primary} border transition-colors hover:bg-[var(--p-accent)]! hover:text-white!` : `${primary} text-white`
+  const btnStyle: React.CSSProperties = outlined
+    ? { border: "1px solid var(--p-accent)", color: "var(--p-accent)", background: "transparent", borderRadius: "var(--p-radius)" }
+    : { background: "var(--p-accent)", borderRadius: "var(--p-radius)" }
   const [step, setStep] = useState<Step>("email")
   // Retour au zoom normal à chaque étape (e-mail → nom → code), après la saisie au clavier.
   useResetZoomOn(step)
@@ -59,7 +71,7 @@ export function LoginScreen({ mode, onToggleMode, compact = false }: {
     setError(null)
     try {
       const res = await callGalleryFunction<IdentifyResult>("gallery-identify", {
-        email, ...(withName ? { firstName, lastName } : {}),
+        email, source, ...(withName ? { firstName, lastName } : {}),
       })
       if (res.status === "ready" && res.yearLogin) { setYear(""); setStep("year") }
       else if (res.status === "ready") await sendCode()
@@ -76,7 +88,7 @@ export function LoginScreen({ mode, onToggleMode, compact = false }: {
     setBusy(true)
     setError(null)
     try {
-      const res = await callGalleryFunction<IdentifyResult>("gallery-identify", { email, birthYear: Number(year) })
+      const res = await callGalleryFunction<IdentifyResult>("gallery-identify", { email, birthYear: Number(year), source })
       if (res.status === "signed") {
         const { error: verifyError } = await galleryClient!.auth.verifyOtp({ token_hash: res.tokenHash, type: "magiclink" })
         if (verifyError) setError("La connexion a échoué. Réessayez dans un instant.")
@@ -107,9 +119,9 @@ export function LoginScreen({ mode, onToggleMode, compact = false }: {
 
   return (
     <div className={`relative flex flex-col items-center justify-center px-6 py-10 ${compact ? "min-h-[26rem]" : "min-h-svh"}`}>
-      {!compact && <ModeToggle mode={mode} onToggle={onToggleMode} className="absolute right-4 top-4" />}
+      {!compact && source !== "invitation" && <ModeToggle mode={mode} onToggle={onToggleMode} className="absolute right-4 top-4" />}
       <div className="w-full max-w-sm space-y-6">
-        <Masthead compact />
+        <Masthead compact subtitle={source === "invitation" ? INVITATION_SUBTITLE : undefined} gilded={source === "invitation"} />
 
         {step === "email" && (
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void identify(false) }}>
@@ -121,8 +133,8 @@ export function LoginScreen({ mode, onToggleMode, compact = false }: {
               <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)}
                 placeholder="vous@exemple.com" className={input} style={{ borderColor: "var(--p-line)" }} />
             </label>
-            <button type="submit" disabled={busy || !email.trim()} className={primary}
-              style={{ background: "var(--p-accent)", borderRadius: "var(--p-radius)" }}>
+            <button type="submit" disabled={busy || !email.trim()} className={btnClass}
+              style={btnStyle}>
               {busy ? "Un instant…" : "Recevoir mon code"}
             </button>
           </form>
@@ -137,8 +149,8 @@ export function LoginScreen({ mode, onToggleMode, compact = false }: {
               placeholder="Prénom" aria-label="Prénom" className={input} style={{ borderColor: "var(--p-line)" }} />
             <input required autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)}
               placeholder="Nom" aria-label="Nom" className={input} style={{ borderColor: "var(--p-line)" }} />
-            <button type="submit" disabled={busy || !firstName.trim() || !lastName.trim()} className={primary}
-              style={{ background: "var(--p-accent)", borderRadius: "var(--p-radius)" }}>
+            <button type="submit" disabled={busy || !firstName.trim() || !lastName.trim()} className={btnClass}
+              style={btnStyle}>
               {busy ? "Un instant…" : "Continuer"}
             </button>
             <BackLink onClick={() => setStep("email")} />
@@ -153,8 +165,8 @@ export function LoginScreen({ mode, onToggleMode, compact = false }: {
             <input inputMode="numeric" autoComplete="off" maxLength={4} required value={year}
               onChange={(e) => setYear(e.target.value.replace(/\D/g, ""))} placeholder="AAAA" aria-label="Année de naissance"
               className={`${input} text-center text-2xl tracking-[0.5em]`} style={{ borderColor: "var(--p-line)" }} />
-            <button type="submit" disabled={busy || year.length !== 4} className={primary}
-              style={{ background: "var(--p-accent)", borderRadius: "var(--p-radius)" }}>
+            <button type="submit" disabled={busy || year.length !== 4} className={btnClass}
+              style={btnStyle}>
               {busy ? "Vérification…" : "Se connecter"}
             </button>
             <div className="flex justify-between text-xs" style={{ color: "var(--p-muted)" }}>
@@ -185,8 +197,8 @@ export function LoginScreen({ mode, onToggleMode, compact = false }: {
             <input inputMode="numeric" autoComplete="one-time-code" maxLength={6} required value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="••••••" aria-label="Code à 6 chiffres"
               className={`${input} text-center text-2xl tracking-[0.5em]`} style={{ borderColor: "var(--p-line)" }} />
-            <button type="submit" disabled={busy || code.length !== 6} className={primary}
-              style={{ background: "var(--p-accent)", borderRadius: "var(--p-radius)" }}>
+            <button type="submit" disabled={busy || code.length !== 6} className={btnClass}
+              style={btnStyle}>
               {busy ? "Vérification…" : "Se connecter"}
             </button>
             <div className="flex justify-between text-xs" style={{ color: "var(--p-muted)" }}>

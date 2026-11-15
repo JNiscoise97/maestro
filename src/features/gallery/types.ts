@@ -96,6 +96,8 @@ export type AccessRequest = {
   first_name: string
   last_name: string
   matched_guest_id: string | null
+  /** Interface d'où vient la demande : galerie (/photos) ou invitation. */
+  source: "photos" | "invitation"
   status: "pending" | "approved" | "rejected"
   created_at: string
   decided_at: string | null

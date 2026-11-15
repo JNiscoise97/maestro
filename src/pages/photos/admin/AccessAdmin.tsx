@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useContext, useState } from "react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -13,7 +13,7 @@ import { SearchableSelect } from "@/components/shared/SearchableSelect"
 import { GalleryError } from "@/features/gallery/client"
 import { useFiancaillesGuests, type FiancaillesGuest } from "@/features/gallery/guests"
 import type { AccessRequest, GalleryMember } from "@/features/gallery/types"
-import { useAdminNav } from "@/context/GalleryAdminNavContext"
+import { AdminNavContext } from "@/context/GalleryAdminNavContext"
 import { memberName } from "./format"
 
 const LINKED_LABELS: Record<string, string> = {
@@ -23,12 +23,24 @@ const LINKED_LABELS: Record<string, string> = {
   admin_manual: "Ajout manuel",
 }
 
-/** Comptes et demandes d'accès (CDCF ACC-04/06, ADM-05). */
-export function AccessAdmin() {
+const SOURCE_LABELS: Record<AccessRequest["source"], string> = {
+  photos: "via la galerie",
+  invitation: "via l'invitation",
+}
+
+/**
+ * Comptes et demandes d'accès (CDCF ACC-04/06, ADM-05).
+ * Utilisé par l'administration de la galerie (scope « photos ») et par celle de l'invitation
+ * (scope « invitation ») : même base de comptes, un compte ouvert donne accès aux deux interfaces.
+ * Côté invitation, les réglages propres à la galerie (accès limité, journal) sont masqués.
+ */
+export function AccessAdmin({ scope = "photos" }: { scope?: AccessRequest["source"] } = {}) {
   const { data: requests = [] } = useAccessRequests()
   const { data: members = [] } = useMembers()
   const action = useAdminAction()
-  const nav = useAdminNav()
+  // Absent hors de l'administration de la galerie (ex. administration de l'invitation).
+  const nav = useContext(AdminNavContext)
+  const galleryScope = scope === "photos"
   const update = useAdminUpdate("members")
   const [filter, setFilter] = useState("")
   const pending = requests.filter((r) => r.status === "pending")
@@ -67,7 +79,7 @@ export function AccessAdmin() {
               <summary className="cursor-pointer text-muted-foreground">Demandes traitées ({requests.filter((r) => r.status !== "pending").length})</summary>
               <ul className="mt-2 space-y-1 text-xs">
                 {requests.filter((r) => r.status !== "pending").map((r) => (
-                  <li key={r.id}>{r.first_name} {r.last_name} · {r.email} — {r.status === "approved" ? "autorisée" : "refusée"} le {r.decided_at ? new Date(r.decided_at).toLocaleDateString("fr-FR") : "?"}</li>
+                  <li key={r.id}>{r.first_name} {r.last_name} · {r.email} ({SOURCE_LABELS[r.source] ?? r.source}) — {r.status === "approved" ? "autorisée" : "refusée"} le {r.decided_at ? new Date(r.decided_at).toLocaleDateString("fr-FR") : "?"}</li>
                 ))}
               </ul>
             </details>
@@ -86,14 +98,14 @@ export function AccessAdmin() {
           <table className="w-full text-sm">
             <thead className="text-left text-xs text-muted-foreground">
               <tr><th className="py-1">Personne</th><th>Invité lié</th><th>Origine</th><th>Dernière connexion</th><th>Statut</th>
-                <th title="Ne voit que la sélection d'accueil (50 photos max.)">Accès limité</th><th /></tr>
+                {galleryScope && <th title="Ne voit que la sélection d'accueil (50 photos max.)">Accès limité</th>}<th /></tr>
             </thead>
             <tbody className="divide-y divide-border">
               {shown.map((m) => (
                 <tr key={m.id}>
                   <td className="py-2">
                     <b>{memberName(m)}</b>{m.role === "admin" && <Badge className="ml-2">admin</Badge>}
-                    {m.limited && m.role !== "admin" && <Badge className="ml-2 bg-amber-500/15 text-amber-700">Accès limité</Badge>}
+                    {galleryScope && m.limited && m.role !== "admin" && <Badge className="ml-2 bg-amber-500/15 text-amber-700">Accès limité</Badge>}
                     <div className="text-xs text-muted-foreground">{m.email}</div>
                   </td>
                   <td className="pr-2">
@@ -112,7 +124,7 @@ export function AccessAdmin() {
                       {m.status === "active" ? "Actif" : "Désactivé"}
                     </Badge>
                   </td>
-                  <td className="text-center">
+                  {galleryScope && <td className="text-center">
                     {m.role === "admin" ? <span className="text-xs text-muted-foreground">—</span> : (
                       <input type="checkbox" className="size-4" checked={m.limited ?? false}
                         aria-label={`Accès limité à la sélection d'accueil — ${memberName(m)}`}
@@ -123,9 +135,9 @@ export function AccessAdmin() {
                           onError: () => toast.error("Modification non enregistrée."),
                         }) }} />
                     )}
-                  </td>
+                  </td>}
                   <td className="space-x-1 whitespace-nowrap text-right">
-                    <Button size="xs" variant="ghost" onClick={() => nav.go("journal", { membre: m.id })}>Historique</Button>
+                    {nav && <Button size="xs" variant="ghost" onClick={() => nav.go("journal", { membre: m.id })}>Historique</Button>}
                     <Button size="xs" variant="ghost" onClick={async () => {
                       try { await revokeSessions(m.id); toast.success("Sessions révoquées.") } catch { toast.error("Révocation impossible.") }
                     }}>Révoquer les sessions</Button>
@@ -173,6 +185,7 @@ function PendingRequest({ request: r, busy, takenGuestIds, onApprove, onReject }
       <div>
         <b>{r.first_name} {r.last_name}</b> · {r.email}
         <span className="ml-2 text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString("fr-FR")}</span>
+        <Badge variant="outline" className="ml-2">{SOURCE_LABELS[r.source] ?? r.source}</Badge>
         {r.matched_guest_id && <Badge className="ml-2 bg-vert-vegetal/15 text-vert-vegetal">Correspond à un invité</Badge>}
       </div>
       <div className="flex flex-wrap items-center gap-2">

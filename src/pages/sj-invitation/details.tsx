@@ -17,7 +17,7 @@ import {
 import { INVITATION_ROUTES, INVITATION_SUBTITLE } from "./paths"
 import { PinNumber, PlacesMap } from "./places-map"
 import { hasPin } from "./places-map-data"
-import { Carte, Fleuron, FlowerCluster, Picto, Polaroid, RecordPlayer, Reveal, Ribbon, Rings } from "./decor"
+import { Carte, Fleuron, FlowerCluster, Picto, Polaroid, RecordPlayer, Reveal, Ribbon } from "./decor"
 import { PAPER_STYLE, TABLE_STYLE, iconForMoment, pictoForTravel, type PictoName } from "./decor-styles"
 
 /**
@@ -171,16 +171,29 @@ function PreviewBar({ view }: { view: GuestView }) {
 
 // ── En-tête et navigation ─────────────────────────────────────────────────────
 
+const HERO_PHOTO = "/sj-invitation/entete.webp"
+const HERO_SHADOW = "0 1px 12px rgba(0,0,0,.4)"
+
 function Hero({ member }: { member: GalleryMember }) {
   return (
-    <header className="relative flex flex-col items-center px-6 pb-14 pt-6 text-center sm:pb-20">
-      <Masthead subtitle={INVITATION_SUBTITLE} gilded />
-      <p className="-mt-4 text-lg sm:text-xl" style={heading}><T>{HERO.dates}</T></p>
-      <p className="mt-1 text-[11px] uppercase tracking-[0.3em]" style={{ color: MATTE_GOLD }}>{HERO.place}</p>
-      <p className="mt-8 max-w-md text-sm leading-relaxed" style={muted}>
+    // Photo des mariés en fond (public/sj-invitation/entete.webp, tirée de IMG_7794.JPG) sous un voile sombre :
+    // textes en blanc, comme sur l'accueil.
+    <header className="relative isolate flex min-h-svh flex-col items-center justify-center overflow-hidden px-6 py-12 text-center text-white">
+      <img src={HERO_PHOTO} alt="" aria-hidden className="absolute inset-0 -z-10 size-full object-cover" />
+      <div aria-hidden className="absolute inset-0 -z-10"
+        style={{ background: "linear-gradient(180deg, rgba(20,16,12,.55) 0%, rgba(20,16,12,.45) 50%, rgba(20,16,12,.65) 100%)" }} />
+      {/* Même nom qu'avant (capitales espacées, « & » entre deux filets), passé en blanc sur la photo. */}
+      <div className="[&_h1_span]:text-white!" style={{ "--p-gold": "#fff", textShadow: HERO_SHADOW } as React.CSSProperties}>
+        <Masthead subtitle={INVITATION_SUBTITLE} gilded />
+      </div>
+      <p className="-mt-4 text-lg sm:text-xl" style={{ ...heading, textShadow: HERO_SHADOW }}><T>{HERO.dates}</T></p>
+      <p className="mt-1 text-[11px] uppercase tracking-[0.3em]" style={{ textShadow: HERO_SHADOW }}>{HERO.place}</p>
+      <p className="mt-8 max-w-md text-sm leading-relaxed text-white/90" style={{ textShadow: HERO_SHADOW }}>
         {member.first_name ? `${member.first_name}, voici` : "Voici"} tout ce qu'il faut savoir sur notre mariage.
       </p>
-      <button type="button" className={`${button} mt-8`} style={buttonStyle} onClick={() => scrollToId("reponse")}>
+      <button type="button" onClick={() => scrollToId("reponse")}
+        className="mt-8 inline-block border border-white px-8 py-3 text-xs uppercase tracking-[0.24em] text-white transition-colors hover:bg-white hover:text-neutral-900"
+        style={{ borderRadius: "var(--p-radius)", textShadow: HERO_SHADOW }}>
         Répondre à l'invitation
       </button>
     </header>
@@ -319,6 +332,14 @@ function InvitationSection() {
 
 // ── 2. Un mot de nous ─────────────────────────────────────────────────────────
 
+/** Polaroïds de « Un mot de nous » (photos des mariés : 1, 6, 4 et 5, recadrées dans public/sj-invitation/). */
+const POLAROIDS: { src: string; rotate: number; shift: string; caption?: string }[] = [
+  { src: "/sj-invitation/polaroid-1.webp", rotate: -6, shift: "sm:translate-x-2" },
+  { src: "/sj-invitation/polaroid-2.webp", rotate: 4, shift: "translate-y-3 sm:-translate-x-1" },
+  { src: "/sj-invitation/polaroid-3.webp", rotate: -3, shift: "sm:translate-x-1 sm:translate-y-2" },
+  { src: "/sj-invitation/polaroid-4.webp", rotate: 6, shift: "translate-y-3 sm:-translate-x-2", caption: "À nous !" },
+]
+
 function OurWordSection() {
   return (
     <Section id="mot" eyebrow="De tout cœur" title="Un mot de nous" narrow picto="coeurs">
@@ -326,9 +347,13 @@ function OurWordSection() {
         {OUR_WORD.paragraphs.map((p) => <p key={p}><T>{p}</T></p>)}
         <p className="pt-4 text-2xl italic" style={{ color: MATTE_GOLD }}>{OUR_WORD.signature}</p>
       </div>
-      <div className="mx-auto mt-12 flex max-w-md justify-center">
-        <Reveal from="left" delay={150} className="relative z-10 w-1/2"><Polaroid src="/sj-invitation/polaroid-1.webp" rotate={-6} className="translate-x-3" /></Reveal>
-        <Reveal from="right" delay={350} className="w-1/2"><Polaroid src="/sj-invitation/polaroid-2.webp" rotate={5} caption="À nous !" className="-translate-x-3 translate-y-4" /></Reveal>
+      {/* Quatre polaroïds éparpillés : 2 × 2 sur téléphone, en ligne sur ordinateur. */}
+      <div className="mx-auto mt-12 grid max-w-xl grid-cols-2 gap-x-2 gap-y-6 sm:grid-cols-4 sm:gap-x-0">
+        {POLAROIDS.map((p, i) => (
+          <Reveal key={p.src} from={i % 2 ? "right" : "left"} delay={120 + i * 140} className={i % 2 ? "relative z-10" : ""}>
+            <Polaroid src={p.src} rotate={p.rotate} caption={p.caption} className={p.shift} />
+          </Reveal>
+        ))}
       </div>
     </Section>
   )
@@ -847,7 +872,6 @@ function ThanksSection() {
   return (
     <section aria-label="Merci" className="px-4 pb-6 pt-14 sm:pt-20">
       <div className="relative mx-auto max-w-sm sm:max-w-md">
-        <Deco className="-left-4 -top-8 w-24 sm:-left-20 sm:w-32" from="left"><Rings className="w-full" /></Deco>
         {/* Ruban derrière le polaroïd et le mot (pas de z-index), comme posé dessous. */}
         <Reveal from="up" delay={200} className="pointer-events-none absolute -right-8 -top-6 h-[96%] sm:-right-24"><Ribbon className="h-full w-auto" /></Reveal>
         <Reveal from="zoom" className="relative">
@@ -873,18 +897,11 @@ function Footer() {
   const { member, signOut } = useGalleryAuth()
   return (
     <footer className="px-6 pb-12 pt-6 text-center">
-      <p className="text-3xl font-light uppercase tracking-[0.18em]" style={{ ...heading, color: MATTE_GOLD }}>
-        S <span className="text-[0.6em] normal-case italic tracking-normal">&amp;</span> J
-      </p>
-      <div className="mt-6 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs" style={muted}>
+      <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs" style={muted}>
         <Link to={INVITATION_ROUTES.opened} className="underline">Revoir la lettre</Link>
         {member?.role === "admin" && <Link to={INVITATION_ROUTES.admin} className="underline">Administration</Link>}
         <button type="button" className="underline" onClick={() => void signOut()}>Se déconnecter</button>
       </div>
-      <p className="mt-6 text-[10px]" style={muted}>
-        Alliances : <a href="https://pngimg.com" target="_blank" rel="noreferrer" className="underline">pngimg.com</a>, licence{" "}
-        <a href="https://creativecommons.org/licenses/by-nc/4.0/deed.fr" target="_blank" rel="noreferrer" className="underline">CC BY-NC 4.0</a>
-      </p>
     </footer>
   )
 }

@@ -5,8 +5,8 @@ import { PAPER_STYLE, type PictoName } from "./decor-styles"
 
 /**
  * Décor de l'invitation complète, d'après le mood board : des cartes blanches posées sur un fond blanc,
- * et en descendant apparaissent des ornements — fleurs blanches, alliances, tourne-disque, polaroïds,
- * rubans de satin, pictogrammes dorés. Fleurs et ruban : images des mariés ; alliances : pngimg.com ; le reste
+ * et en descendant apparaissent des ornements — fleurs blanches, tourne-disque, polaroïds,
+ * rubans de satin, pictogrammes dorés. Fleurs et ruban : images des mariés ; le reste
  * est dessiné en SVG, et les polaroïds reprennent la photo des mariés (public/sj-invitation/).
  */
 
@@ -58,10 +58,9 @@ export function Fleuron({ className = "" }: { className?: string }) {
   )
 }
 
-// ── Fleurs blanches et alliances ──────────────────────────────────────────────
+// ── Fleurs blanches ──────────────────────────────────────────────
 // Fleurs : compositions découpées dans le collage fourni par les mariés (fond transparent), une image
 // WebP par composition dans public/sj-invitation/fleurs-*.webp.
-// Alliances : PNG détouré de pngimg.com (licence CC BY-NC 4.0 : usage non commercial, crédit en pied de page).
 
 const FLOWERS = {
   /** Coin haut-gauche : hortensia et rose, rameaux qui retombent à gauche. */
@@ -88,14 +87,6 @@ export function FlowerCluster({ className = "", flip = false, kind = "bouquet-ro
   return (
     <img src={FLOWERS[kind]} alt="" aria-hidden loading="lazy" decoding="async" className={`pointer-events-none select-none ${className}`}
       style={{ ...style, transform: flip ? "scaleX(-1)" : undefined, filter: "drop-shadow(0 8px 10px rgba(70,52,25,.18))" }} />
-  )
-}
-
-/** Alliances dorées détourées. */
-export function Rings({ className = "", style }: { className?: string; style?: React.CSSProperties }) {
-  return (
-    <img src="/sj-invitation/alliances.webp" alt="" aria-hidden loading="lazy" decoding="async" className={`pointer-events-none select-none ${className}`}
-      style={{ ...style, filter: "drop-shadow(0 6px 6px rgba(70,52,25,.22))" }} />
   )
 }
 

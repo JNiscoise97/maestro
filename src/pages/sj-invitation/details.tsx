@@ -338,8 +338,8 @@ type PolaroidPhoto = { src: string; rotate: number; caption?: string }
 
 /** Polaroïds sous « Un mot de nous » (photos des mariés 1 et 6, recadrées dans public/sj-invitation/). */
 const POLAROIDS_MOT: [PolaroidPhoto, PolaroidPhoto] = [
-  { src: "/sj-invitation/polaroid-1.webp", rotate: -6 },
-  { src: "/sj-invitation/polaroid-2.webp", rotate: 5 },
+  { src: "/sj-invitation/polaroid-1.webp", rotate: -6, caption: "Première photo de nous !" },
+  { src: "/sj-invitation/polaroid-2.webp", rotate: 5, caption: "Au Mexique 2023 !" },
 ]
 
 /** Polaroïds plus bas, dans « Liste de mariage » (photos 4 et 5). */

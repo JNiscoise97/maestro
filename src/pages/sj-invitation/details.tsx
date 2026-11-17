@@ -519,8 +519,10 @@ function AmbianceSection({ days }: { days: Day[] }) {
   const ids = new Set(days.flatMap((d) => d.moments.map((m) => m.sequenceId)))
   const notes = AMBIANCE.notes.filter((n) => n.sequenceIds.some((id) => ids.has(id)))
   return (
-    <Section id="ambiance" eyebrow="Ambiance & tenues" title="Comment s'habiller ?" width="max-w-8xl" picto="robe">
-      <Reveal from="zoom" className="mx-auto -mt-2 mb-10 w-48 sm:w-56"><RecordPlayer className="w-full" /></Reveal>
+    <Section id="ambiance" eyebrow="Ambiance & tenues" title="Comment s'habiller ?" width="max-w-8xl" picto="robe" decor={
+      // Tourne-disque flottant en biais, en haut à gauche (comme le bouquet du programme).
+      <Deco className="-left-4 -top-12 w-32 sm:-left-10 sm:-top-16 sm:w-48" from="left"><RecordPlayer className="w-full -rotate-12" /></Deco>
+    }>
       <div className="space-y-6 text-center">
         <p className="text-xl leading-relaxed sm:text-2xl" style={heading}>
           <T>{AMBIANCE.text}</T>{" "}

@@ -63,6 +63,8 @@ export type Moment = {
   dressCode?: string
   /** Capacité limitée : affiche la mention « Places limitées ». */
   limited?: boolean
+  /** Pastille d'avertissement affichée sous le texte (ex. « Lieu communiqué prochainement »). */
+  warning?: string
 }
 
 export type Day = {
@@ -101,7 +103,7 @@ export const DAYS: Day[] = [
   },
   {
     date: "2027-06-27", label: "Dimanche 27 juin", moments: [
-      { sequenceId: "493c6164-7ff2-4c87-a037-b59c6bcfe008", time: "14 h 30", title: "Nikkah", text: "Bénédiction religieuse indienne selon la tradition musulmane ismaélienne", placeId: "khane", dressCode: "tenue indienne si souhaitée", limited: true },
+      { sequenceId: "493c6164-7ff2-4c87-a037-b59c6bcfe008", time: "14 h 30", title: "Nikkah", text: "Bénédiction religieuse indienne selon la tradition musulmane ismaélienne", placeId: "khane", dressCode: "indienne si souhaitée", limited: true, warning: "Lieu communiqué prochainement" },
     ],
   },
   {
@@ -128,7 +130,7 @@ export type Place = {
 export const PLACES: Place[] = [
   { id: "mairie", name: "Hôtel de Ville de Montpellier", address: "1 place Georges Frêche, 34000 Montpellier", access: "Accessible en tramway. Parkings payants à proximité." },
   { id: "terrasse", name: "La Terrasse by La Salle", address: "Rooftop du complexe La Salle, Mauguio" },
-  { id: "pique-nique", name: "Pique-nique en plein air", address: "Lieu communiqué prochainement", access: "Pensez à une couverture et à un chapeau." },
+  { id: "pique-nique", name: "Pique-nique en plein air", address: "Lieu communiqué prochainement", access: "" },
   { id: "doppio", name: "Doppio Malto", address: "Centre commercial Odysseum, Montpellier", access: "Étage du restaurant privatisé pour l'occasion." },
   { id: "khane", name: "Jamatkhana de Montpellier", address: "85 rue du Pr Antonin Balmès, ZAC de Tournezy, 34070 Montpellier" },
   { id: "villas", name: "Les villas des mariés", address: "Villa des filles : 191 rue Adrienne Boland, 34070 Montpellier · Villa des garçons : 14 impasse du Roitelet, Mauguio" },
@@ -144,11 +146,11 @@ export const AMBIANCE = {
   text: "Nous imaginons une ambiance élégante et festive, qui mêlera des influences :",
   influences: ["gujaraties", "malgaches", "réunionnaises", "guadeloupéennes"],
   dress: "Les tenues traditionnelles ou inspirées de vos origines sont les bienvenues, sans être obligatoires :",
-  examples: "costume, robe élégante, sari, kurta, tenue créole ou tenue de soirée.",
+  examples: "costume, robe élégante, sari, kurta, lamba, tenue créole ou tenue de soirée.",
   avoid: "Merci d'éviter les tenues trop décontractées.",
   /** Précisions par moment : chacune ne s'affiche que si l'invité est convié à l'un des moments indiqués. */
   notes: [
-    { text: "Nikkah : tenue indienne si souhaitée.", sequenceIds: ["493c6164-7ff2-4c87-a037-b59c6bcfe008"] },
+    { text: "Nikkah : indienne si souhaitée.", sequenceIds: ["493c6164-7ff2-4c87-a037-b59c6bcfe008"] },
     { text: "Pique-nique : tenue décontractée.", sequenceIds: ["52990fa4-fc1e-4b99-b51d-50b1efef38a9"] },
     { text: "Soirée conviviale : tenue décontractée.", sequenceIds: ["5347d0f2-31b0-4e69-9a8f-f6f3d10c0969"] },
     { text: "Célébration au domaine : prévoyez des chaussures confortables pour danser et une petite laine pour la nuit.", sequenceIds: ["c14a9820-2d9f-466f-9d19-1b732b2733c1"] },

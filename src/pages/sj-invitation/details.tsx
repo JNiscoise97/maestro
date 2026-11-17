@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
-import { ChevronDown, Lock, LockOpen, MapPin } from "lucide-react"
+import { ChevronDown, Lock, LockOpen, MapPin, TriangleAlert } from "lucide-react"
 
 import { useGalleryAuth } from "@/context/GalleryAuthContext"
 import { MATTE_GOLD } from "@/features/gallery/gilded"
@@ -341,7 +341,7 @@ type PolaroidPhoto = { src: string; rotate: number; caption?: string }
 /** Polaroïds sous « Un mot de nous » (photos des mariés 1 et 6, recadrées dans public/sj-invitation/). */
 const POLAROIDS_MOT: [PolaroidPhoto, PolaroidPhoto] = [
   { src: "/sj-invitation/polaroid-1.webp", rotate: -6, caption: "Première photo de nous !" },
-  { src: "/sj-invitation/polaroid-2.webp", rotate: 5, caption: "Au Mexique 2023 !" },
+  { src: "/sj-invitation/polaroid-2.webp", rotate: 5, caption: "Mexique, 2023 !" },
 ]
 
 /** Polaroïds plus bas, dans « Liste de mariage » (photos 4 et 5). */
@@ -427,6 +427,13 @@ function ProgrammeSection({ view }: { view: GuestView }) {
                           {m.limited && <LimitedBadge className="ml-3 align-middle" />}
                         </h4>
                         <p className="mt-1 text-sm leading-relaxed" style={muted}><T>{m.text}</T></p>
+                        {m.warning && (
+                          <p className="mt-2">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                              <TriangleAlert aria-hidden className="size-3 shrink-0" /><T>{m.warning}</T>
+                            </span>
+                          </p>
+                        )}
                         <p className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs">
                           {placeName(m.placeId) && (
                             <a href={`#lieu-${m.placeId}`} onClick={(e) => { e.preventDefault(); scrollToId(`lieu-${m.placeId}`) }}
@@ -512,7 +519,7 @@ function AmbianceSection({ days }: { days: Day[] }) {
   const ids = new Set(days.flatMap((d) => d.moments.map((m) => m.sequenceId)))
   const notes = AMBIANCE.notes.filter((n) => n.sequenceIds.some((id) => ids.has(id)))
   return (
-    <Section id="ambiance" eyebrow="Ambiance & tenues" title="Comment s'habiller ?" narrow picto="robe">
+    <Section id="ambiance" eyebrow="Ambiance & tenues" title="Comment s'habiller ?" width="max-w-8xl" picto="robe">
       <Reveal from="zoom" className="mx-auto -mt-2 mb-10 w-48 sm:w-56"><RecordPlayer className="w-full" /></Reveal>
       <div className="space-y-6 text-center">
         <p className="text-xl leading-relaxed sm:text-2xl" style={heading}>

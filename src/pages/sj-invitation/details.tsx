@@ -623,7 +623,7 @@ function GiftsSection() {
 
 function FaqSection() {
   return (
-    <Section id="faq" eyebrow="Vos questions" title="Questions fréquentes" narrow picto="question">
+    <Section id="faq" eyebrow="Tes questions" title="Questions fréquentes" narrow picto="question">
       <div className="border-t" style={{ borderColor: "var(--p-line)" }}>
         {FAQ.map((f) => (
           <details key={f.q} className="group border-b" style={{ borderColor: "var(--p-line)" }}>

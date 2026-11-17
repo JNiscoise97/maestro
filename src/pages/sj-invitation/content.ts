@@ -200,16 +200,16 @@ export const GIFTS = {
 // Lue par tous les invités : ne pas y citer de moment réservé à certains.
 
 export const FAQ: { q: string; a: string }[] = [
-  { q: "Quand dois-je répondre à l'invitation ?", a: "Avant le 15 février 2027, grâce au formulaire « Votre réponse » en bas de cette page. Vous pourrez la modifier jusqu'à cette date." },
-  { q: "Puis-je venir accompagné(e) d'un invité supplémentaire ?", a: "Votre invitation est nominative et indique les personnes conviées. Si vous souhaitez venir accompagné(e), parlez-nous-en avant de répondre." },
-  { q: "Les enfants sont-ils les bienvenus ?", a: "Oui, les enfants mentionnés sur votre invitation sont les bienvenus. Ajoutez-les une à une dans le formulaire de réponse (une case indique les moins de 10 ans)." },
-  { q: "Puis-je venir seulement à certains moments ?", a: "Bien sûr. Le formulaire de réponse vous demande votre présence moment par moment, pour chaque personne." },
-  { q: "Le programme est-il le même pour tous les invités ?", a: "Non : certains lieux ont une capacité réduite. Cette page présente les moments auxquels vous êtes conviés." },
+  { q: "Quand dois-je répondre à l'invitation ?", a: "Avant le 15 février 2027, grâce au formulaire « Seras-tu des nôtres ? » en bas de cette page. Tu pourras modifier ta réponse jusqu'à cette date." },
+  { q: "Puis-je venir accompagné(e) d'un invité supplémentaire ?", a: "Ton invitation est nominative et indique les personnes conviées. Si tu souhaites venir accompagné(e), parle-nous-en avant de répondre." },
+  { q: "Les enfants sont-ils les bienvenus ?", a: "Oui, les enfants mentionnés sur ton invitation sont les bienvenus. Ajoute-les un à un dans le formulaire de réponse (une case indique les moins de 10 ans)." },
+  { q: "Puis-je venir seulement à certains moments ?", a: "Bien sûr. Le formulaire de réponse te demande ta présence moment par moment, pour chaque personne." },
+  { q: "Le programme est-il le même pour tous les invités ?", a: "Non : certains lieux ont une capacité réduite. Cette page présente les moments auxquels tu es convié(e)." },
   { q: "Comment dois-je m'habiller ?", a: "Tout est expliqué dans la rubrique « Ambiance & tenues », et les tenues particulières figurent dans le programme." },
   { q: "Où puis-je dormir ?", a: "Nos adresses conseillées sont dans la rubrique « Venir & se loger »." },
   // Questions ajoutées, à garder ou à supprimer :
-  { q: "Y a-t-il un parking sur place ?", a: "Oui au Domaine Ostara. En centre-ville, privilégiez le tramway ou les parkings publics." },
-  { q: "Qui contacter en cas de question ou le jour J ?", a: "Écrivez-nous directement pour toute question. Le jour J, nos témoins seront vos interlocuteurs." },
+  { q: "Y a-t-il un parking sur place ?", a: "Oui au Domaine Ostara. En centre-ville, privilégie le tramway ou les parkings publics." },
+  { q: "Qui contacter en cas de question ou le jour J ?", a: "Écris-nous directement pour toute question. Le jour J, nos témoins seront tes interlocuteurs." },
 ]
 
 // ── 9. Votre réponse ──────────────────────────────────────────────────────────

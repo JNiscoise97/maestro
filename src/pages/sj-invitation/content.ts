@@ -89,27 +89,27 @@ export const PROGRAMME = {
 export const DAYS: Day[] = [
   {
     date: "2027-06-25", label: "Vendredi 25 juin", moments: [
-      { sequenceId: "443599cb-aec3-4071-9e55-5af87663ca58", time: "15 h", title: "Mariage civil", text: "Le « oui » officiel", placeId: "mairie", limited: true },
+      { sequenceId: "443599cb-aec3-4071-9e55-5af87663ca58", time: "14 h 30", title: "Mariage civil", text: "Le « oui » officiel", placeId: "mairie", limited: true },
       { sequenceId: "579716f5-2616-4dc0-ba77-133ed8826510", time: "16 h – 18 h 30", title: "Goûter d'honneur", text: "Douceurs et champagne", placeId: "terrasse", limited: true },
     ],
   },
   {
     date: "2027-06-26", label: "Samedi 26 juin", moments: [
       { sequenceId: "52990fa4-fc1e-4b99-b51d-50b1efef38a9", time: "12 h", title: "Pique-nique partagé", text: "Chacun apporte un plat", placeId: "pique-nique" },
-      { sequenceId: "5347d0f2-31b0-4e69-9a8f-f6f3d10c0969", time: "19 h – minuit", title: "Soirée conviviale", text: "Soirée jeux entre invités de notre génération", placeId: "doppio", limited: true },
+      { sequenceId: "5347d0f2-31b0-4e69-9a8f-f6f3d10c0969", time: "18 h 30 – minuit", title: "Soirée conviviale", text: "Soirée jeux entre invités de notre génération", placeId: "doppio", limited: true },
     ],
   },
   {
     date: "2027-06-27", label: "Dimanche 27 juin", moments: [
-      { sequenceId: "493c6164-7ff2-4c87-a037-b59c6bcfe008", time: "15 h", title: "Nikkah", text: "Bénédiction religieuse indienne selon la tradition musulmane ismaélienne", placeId: "khane", dressCode: "tenue indienne", limited: true },
+      { sequenceId: "493c6164-7ff2-4c87-a037-b59c6bcfe008", time: "14 h 30", title: "Nikkah", text: "Bénédiction religieuse indienne selon la tradition musulmane ismaélienne", placeId: "khane", dressCode: "tenue indienne si souhaitée", limited: true },
     ],
   },
   {
     date: "2027-06-28", label: "Lundi 28 juin", moments: [
-      { sequenceId: "19eb750b-88d2-471e-b06d-749da2ee40c6", time: "Matinée", title: "Préparation des mariés", text: "Brunch, coiffure, habillage", placeId: "villas", limited: true },
-      { sequenceId: "baf9abc9-74fb-4273-a9ff-cd60a64bf5ec", time: "16 h", title: "Bénédiction à l'église", text: "Bénédiction religieuse selon la tradition catholique", placeId: "eglise" },
-      { sequenceId: "e19ecc45-67ae-4319-9887-6d67b39ed24e", time: "17 h 30", title: "Séance photo", text: "Portraits et photos de groupe", placeId: "photo" },
-      { sequenceId: "c14a9820-2d9f-466f-9d19-1b732b2733c1", time: "19 h – fin de nuit", title: "Célébration de mariage", text: "Cocktail et dîner dansant", placeId: "ostara" },
+      { sequenceId: "19eb750b-88d2-471e-b06d-749da2ee40c6", time: "Matinée", title: "Préparation des mariés", text: "Brunch, mise en beauté, habillage", placeId: "villas", limited: true },
+      { sequenceId: "baf9abc9-74fb-4273-a9ff-cd60a64bf5ec", time: "15 h 30", title: "Bénédiction à l'église", text: "Bénédiction religieuse selon la tradition catholique", placeId: "eglise" },
+      { sequenceId: "e19ecc45-67ae-4319-9887-6d67b39ed24e", time: "17 h 00", title: "Séance photo", text: "Portraits et photos de groupe", placeId: "photo" },
+      { sequenceId: "c14a9820-2d9f-466f-9d19-1b732b2733c1", time: "17 h 30 – fin de nuit", title: "Célébration de mariage", text: "Cocktail et dîner dansant", placeId: "ostara" },
     ],
   },
 ]
@@ -148,7 +148,7 @@ export const AMBIANCE = {
   avoid: "Merci d'éviter les tenues trop décontractées.",
   /** Précisions par moment : chacune ne s'affiche que si l'invité est convié à l'un des moments indiqués. */
   notes: [
-    { text: "Nikkah : tenue indienne.", sequenceIds: ["493c6164-7ff2-4c87-a037-b59c6bcfe008"] },
+    { text: "Nikkah : tenue indienne si souhaitée.", sequenceIds: ["493c6164-7ff2-4c87-a037-b59c6bcfe008"] },
     { text: "Pique-nique : tenue décontractée.", sequenceIds: ["52990fa4-fc1e-4b99-b51d-50b1efef38a9"] },
     { text: "Soirée conviviale : tenue décontractée.", sequenceIds: ["5347d0f2-31b0-4e69-9a8f-f6f3d10c0969"] },
     { text: "Célébration au domaine : prévoyez des chaussures confortables pour danser et une petite laine pour la nuit.", sequenceIds: ["c14a9820-2d9f-466f-9d19-1b732b2733c1"] },

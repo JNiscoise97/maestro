@@ -33,7 +33,7 @@ export function iconForMoment(title: string): string {
 export function pictoForTravel(title: string): PictoName {
   const t = title.toLowerCase()
   if (t.includes("train")) return "train"
-  if (t.includes("avion")) return "avion"
-  if (t.includes("voiture")) return "voiture"
+  if (t.includes("avion") || t.includes("plane")) return "avion"
+  if (t.includes("voiture") || t.includes("car")) return "voiture"
   return "pin"
 }

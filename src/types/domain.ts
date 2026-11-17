@@ -351,6 +351,8 @@ export interface Guest {
   postalAddress?: string | null
   /** Nom sur l'invitation (ex. « Tatie Monique ») ; null = surnom, sinon prénom — voir 0176_invitations_foyers.sql. */
   invitationName?: string | null
+  /** Langue de l'invitation en ligne ; null = français — voir 0180_langue_invitation.sql. */
+  invitationLanguage?: "fr" | "en" | null
   /** Foyer (une invitation par foyer) ; null = pas encore rattaché — voir 0179_retour_foyers.sql. */
   householdId?: string | null
 }

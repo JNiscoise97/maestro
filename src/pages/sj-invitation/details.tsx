@@ -7,14 +7,14 @@ import { MATTE_GOLD } from "@/features/gallery/gilded"
 import type { GalleryMember } from "@/features/gallery/types"
 import { Masthead } from "@/pages/photos/GalleryChrome"
 import { rsvpService, type MomentAnswer, type PartyMember, type RsvpResponse } from "@/services/rsvp.service"
+import { isTodo, type Day, type Moment } from "./content"
 import {
-  AMBIANCE, CORTEGE, DAYS, FAQ, GIFTS, INVITATION, OUR_WORD, PLACES, PROGRAMME, RSVP, THANKS, TRAVEL, isTodo, type Day, type Moment,
-} from "./content"
-import {
-  findGuest, loadGuestIdsWithSequences, loadProgramme, loadWeddingGuests, momentsInWords, visibleDays, weddingTable,
-  type Programme, type WeddingGuest,
+  coveringResponse, findGuest, householdOf, loadGuestIdsWithSequences, loadProgramme, loadWeddingGuests, visibleDays, weddingTable,
+  type Covering, type Programme, type WeddingGuest,
 } from "./guest-programme"
-import { INVITATION_ROUTES, INVITATION_SUBTITLE } from "./paths"
+import { frenchTitle, joinList, useContent, type Content } from "./i18n"
+import { LangSwitch } from "./lang-switch"
+import { INVITATION_ROUTES } from "./paths"
 import { PinNumber, PlacesMap } from "./places-map"
 import { hasPin } from "./places-map-data"
 import { Carte, Fleuron, FlowerCluster, Picto, Polaroid, RecordPlayer, Reveal, Ribbon } from "./decor"
@@ -29,17 +29,11 @@ import { PAPER_STYLE, TABLE_STYLE, iconForMoment, pictoForTravel, type PictoName
 
 type SectionId = "invitation" | "mot" | "programme" | "lieux" | "ambiance" | "cortege" | "venir" | "liste" | "faq" | "reponse"
 
-const NAV: { id: SectionId; label: string }[] = [
-  { id: "invitation", label: "Invitation" },
-  { id: "mot", label: "Un mot" },
-  { id: "programme", label: "Programme" },
-  { id: "lieux", label: "Lieux" },
-  { id: "ambiance", label: "Tenues" },
-  ...(CORTEGE.show ? [{ id: "cortege" as const, label: "Cortège" }] : []),
-  { id: "venir", label: "Venir & dormir" },
-  { id: "liste", label: "Liste" },
-  { id: "faq", label: "Questions" },
-]
+/** Rubriques de la barre de navigation (Cortège seulement s'il est affiché). */
+function navItems(c: Content): { id: SectionId; label: string }[] {
+  const ids: SectionId[] = ["invitation", "mot", "programme", "lieux", "ambiance", ...(c.CORTEGE.show ? ["cortege" as const] : []), "venir", "liste", "faq"]
+  return ids.map((id) => ({ id, label: c.UI.nav[id as Exclude<SectionId, "reponse">] }))
+}
 
 const NAV_HEIGHT = 56
 const button = "inline-block border px-8 py-3 text-xs uppercase tracking-[0.24em] transition-colors hover:bg-[#a8844f]! hover:text-white! disabled:opacity-40"
@@ -63,6 +57,7 @@ function scrollToId(id: string) {
 }
 
 export function DetailsScreen({ member }: { member: GalleryMember }) {
+  const { CORTEGE } = useContent()
   const view = useGuestView(member)
   return (
     <div className="min-h-svh overflow-x-clip" style={{ ...TABLE_STYLE, color: "#2e2a25" }}>
@@ -76,7 +71,7 @@ export function DetailsScreen({ member }: { member: GalleryMember }) {
         <PlacesSection days={view.days} />
         <AmbianceSection days={view.days} />
         {CORTEGE.show && <CortegeSection />}
-        <TravelSection />
+        <TravelSection days={view.days} />
         <GiftsSection />
         <FaqSection />
         <RsvpSection member={member} days={view.days} guestId={view.guestId} />
@@ -107,6 +102,7 @@ type GuestView = {
 const FULL_PROGRAMME_EMAILS = ["niscoise.j@gmail.com"]
 
 function useGuestView(member: GalleryMember): GuestView {
+  const { DAYS } = useContent()
   const isAdmin = member.role === "admin"
   const [guests, setGuests] = useState<WeddingGuest[] | null>(null)
   const [previewable, setPreviewable] = useState<Set<string>>(new Set())
@@ -136,16 +132,16 @@ function useGuestView(member: GalleryMember): GuestView {
   }, [guests, target])
 
   const base = { guestId: self?.id ?? member.guest_id ?? null, guests: guests ?? [], previewable, previewId, setPreviewId }
-  const unknown = { ...base, loading: false, mode: "unknown" as const, days: visibleDays(null, true) }
+  const unknown = { ...base, loading: false, mode: "unknown" as const, days: visibleDays(null, true, DAYS) }
   if (!guests) return { ...base, loading: true, mode: "some", days: [] }
-  if (isAdmin && !previewId) return { ...base, loading: false, mode: "all", days: visibleDays(null) }
+  if (isAdmin && !previewId) return { ...base, loading: false, mode: "all", days: visibleDays(null, false, DAYS) }
   if (!isAdmin && FULL_PROGRAMME_EMAILS.includes(member.email.trim().toLowerCase()))
-    return { ...base, loading: false, mode: "all", days: visibleDays(null) }
+    return { ...base, loading: false, mode: "all", days: visibleDays(null, false, DAYS) }
   if (!target) return unknown
   if (loaded?.id !== target.id) return { ...base, loading: true, mode: "some", days: [] }
   const programme = loaded.programme
   if (programme?.status !== "found" || programme.sequenceIds.size === 0) return unknown
-  const days = visibleDays(programme.sequenceIds)
+  const days = visibleDays(programme.sequenceIds, false, DAYS)
   const count = days.reduce((n, d) => n + d.moments.length, 0)
   const total = DAYS.reduce((n, d) => n + d.moments.length, 0)
   return { ...base, loading: false, mode: count === total ? "all" : "some", days }
@@ -153,6 +149,7 @@ function useGuestView(member: GalleryMember): GuestView {
 
 /** Administrateur : voir la page telle qu'un invité la verra. */
 function PreviewBar({ view }: { view: GuestView }) {
+  const { UI } = useContent()
   const options = view.guests
     .filter((g) => view.previewable.has(g.id))
     .map((g) => ({ id: g.id, name: `${g.first_name ?? ""} ${g.last_name ?? ""}`.trim() }))
@@ -160,10 +157,10 @@ function PreviewBar({ view }: { view: GuestView }) {
   return (
     <div className="border-t px-6 py-3 text-xs" style={{ borderColor: "var(--p-line)", background: "#faf8f4" }}>
       <label className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-3 gap-y-1">
-        <span className="uppercase tracking-[0.16em]" style={muted}>Aperçu administrateur</span>
+        <span className="uppercase tracking-[0.16em]" style={muted}>{UI.preview.label}</span>
         <select value={view.previewId} onChange={(e) => view.setPreviewId(e.target.value)}
           className="max-w-full border bg-white px-2 py-1.5 text-sm" style={{ borderColor: "#d8d2c8", borderRadius: "var(--p-radius)" }}>
-          <option value="">Tout le programme</option>
+          <option value="">{UI.preview.all}</option>
           {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
         </select>
       </label>
@@ -177,36 +174,41 @@ const HERO_PHOTO = "/sj-invitation/details-fond.webp"
 const HERO_SHADOW = "0 1px 12px rgba(0,0,0,.4)"
 
 function Hero({ member }: { member: GalleryMember }) {
+  const { UI } = useContent()
   return (
     // Photo des mariés en fond (public/sj-invitation/details-fond.webp, tirée de S&J397.jpg) sous un voile sombre :
     // textes en blanc, comme sur l'accueil.
     <header className="relative isolate flex min-h-svh flex-col items-center justify-center overflow-hidden px-6 py-12 text-center text-white">
       <img src={HERO_PHOTO} alt="" aria-hidden className="absolute inset-0 -z-10 size-full object-cover" />
+      <LangSwitch tone="light" className="absolute right-4 top-4" />
       <div aria-hidden className="absolute inset-0 -z-10"
         style={{ background: "linear-gradient(180deg, rgba(20,16,12,.55) 0%, rgba(20,16,12,.45) 50%, rgba(20,16,12,.65) 100%)" }} />
       {/* Même nom qu'avant (capitales espacées, « & » entre deux filets), passé en blanc sur la photo. */}
       <div className="[&_h1_span]:text-white!" style={{ "--p-gold": "#fff", textShadow: HERO_SHADOW } as React.CSSProperties}>
-        <Masthead subtitle={INVITATION_SUBTITLE} gilded />
+        <Masthead subtitle={UI.subtitle} gilded />
       </div>
       <p className="mt-2 max-w-md text-sm leading-relaxed text-white/90" style={{ textShadow: HERO_SHADOW }}>
-        {member.first_name ? `${member.first_name}, voici` : "Voici"} tout ce qu'il faut savoir sur notre mariage.
+        {UI.hero.intro(member.first_name ?? "")}
       </p>
       <button type="button" onClick={() => scrollToId("reponse")}
         className="mt-8 inline-block border border-white px-8 py-3 text-xs uppercase tracking-[0.24em] text-white transition-colors hover:bg-white hover:text-neutral-900"
         style={{ borderRadius: "var(--p-radius)", textShadow: HERO_SHADOW }}>
-        Répondre à l'invitation
+        {UI.hero.reply}
       </button>
     </header>
   )
 }
 
 function Nav() {
+  const content = useContent()
+  const { UI } = content
+  const NAV = navItems(content)
   const [active, setActive] = useState<SectionId | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
   // Rubrique en cours : la dernière dont le haut est passé sous la barre.
   useEffect(() => {
-    const ids: SectionId[] = [...NAV.map((n) => n.id), "reponse"]
+    const ids: SectionId[] = [...navItems(content).map((n) => n.id), "reponse"]
     let frame = 0
     const update = () => {
       frame = 0
@@ -228,7 +230,7 @@ function Nav() {
       window.removeEventListener("resize", onScroll)
       cancelAnimationFrame(frame)
     }
-  }, [])
+  }, [content])
 
   // Sur téléphone, la barre défile horizontalement : on garde le lien actif visible.
   useEffect(() => {
@@ -240,7 +242,7 @@ function Nav() {
   }, [active])
 
   return (
-    <nav aria-label="Rubriques de l'invitation" className="sticky top-0 z-30 border-y backdrop-blur"
+    <nav aria-label={UI.nav.aria} className="sticky top-0 z-30 border-y backdrop-blur"
       style={{ height: NAV_HEIGHT, background: "rgba(255,255,255,.92)", borderColor: "var(--p-line)" }}>
       <div className="mx-auto flex h-full max-w-5xl items-center gap-3 pl-2 pr-3 sm:px-6">
         <div ref={listRef} className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -258,8 +260,9 @@ function Nav() {
           className="shrink-0 px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-white transition-opacity hover:opacity-90"
           style={{ background: MATTE_GOLD, borderRadius: "var(--p-radius)" }}
           aria-current={active === "reponse" ? "true" : undefined}>
-          Répondre
+          {UI.nav.reply}
         </a>
+        <LangSwitch className="hidden shrink-0 sm:flex" />
       </div>
     </nav>
   )
@@ -313,8 +316,9 @@ function Deco({ className, children, delay = 300, from = "zoom" }: {
 // ── 1. Invitation ─────────────────────────────────────────────────────────────
 
 function InvitationSection() {
+  const { INVITATION, UI } = useContent()
   return (
-    <Section id="invitation" eyebrow="Faire-part" title="L'invitation" carte decor={
+    <Section id="invitation" eyebrow={UI.sections.invitation.eyebrow} title={UI.sections.invitation.title} carte decor={
       <Deco className="-right-8 -top-10 w-36 sm:-right-24 sm:-top-14 sm:w-52"><FlowerCluster kind="couronne" className="w-full" /></Deco>
     }>
       <div className="text-center" style={heading}>
@@ -340,15 +344,15 @@ function InvitationSection() {
 type PolaroidPhoto = { src: string; rotate: number; caption?: string }
 
 /** Polaroïds sous « Un mot de nous » (photos des mariés 1 et 6, recadrées dans public/sj-invitation/). */
-const POLAROIDS_MOT: [PolaroidPhoto, PolaroidPhoto] = [
-  { src: "/sj-invitation/polaroid-1.webp", rotate: -6, caption: "1ère photo de nous, 2020 !" },
-  { src: "/sj-invitation/polaroid-2.webp", rotate: 5, caption: "Mexique, 2023 !" },
+const polaroidsMot = (c: Content["UI"]["polaroids"]): [PolaroidPhoto, PolaroidPhoto] => [
+  { src: "/sj-invitation/polaroid-1.webp", rotate: -6, caption: c.first },
+  { src: "/sj-invitation/polaroid-2.webp", rotate: 5, caption: c.mexico },
 ]
 
 /** Polaroïds plus bas, dans « Liste de mariage » (photos 4 et 5). */
-const POLAROIDS_LISTE: [PolaroidPhoto, PolaroidPhoto] = [
-  { src: "/sj-invitation/polaroid-3.webp", rotate: -4, caption: "La Réunion, 2023 !" },
-  { src: "/sj-invitation/polaroid-4.webp", rotate: 6, caption: "À nous !" },
+const polaroidsListe = (c: Content["UI"]["polaroids"]): [PolaroidPhoto, PolaroidPhoto] => [
+  { src: "/sj-invitation/polaroid-3.webp", rotate: -4, caption: c.reunion },
+  { src: "/sj-invitation/polaroid-4.webp", rotate: 6, caption: c.us },
 ]
 
 /** Deux polaroïds qui se chevauchent légèrement, le second un peu plus bas ; ils arrivent de chaque côté. */
@@ -367,35 +371,36 @@ function PolaroidPair({ photos }: { photos: [PolaroidPhoto, PolaroidPhoto] }) {
 }
 
 function OurWordSection() {
+  const { OUR_WORD, UI } = useContent()
   return (
-    <Section id="mot" eyebrow="De tout cœur" title="Un mot de nous" width="max-w-8xl" picto="coeurs">
+    <Section id="mot" eyebrow={UI.sections.mot.eyebrow} title={UI.sections.mot.title} width="max-w-8xl" picto="coeurs">
       <div className="space-y-5 text-center text-xl leading-relaxed sm:text-2xl" style={heading}>
         {OUR_WORD.paragraphs.map((p) => <p key={p}><T>{p}</T></p>)}
         <p className="pt-4 text-2xl italic" style={{ color: MATTE_GOLD }}>{OUR_WORD.signature}</p>
       </div>
-      <PolaroidPair photos={POLAROIDS_MOT} />
+      <PolaroidPair photos={polaroidsMot(UI.polaroids)} />
     </Section>
   )
 }
 
 // ── 3. Programme ──────────────────────────────────────────────────────────────
 
-const placeName = (id: string) => PLACES.find((p) => p.id === id)?.name ?? ""
-
 function ProgrammeSection({ view }: { view: GuestView }) {
+  const { PLACES, PROGRAMME, UI } = useContent()
+  const placeName = (id: string) => PLACES.find((p) => p.id === id)?.name ?? ""
   const { days, mode, loading } = view
   // Numéro de chaque moment (I, II…), dans l'ordre du programme de l'invité.
   const number = useMemo(() => new Map(days.flatMap((d) => d.moments).map((m, i) => [m.sequenceId, i + 1])), [days])
   const count = number.size
   const hasLimited = days.some((d) => d.moments.some((m) => m.limited))
-  const title = mode === "all" ? PROGRAMME.titleAll : count ? PROGRAMME.titleSome.replace("{n}", momentsInWords(count)) : "Le programme"
-  const eyebrow = days.length > 1 ? `${["", "Un jour", "Deux jours", "Trois jours", "Quatre jours"][days.length] ?? `${days.length} jours`}` : days[0]?.label ?? "Programme"
+  const title = mode === "all" ? PROGRAMME.titleAll : count ? PROGRAMME.titleSome.replace("{n}", UI.momentsInWords(count)) : UI.sections.programme.title
+  const eyebrow = days.length > 1 ? UI.programme.days[days.length] ?? String(days.length) : days[0]?.label ?? UI.sections.programme.eyebrow
   return (
-    <Section id="programme" eyebrow={eyebrow} title={loading ? "Ton programme" : title} decor={
+    <Section id="programme" eyebrow={eyebrow} title={loading ? UI.sections.programme.loadingTitle : title} decor={
       <Deco className="-bottom-10 -right-8 w-32 sm:-right-20 sm:w-48"><FlowerCluster kind="arums" className="w-full" /></Deco>
     }>
       {loading ? (
-        <p className="text-center text-sm" style={muted} role="status">Chargement de ton programme…</p>
+        <p className="text-center text-sm" style={muted} role="status">{UI.sections.programme.loading}</p>
       ) : (
         <>
           <p className="mx-auto max-w-xl text-center text-sm leading-relaxed" style={muted}>
@@ -419,7 +424,7 @@ function ProgrammeSection({ view }: { view: GuestView }) {
                   {day.moments.map((m) => (
                     <li key={m.sequenceId} className="grid gap-x-8 gap-y-1 sm:grid-cols-[9rem_1fr]">
                       <div className="flex items-center gap-3 sm:flex-col sm:items-end sm:gap-1">
-                        <img src={iconForMoment(m.title)} alt="" aria-hidden loading="lazy" decoding="async" className="size-16 shrink-0 object-contain sm:size-20" />
+                        <img src={iconForMoment(frenchTitle(m.sequenceId) || m.title)} alt="" aria-hidden loading="lazy" decoding="async" className="size-16 shrink-0 object-contain sm:size-20" />
                         <p className="text-sm sm:text-right" style={muted}><T>{m.time}</T></p>
                       </div>
                       <div>
@@ -438,7 +443,7 @@ function ProgrammeSection({ view }: { view: GuestView }) {
                               <MapPin className="size-3.5" aria-hidden /><T>{placeName(m.placeId)}</T>
                             </a>
                           )}
-                          {m.dressCode && <span style={muted}>Tenue : <T>{m.dressCode}</T></span>}
+                          {m.dressCode && <span style={muted}>{UI.programme.dress} <T>{m.dressCode}</T></span>}
                         </p>
                       </div>
                     </li>
@@ -463,10 +468,11 @@ function NoticePill({ children }: { children: string }) {
 }
 
 function LimitedBadge({ className = "" }: { className?: string }) {
+  const { UI } = useContent()
   return (
     <span className={`inline-block shrink-0 whitespace-nowrap border px-2 py-0.5 font-sans text-[9.5px] uppercase tracking-[0.16em] ${className}`}
       style={{ borderColor: MATTE_GOLD, color: MATTE_GOLD, borderRadius: "var(--p-radius)" }}>
-      Places limitées
+      {UI.programme.limited}
     </span>
   )
 }
@@ -477,14 +483,18 @@ function toRoman(n: number): string {
 
 // ── 4. Lieux ──────────────────────────────────────────────────────────────────
 
+/** Adresse pas encore connue (« Lieu communiqué prochainement » / « Location to be announced »). */
+const isPending = (address: string) => /prochainement|to be announced/i.test(address)
+
 function PlacesSection({ days }: { days: Day[] }) {
+  const { PLACES, UI } = useContent()
   // Seuls les lieux des moments de l'invité, dans l'ordre du programme.
   const places = PLACES.filter((p) => days.some((d) => d.moments.some((m) => m.placeId === p.id)))
   // Numéro de chaque lieu présent sur le plan (dans l'ordre du programme).
   const number = new Map(places.filter((p) => hasPin(p.id)).map((p, i) => [p.id, i + 1]))
   return (
-    <Section id="lieux" eyebrow="Où nous retrouver" title="Les lieux" picto="pin">
-      <PlacesMap placeIds={places.map((p) => p.id)} number={number} />
+    <Section id="lieux" eyebrow={UI.sections.lieux.eyebrow} title={UI.sections.lieux.title} picto="pin">
+      <PlacesMap placeIds={places.map((p) => p.id)} number={number} labels={UI.mapLabels} ariaLabel={UI.places.mapAria} />
       <div className="grid gap-x-12 gap-y-10 sm:grid-cols-2">
         {places.map((place) => {
           const moments = days.flatMap((d) => d.moments.filter((m) => m.placeId === place.id).map((m) => ({ day: d.label, ...m })))
@@ -492,7 +502,7 @@ function PlacesSection({ days }: { days: Day[] }) {
             <article key={place.id} id={`lieu-${place.id}`} className="text-center sm:text-left"
               style={{ scrollMarginTop: NAV_HEIGHT + 16 }}>
               <h3 className="text-2xl" style={heading}>{number.has(place.id) && <PinNumber n={number.get(place.id)!} />}<T>{place.name}</T></h3>
-              {/prochainement/i.test(place.address)
+              {isPending(place.address)
                 ? <p className="mt-2"><NoticePill>{place.address}</NoticePill></p>
                 : <p className="mt-2 text-sm" style={muted}><T>{place.address}</T></p>}
               {place.access && <p className="mt-2 text-sm" style={muted}><T>{place.access}</T></p>}
@@ -507,10 +517,10 @@ function PlacesSection({ days }: { days: Day[] }) {
                   </li>
                 ))}
               </ul>
-              {!isTodo(place.address) && !/prochainement/i.test(place.address) && (
+              {!isTodo(place.address) && !isPending(place.address) && (
                 <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place.name}, ${place.address}`)}`}
                   target="_blank" rel="noreferrer" className={`${button} mt-6 px-5! py-2!`} style={buttonStyle}>
-                  Itinéraire
+                  {UI.places.directions}
                 </a>
               )}
             </article>
@@ -524,26 +534,35 @@ function PlacesSection({ days }: { days: Day[] }) {
 // ── 4 bis. Ambiance & tenues ──────────────────────────────────────────────────
 
 function AmbianceSection({ days }: { days: Day[] }) {
-  // Jours où l'invité est convié, avec leur libellé (« Vendredi 25 juin »).
-  const label = new Map(days.map((d) => [d.date, d.label]))
-  const shown = AMBIANCE.days.filter((a) => label.has(a.date))
+  const { AMBIANCE, UI } = useContent()
+  // Jours où l'invité est convié ; le texte ne cite que ses moments (« Pour le pique-nique, … »).
+  const byDate = new Map(days.map((d) => [d.date, d]))
+  const shown = AMBIANCE.days.flatMap((a) => {
+    const day = byDate.get(a.date)
+    if (!day) return []
+    const names = day.moments.map((m) => a.moments?.[m.sequenceId]).filter((x): x is string => !!x)
+    const list = joinList(names, UI.common.and)
+    if (a.text.includes("{moments}") && !list) return []
+    return [{ ...a, label: day.label, text: a.text.replace("{moments}", list) }]
+  })
   const tenue = (name: string) => `/sj-invitation/tenue-${name}.webp`
   return (
-    <Section id="ambiance" eyebrow="Ambiance & tenues" title="Comment s'habiller ?" width="max-w-8xl" picto="robe" decor={
+    <Section id="ambiance" eyebrow={UI.sections.ambiance.eyebrow} title={UI.sections.ambiance.title} width="max-w-8xl" picto="robe" decor={
       // Tourne-disque flottant en biais, en haut à gauche (comme le bouquet du programme).
-      <Deco className="-left-4 -top-12 w-32 sm:-left-10 sm:-top-16 sm:w-48" from="left"><RecordPlayer className="w-full -rotate-12" /></Deco>
+      <Deco className="-left-4 -top-12 w-32 sm:-left-10 sm:-top-16 sm:w-48" from="left"><RecordPlayer className="w-full -rotate-12" caption={UI.ambiance.record} /></Deco>
     }>
       <div className="mx-auto max-w-2xl space-y-3 text-center">
         <p className="text-xl leading-relaxed sm:text-2xl" style={heading}><T>{AMBIANCE.intro}</T></p>
         <p className="text-base leading-relaxed sm:text-lg" style={muted}><T>{AMBIANCE.why}</T></p>
       </div>
       <Fleuron className="my-10" />
-      <div className="grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Lignes centrées : un jour seul (ou un nombre impair) ne reste pas calé à gauche. */}
+      <div className="flex flex-wrap justify-center gap-x-8 gap-y-12">
         {shown.map((a, k) => {
           const wide = a.tenues.length > 2
           return (
-            <Reveal key={a.date} delay={k * 120} className={`flex flex-col items-center text-center ${wide ? "sm:col-span-2 lg:col-span-3" : ""}`}>
-              <p className="text-[11px] uppercase tracking-[0.3em]" style={{ color: MATTE_GOLD }}>{label.get(a.date)}</p>
+            <Reveal key={a.date} delay={k * 120} className={`flex flex-col items-center text-center ${wide ? "w-full" : "w-full sm:w-[calc(50%-1rem)] lg:w-[calc(33.333%-1.5rem)]"}`}>
+              <p className="text-[11px] uppercase tracking-[0.3em]" style={{ color: MATTE_GOLD }}>{a.label}</p>
               <h3 className="mt-1 text-3xl sm:text-4xl" style={heading}>{a.mood}</h3>
               <div className={wide ? "mt-6 flex w-full max-w-5xl flex-wrap justify-center gap-2 sm:gap-4" : "mt-6 flex justify-center gap-2"}>
                 {a.tenues.map((t) => (
@@ -564,8 +583,9 @@ function AmbianceSection({ days }: { days: Day[] }) {
 // ── 5. Cortège ────────────────────────────────────────────────────────────────
 
 function CortegeSection() {
+  const { CORTEGE, UI } = useContent()
   return (
-    <Section id="cortege" eyebrow="À nos côtés" title="Le cortège" picto="coeurs">
+    <Section id="cortege" eyebrow={UI.sections.cortege.eyebrow} title={UI.sections.cortege.title} picto="coeurs">
       <p className="mx-auto mb-12 max-w-xl text-center text-sm leading-relaxed" style={muted}><T>{CORTEGE.intro}</T></p>
       <div className="grid gap-10 text-center sm:grid-cols-2">
         {CORTEGE.groups.map((g) => (
@@ -588,9 +608,17 @@ function CortegeSection() {
 
 // ── 6. Venir & se loger ───────────────────────────────────────────────────────
 
-function TravelSection() {
+function TravelSection({ days }: { days: Day[] }) {
+  const { TRAVEL, UI } = useContent()
+  // Lieux où l'invité est convié : chaque hébergement ne cite que ceux-là.
+  const placeIds = new Set(days.flatMap((d) => d.moments.map((m) => m.placeId)))
+  const stayText = (s: (typeof TRAVEL.stays)[number]) => {
+    const names = Object.entries(s.places).filter(([id]) => placeIds.has(id)).map(([, n]) => n)
+    if (!names.length) return s.fallback
+    return s.details.replace("{lieux}", joinList(names, UI.common.and))
+  }
   return (
-    <Section id="venir" eyebrow="Infos pratiques" title="Venir & se loger">
+    <Section id="venir" eyebrow={UI.sections.venir.eyebrow} title={UI.sections.venir.title}>
       <div className="grid gap-8 sm:grid-cols-3">
         {TRAVEL.getting.map((g) => (
           <div key={g.title} className="text-center">
@@ -602,13 +630,13 @@ function TravelSection() {
       </div>
       <div className="mt-16 text-center"><Picto name="hotel" className="h-11 gap-1" /></div>
       <h3 className="mb-6 mt-3 border-b pb-3 text-center text-[11px] uppercase tracking-[0.3em]"
-        style={{ color: MATTE_GOLD, borderColor: "var(--p-line)" }}>Où dormir</h3>
+        style={{ color: MATTE_GOLD, borderColor: "var(--p-line)" }}>{UI.travel.stay}</h3>
       <ul className="grid gap-6 sm:grid-cols-2">
         {TRAVEL.stays.map((s) => (
           <li key={s.name}>
             <p className="text-xl" style={heading}><T>{s.name}</T></p>
-            <p className="mt-1 text-sm leading-relaxed" style={muted}><T>{s.details}</T></p>
-            {s.url && <a href={s.url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs underline" style={{ color: MATTE_GOLD }}>Réserver</a>}
+            <p className="mt-1 text-sm leading-relaxed" style={muted}><T>{stayText(s)}</T></p>
+            {s.url && <a href={s.url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs underline" style={{ color: MATTE_GOLD }}>{UI.travel.book}</a>}
           </li>
         ))}
       </ul>
@@ -619,15 +647,16 @@ function TravelSection() {
 // ── 7. Liste de mariage ───────────────────────────────────────────────────────
 
 function GiftsSection() {
+  const { GIFTS, UI } = useContent()
   return (
-    <Section id="liste" eyebrow="Si le cœur t'en dit" title="Liste de mariage" narrow picto="cadeau">
+    <Section id="liste" eyebrow={UI.sections.liste.eyebrow} title={UI.sections.liste.title} narrow picto="cadeau">
       <p className="text-center text-lg leading-relaxed sm:text-xl" style={heading}><T>{GIFTS.text}</T></p>
       {GIFTS.url && (
         <p className="mt-8 text-center">
           <a href={GIFTS.url} target="_blank" rel="noreferrer" className={button} style={buttonStyle}>{GIFTS.label}</a>
         </p>
       )}
-      <PolaroidPair photos={POLAROIDS_LISTE} />
+      <PolaroidPair photos={polaroidsListe(UI.polaroids)} />
     </Section>
   )
 }
@@ -635,8 +664,9 @@ function GiftsSection() {
 // ── 8. FAQ ────────────────────────────────────────────────────────────────────
 
 function FaqSection() {
+  const { FAQ, UI } = useContent()
   return (
-    <Section id="faq" eyebrow="Tes questions" title="Questions fréquentes" narrow picto="question">
+    <Section id="faq" eyebrow={UI.sections.faq.eyebrow} title={UI.sections.faq.title} narrow picto="question">
       <div className="border-t" style={{ borderColor: "var(--p-line)" }}>
         {FAQ.map((f) => (
           <details key={f.q} className="group border-b" style={{ borderColor: "var(--p-line)" }}>
@@ -662,28 +692,41 @@ const RSVP_TABLE = weddingTable("rsvp_responses")
 
 type Presence = "yes" | "no" | "unsure"
 type Answers = Record<string, MomentAnswer | null>
-type Person = { key: string; firstName: string; lastName: string; under10: boolean; moments: Answers; hasDiet: boolean; diet: string }
+/** guestId : membre du foyer proposé (nom repris de la liste, non modifiable) ; absent : personne ajoutée librement. */
+type Person = { key: string; guestId?: string | null; firstName: string; lastName: string; under10: boolean; moments: Answers; hasDiet: boolean; diet: string }
 type StepId = "presence" | "moments" | "party" | "word"
 
 const ANSWER_ORDER: MomentAnswer[] = ["yes", "no", "unsure"]
 const toAttendance = { yes: "yes", no: "no", unsure: "probably" } as const
 const fromAttendance = (a: string): Presence => (a === "no" || a === "probably-not" ? "no" : a === "probably" ? "unsure" : "yes")
 const newKey = () => Math.random().toString(36).slice(2)
+/** Prénom puis NOM DE FAMILLE en capitales (comme sur le faire-part). */
+const guestName = (g: WeddingGuest) => ({ firstName: g.first_name?.trim() ?? "", lastName: g.last_name?.trim().toLocaleUpperCase("fr-FR") ?? "" })
 
 /**
  * Formulaire de réponse, étape par étape :
  *   1. Ta présence (nom, oui / non / je ne sais pas encore) ;
  *   2. Tes moments : oui / non / je ne sais pas encore pour chacun (si l'invité est convié à plusieurs) ;
- *   3. Qui vient avec toi : personnes ajoutées une à une (prénom, nom, moins de 10 ans, présence par moment),
- *      avec le compteur de personnes ;
+ *   3. Qui vient avec toi : les membres du foyer qui n'ont pas encore répondu sont proposés (un clic les ajoute,
+ *      reliés à leur fiche) ; d'autres personnes peuvent être ajoutées librement (prénom, nom, moins de 10 ans,
+ *      présence par moment), avec le compteur de personnes ;
  *   4. Un petit mot (restrictions alimentaires, message), puis envoi.
  * Une réponse « non » passe directement à l'étape 4.
+ *
+ * Foyer : la réponse la plus récente qui concerne une personne vaut pour elle. Si un proche a répondu pour
+ * l'invité, celui-ci voit cette réponse et peut envoyer la sienne, qui la remplace pour lui seul.
  */
 function RsvpSection({ member, days: programmeDays, guestId }: { member: GalleryMember; days: Day[]; guestId: string | null }) {
+  const { RSVP, UI } = useContent()
+  const E = UI.rsvp.errors
   const moments = programmeDays.flatMap((d) => d.moments.map((m) => ({ ...m, day: d.label, date: d.date })))
   const askMoments = moments.length > 1
 
   const [previous, setPrevious] = useState<RsvpResponse | null>(null)
+  // Réponse envoyée par un proche du foyer pour cet invité (sans réponse plus récente de sa part).
+  const [coveredBy, setCoveredBy] = useState<Covering | null>(null)
+  // Membres du foyer (lui excepté), réponses du foyer (la plus récente d'abord) et invités, pour les noms.
+  const [household, setHousehold] = useState<{ members: WeddingGuest[]; responses: RsvpResponse[]; guests: WeddingGuest[] }>({ members: [], responses: [], guests: [] })
   const [editing, setEditing] = useState(true)
   const [step, setStep] = useState(0)
   // Prénom puis NOM DE FAMILLE en capitales (comme sur le faire-part).
@@ -709,28 +752,57 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
   const isLast = step >= steps.length - 1
   const count = 1 + others.length
 
-  // Réponse déjà envoyée par cet invité : on l'affiche et on pré-remplit le formulaire pour la modifier.
+  // Réponse qui vaut pour cet invité (la sienne, ou celle d'un proche du foyer qui l'a inclus) : on l'affiche
+  // et on pré-remplit le formulaire pour la modifier.
   useEffect(() => {
     if (!guestId) return
     let alive = true
-    void rsvpService.latestForGuest(guestId, RSVP_TABLE).then((r) => {
-      if (!alive || !r) return
-      setPrevious(r)
+    void (async () => {
+      const guests = await loadWeddingGuests().catch(() => [] as WeddingGuest[])
+      const me = guests.find((g) => g.id === guestId)
+      const members = me ? householdOf(me, guests) : []
+      const responses = await rsvpService.listForGuests([guestId, ...members.map((m) => m.id)], RSVP_TABLE)
+      if (!alive) return
+      setHousehold({ members, responses, guests })
+      const own = responses.find((r) => r.guestId === guestId)
+      const covering = me ? coveringResponse(responses, me) : own ? { response: own, member: null } : null
+      if (!covering) return
       setEditing(false)
-      fill(r)
-    })
+      if (covering.response.guestId === guestId) {
+        setPrevious(covering.response)
+        fill(covering.response, responses, guests)
+      } else {
+        setCoveredBy(covering)
+        fillFromProche(covering)
+      }
+    })()
     return () => { alive = false }
     // Recharger seulement quand l'invité change (fill ne fait que remplir le formulaire).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guestId])
 
-  function fill(r: RsvpResponse) {
+  /**
+   * Personnes d'une réponse qui en dépendent encore : un membre du foyer qui a répondu depuis (lui-même ou via
+   * un autre proche) n'en fait plus partie, pour ne pas écraser sa réponse en modifiant celle-ci.
+   */
+  function stillCovered(r: RsvpResponse, responses = household.responses, guests = household.guests): RsvpResponse {
+    if (!r.party) return r
+    const [self, ...rest] = r.party
+    const kept = rest.filter((p) => {
+      const g = p.guestId ? guests.find((x) => x.id === p.guestId) : undefined
+      return !g || coveringResponse(responses, g)?.response.id === r.id
+    })
+    return { ...r, party: [self, ...kept] }
+  }
+
+  function fill(response: RsvpResponse, responses = household.responses, guests = household.guests) {
+    const r = stillCovered(response, responses, guests)
     const [self, ...rest] = r.party ?? []
     setFirstName(self?.firstName ?? accountFirst)
     setLastName(self?.lastName ?? accountLast)
     setPresence(fromAttendance(r.attendance))
     setMine(self?.moments ?? {})
-    setOthers(rest.map((p) => ({ ...p, key: newKey(), hasDiet: !!p.diet?.trim(), diet: p.diet ?? "" })))
+    setOthers(rest.map((p) => ({ ...p, key: newKey(), guestId: p.guestId ?? null, hasDiet: !!p.diet?.trim(), diet: p.diet ?? "" })))
     // Anciennes réponses : une seule restriction pour tout le monde, reprise pour la personne qui répond.
     const myDiet = self ? (self.diet ?? "") : (r.dietaryConstraints ?? "")
     setHasDiet(!!myDiet.trim())
@@ -739,24 +811,53 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
     setStep(0)
   }
 
+  /** Formulaire pré-rempli avec la partie de la réponse d'un proche qui concerne l'invité ; il répond pour lui seul. */
+  function fillFromProche({ response: r, member: m }: Covering) {
+    setFirstName(accountFirst || (m?.firstName ?? ""))
+    setLastName(accountLast || (m?.lastName ?? ""))
+    setPresence(fromAttendance(r.attendance))
+    setMine(m?.moments ?? {})
+    setOthers([])
+    setHasDiet(!!m?.diet?.trim())
+    setDietary(m?.diet ?? "")
+    setMessage("")
+    setStep(0)
+  }
+
+  /** Nom de la personne qui a envoyé une réponse (prénom de sa fiche, sinon le nom saisi). */
+  const responderName = (r: RsvpResponse) =>
+    household.guests.find((g) => g.id === r.guestId)?.first_name?.trim() || r.party?.[0]?.firstName || r.name
+
+  // Membres du foyer pas encore dans le formulaire : proposés s'ils n'ont pas répondu (ou si c'est l'invité
+  // lui-même qui les avait inclus), grisés sinon.
+  const suggestions = household.members
+    .filter((g) => !others.some((p) => p.guestId === g.id))
+    .map((g) => {
+      const c = coveringResponse(household.responses, g)
+      return { guest: g, answered: c && c.response.guestId !== guestId ? c.response : null }
+    })
+
+  const addMember = (g: WeddingGuest) =>
+    setOthers((list) => [...list, { key: newKey(), guestId: g.id, ...guestName(g), under10: false, moments: {}, hasDiet: false, diet: "" }])
+
   /** Réponses d'une personne pour tous les moments (un seul moment : la présence globale). */
   const answersOf = (a: Answers): Record<string, MomentAnswer> =>
     Object.fromEntries(moments.map((m) => [m.sequenceId, a[m.sequenceId] ?? (askMoments ? "unsure" : (presence ?? "unsure"))]))
 
   function validate(id: StepId): string | null {
     if (id === "presence") {
-      if (!firstName.trim() || !lastName.trim()) return "Merci d'indiquer ton prénom et ton nom."
-      if (!presence) return "Merci d'indiquer si tu seras présent."
+      if (!firstName.trim() || !lastName.trim()) return E.name
+      if (!presence) return E.presence
     }
-    if (id === "moments" && moments.some((m) => !mine[m.sequenceId])) return "Merci de répondre pour chacun des moments."
+    if (id === "moments" && moments.some((m) => !mine[m.sequenceId])) return E.moments
     if (id === "party") {
       const i = others.findIndex((p) => !p.firstName.trim() || !p.lastName.trim())
-      if (i >= 0) return `Merci d'indiquer le prénom et le nom de la personne ${i + 2}.`
+      if (i >= 0) return E.personName(i + 2)
       const j = others.findIndex((p) => moments.some((m) => !p.moments[m.sequenceId]))
-      if (j >= 0) return `Merci d'indiquer la présence de ${others[j].firstName.trim()} à chacun des moments.`
-      if (hasDiet && !dietary.trim()) return "Merci de préciser tes restrictions alimentaires, ou de décocher la case."
+      if (j >= 0) return E.personMoments(others[j].firstName.trim())
+      if (hasDiet && !dietary.trim()) return E.diet
       const k = others.findIndex((p) => p.hasDiet && !p.diet.trim())
-      if (k >= 0) return `Merci de préciser les restrictions alimentaires de ${others[k].firstName.trim()}, ou de décocher la case.`
+      if (k >= 0) return E.personDiet(others[k].firstName.trim())
     }
     return null
   }
@@ -780,10 +881,10 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
     setError(null)
     const coming = presence !== "no"
     const party: PartyMember[] = coming ? [
-      { firstName: firstName.trim(), lastName: lastName.trim(), under10: false, moments: answersOf(mine), diet: hasDiet && dietary.trim() ? dietary.trim() : null },
+      { firstName: firstName.trim(), lastName: lastName.trim(), under10: false, moments: answersOf(mine), diet: hasDiet && dietary.trim() ? dietary.trim() : null, guestId },
       ...others.map((p) => ({
         firstName: p.firstName.trim(), lastName: p.lastName.trim(), under10: p.under10, moments: answersOf(p.moments),
-        diet: p.hasDiet && p.diet.trim() ? p.diet.trim() : null,
+        diet: p.hasDiet && p.diet.trim() ? p.diet.trim() : null, guestId: p.guestId ?? null,
       })),
     ] : []
     // Récapitulatif des restrictions (colonne existante, lue par l'onglet Réponses) : « Prénom Nom : … ».
@@ -806,10 +907,12 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
         message: message.trim() || null,
       }, RSVP_TABLE)
       setPrevious(saved)
+      setCoveredBy(null)
+      setHousehold((h) => ({ ...h, responses: [saved, ...h.responses] }))
       setEditing(false)
       scrollToId("reponse")
     } catch {
-      setError("L'envoi n'a pas abouti. Merci de réessayer.")
+      setError(E.send)
     } finally {
       setLoading(false)
     }
@@ -818,20 +921,24 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
   const updateOther = (key: string, patch: Partial<Person>) => setOthers((list) => list.map((p) => (p.key === key ? { ...p, ...patch } : p)))
 
   return (
-    <Section id="reponse" eyebrow="Confirmation de présence" title="Seras-tu des nôtres ?" narrow picto="enveloppe" decor={
+    <Section id="reponse" eyebrow={UI.sections.reponse.eyebrow} title={UI.sections.reponse.title} narrow picto="enveloppe" decor={
       <Deco className="-right-6 -top-10 w-32 sm:-right-12 sm:-top-14 sm:w-48"><FlowerCluster flip kind="coin-hortensia" className="w-full" /></Deco>
     }>
       <div className="-mt-4 mb-10 space-y-3 text-center text-sm leading-relaxed" style={muted}>
         <p><T>{RSVP.intro}</T></p>
-        <p>Merci de nous répondre avant le <strong style={{ color: "#2e2a25" }}>{RSVP.deadline}</strong>.</p>
+        <p>{UI.rsvp.before} <strong style={{ color: "#2e2a25" }}>{RSVP.deadline}</strong>.</p>
       </div>
 
       {previous && !editing ? (
-        <PreviousAnswer response={previous} moments={moments} onEdit={() => { fill(previous); setEditing(true) }} />
+        <PreviousAnswer response={stillCovered(previous)} moments={moments} onEdit={() => { fill(previous); setEditing(true) }} />
+      ) : coveredBy && !editing ? (
+        <PreviousAnswer response={{ ...coveredBy.response, party: coveredBy.member ? [coveredBy.member] : coveredBy.response.party }} moments={moments}
+          title={UI.rsvp.answeredFor(responderName(coveredBy.response))} note={UI.rsvp.answeredForNote} editLabel={UI.rsvp.answerMyself}
+          onEdit={() => { fillFromProche(coveredBy); setEditing(true) }} />
       ) : (
         <form onSubmit={submit} noValidate className="text-left">
           {/* Étapes */}
-          <ol className="mb-10 flex items-center gap-2" aria-label="Étapes du formulaire">
+          <ol className="mb-10 flex items-center gap-2" aria-label={UI.rsvp.stepsAria}>
             {steps.map((id, i) => (
               <li key={id} className="flex flex-1 flex-col items-center gap-1.5 text-center" aria-current={i === step ? "step" : undefined}>
                 <span className="h-0.5 w-full" style={{ background: i <= step ? MATTE_GOLD : "#e5dfd5" }} />
@@ -841,7 +948,7 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
               </li>
             ))}
           </ol>
-          <p className="sr-only" aria-live="polite">Étape {step + 1} sur {steps.length} : {RSVP.steps[current]}</p>
+          <p className="sr-only" aria-live="polite">{UI.rsvp.stepStatus(step + 1, steps.length, RSVP.steps[current])}</p>
 
           <div className="space-y-10">
             {current === "presence" && (
@@ -849,13 +956,13 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
                 <Question label={RSVP.name.label} help={RSVP.name.help} required group>
                   {/* Nom déjà connu (compte de l'invité) : en lecture seule, le cadenas permet de le modifier. */}
                   <div className="relative grid gap-4 pr-10 sm:grid-cols-2">
-                    {([["Prénom", firstName, setFirstName, "given-name"], ["Nom", lastName, setLastName, "family-name"]] as const).map(([text, value, set, auto], i) => (
+                    {([[UI.rsvp.firstName, firstName, setFirstName, "given-name"], [UI.rsvp.lastName, lastName, setLastName, "family-name"]] as const).map(([text, value, set, auto], i) => (
                       <input key={text} ref={i === 0 ? nameRef : undefined} value={value} onChange={(e) => set(e.target.value)} placeholder={text} aria-label={text}
                         autoComplete={auto} readOnly={nameLocked} aria-readonly={nameLocked || undefined}
                         className={`${field} ${nameLocked ? "cursor-default" : ""}`} style={{ ...fieldStyle, color: nameLocked ? "var(--p-muted)" : undefined }} />
                     ))}
                     <button type="button" onClick={() => { setNameLocked((v) => !v); if (nameLocked) requestAnimationFrame(() => nameRef.current?.focus()) }}
-                      aria-label={nameLocked ? "Modifier le nom" : "Verrouiller le nom"} title={nameLocked ? "Modifier le nom" : "Verrouiller le nom"}
+                      aria-label={nameLocked ? UI.rsvp.unlockName : UI.rsvp.lockName} title={nameLocked ? UI.rsvp.unlockName : UI.rsvp.lockName}
                       className="absolute right-0 top-1 flex size-8 items-center justify-center transition-colors hover:text-[#a8844f]"
                       style={{ color: nameLocked ? "var(--p-muted)" : MATTE_GOLD }}>
                       {nameLocked ? <Lock className="size-4" aria-hidden /> : <LockOpen className="size-4" aria-hidden />}
@@ -882,14 +989,14 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
             {current === "party" && (
               <Question label={RSVP.party.label} help={RSVP.party.help} group>
                 <p className="mb-5 text-center text-sm" role="status" style={{ color: MATTE_GOLD }}>
-                  <strong className="text-2xl font-normal" style={heading}>{count}</strong> personne{count > 1 ? "s" : ""} au total, toi compris
-                  {others.some((p) => p.under10) && ` · dont ${others.filter((p) => p.under10).length} de moins de 10 ans`}
+                  <strong className="text-2xl font-normal" style={heading}>{count}</strong> {UI.rsvp.total(count)}
+                  {others.some((p) => p.under10) && UI.rsvp.under10Count(others.filter((p) => p.under10).length)}
                 </p>
                 <div className="space-y-5">
                   {/* La personne qui répond : ses restrictions alimentaires. */}
                   <div className="border p-4 sm:p-5" style={{ borderColor: "#e5dfd5", borderRadius: "var(--p-radius)" }}>
                     <div className="mb-3 flex items-baseline justify-between gap-3">
-                      <span className="text-[10.5px] uppercase tracking-[0.16em]" style={muted}>Toi</span>
+                      <span className="text-[10.5px] uppercase tracking-[0.16em]" style={muted}>{UI.rsvp.you}</span>
                       <span className="text-lg" style={heading}>{firstName} {lastName}</span>
                     </div>
                     <DietField id="rsvp-diet-0" label={RSVP.dietary.checkSelf} checked={hasDiet} value={dietary}
@@ -899,23 +1006,28 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
                   {others.map((p, i) => (
                     <div key={p.key} className="border p-4 sm:p-5" style={{ borderColor: "#e5dfd5", borderRadius: "var(--p-radius)" }}>
                       <div className="mb-3 flex items-center justify-between">
-                        <span className="text-[10.5px] uppercase tracking-[0.16em]" style={muted}>Personne {i + 2}</span>
+                        <span className="text-[10.5px] uppercase tracking-[0.16em]" style={muted}>{UI.rsvp.person(i + 2)}</span>
                         <button type="button" className="text-xs underline" style={muted}
-                          onClick={() => setOthers((list) => list.filter((x) => x.key !== p.key))}>Retirer</button>
+                          onClick={() => setOthers((list) => list.filter((x) => x.key !== p.key))}>{UI.rsvp.remove}</button>
                       </div>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <input value={p.firstName} onChange={(e) => updateOther(p.key, { firstName: e.target.value })} placeholder="Prénom"
-                          aria-label={`Prénom de la personne ${i + 2}`} className={field} style={fieldStyle} />
-                        <input value={p.lastName} onChange={(e) => updateOther(p.key, { lastName: e.target.value })} placeholder="Nom"
-                          aria-label={`Nom de la personne ${i + 2}`} className={field} style={fieldStyle} />
-                      </div>
+                      {p.guestId ? (
+                        // Membre du foyer : nom repris de la liste.
+                        <p className="text-lg" style={heading}>{p.firstName} {p.lastName}</p>
+                      ) : (
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <input value={p.firstName} onChange={(e) => updateOther(p.key, { firstName: e.target.value })} placeholder={UI.rsvp.firstName}
+                            aria-label={UI.rsvp.firstNameOf(i + 2)} className={field} style={fieldStyle} />
+                          <input value={p.lastName} onChange={(e) => updateOther(p.key, { lastName: e.target.value })} placeholder={UI.rsvp.lastName}
+                            aria-label={UI.rsvp.lastNameOf(i + 2)} className={field} style={fieldStyle} />
+                        </div>
+                      )}
                       <label className="mt-4 flex cursor-pointer items-center gap-2.5 text-sm">
                         <input type="checkbox" checked={p.under10} onChange={(e) => updateOther(p.key, { under10: e.target.checked })}
                           className="size-4" style={{ accentColor: MATTE_GOLD }} />
                         {RSVP.party.under10}
                       </label>
                       <div className="mt-3">
-                        <DietField id={`rsvp-diet-${p.key}`} label={`${p.firstName.trim() || "Cette personne"} ${RSVP.dietary.checkOther.toLowerCase()}`}
+                        <DietField id={`rsvp-diet-${p.key}`} label={`${p.firstName.trim() || UI.rsvp.thisPerson} ${RSVP.dietary.checkOther.toLowerCase()}`}
                           checked={p.hasDiet} value={p.diet}
                           onCheck={(v) => updateOther(p.key, { hasDiet: v })} onChange={(v) => updateOther(p.key, { diet: v })} />
                       </div>
@@ -926,6 +1038,30 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
                       </div>
                     </div>
                   ))}
+                  {suggestions.length > 0 && (
+                    <div className="text-center">
+                      <p className="mb-2.5 text-xs uppercase tracking-[0.16em]" style={muted}>{UI.rsvp.household}</p>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {suggestions.map(({ guest: g, answered }) => {
+                          const n = guestName(g)
+                          return answered ? (
+                            <span key={g.id} className="border border-dashed px-3 py-1.5 text-sm" style={{ borderColor: "#d8d2c8", color: "var(--p-muted)", borderRadius: "var(--p-radius)" }}>
+                              {n.firstName} {n.lastName}
+                              <span className="ml-1.5 text-xs italic">
+                                · {answered.guestId === g.id ? UI.rsvp.alreadyAnswered : UI.rsvp.answeredBy(responderName(answered))}
+                              </span>
+                            </span>
+                          ) : (
+                            <button key={g.id} type="button" onClick={() => addMember(g)}
+                              className="border px-3 py-1.5 text-sm transition-colors hover:bg-[#a8844f]/10"
+                              style={{ borderColor: MATTE_GOLD, color: MATTE_GOLD, borderRadius: "var(--p-radius)" }}>
+                              + {n.firstName} {n.lastName}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                   <div className="text-center">
                     <button type="button" className={button} style={buttonStyle}
                       onClick={() => setOthers((list) => [...list, { key: newKey(), firstName: "", lastName: lastName.trim(), under10: false, moments: {}, hasDiet: false, diet: "" }])}>
@@ -939,7 +1075,7 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
             {current === "word" && (
               <>
                 <Question id="rsvp-msg" label={RSVP.message.label} help={RSVP.message.help}>
-                  <textarea id="rsvp-msg" rows={3} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Ton message"
+                  <textarea id="rsvp-msg" rows={3} value={message} onChange={(e) => setMessage(e.target.value)} placeholder={UI.rsvp.messagePlaceholder}
                     className={`${field} resize-y`} style={fieldStyle} />
                 </Question>
               </>
@@ -951,15 +1087,16 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             {step > 0 && (
               <button type="button" className="px-4 py-3 text-xs uppercase tracking-[0.24em] underline-offset-4 hover:underline" style={muted} onClick={() => go(-1)}>
-                Précédent
+                {UI.rsvp.previous}
               </button>
             )}
             <button type="submit" disabled={loading} className={button} style={buttonStyle}>
-              {isLast ? (loading ? "Envoi…" : "Envoyer ma réponse") : "Suivant"}
+              {isLast ? (loading ? UI.rsvp.sending : UI.rsvp.send) : UI.rsvp.next}
             </button>
-            {previous && (
-              <button type="button" className="text-xs underline" style={muted} onClick={() => { fill(previous); setEditing(false) }}>
-                Annuler
+            {(previous || coveredBy) && (
+              <button type="button" className="text-xs underline" style={muted}
+                onClick={() => { if (previous) fill(previous); else if (coveredBy) fillFromProche(coveredBy); setEditing(false) }}>
+                {UI.rsvp.cancel}
               </button>
             )}
           </div>
@@ -973,6 +1110,7 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
 function DietField({ id, label: text, checked, value, onCheck, onChange }: {
   id: string; label: string; checked: boolean; value: string; onCheck: (v: boolean) => void; onChange: (v: string) => void
 }) {
+  const { RSVP, UI } = useContent()
   return (
     <div>
       <label className="flex cursor-pointer items-center gap-2.5 text-sm">
@@ -981,8 +1119,8 @@ function DietField({ id, label: text, checked, value, onCheck, onChange }: {
         {text}
       </label>
       {checked && (
-        <textarea id={id} rows={2} value={value} onChange={(e) => onChange(e.target.value)} autoFocus aria-label={`${text} : précisions`}
-          placeholder={`${RSVP.dietary.help} Ex. : allergie aux fruits à coque`} className={`${field} mt-2 resize-y`} style={fieldStyle} />
+        <textarea id={id} rows={2} value={value} onChange={(e) => onChange(e.target.value)} autoFocus aria-label={`${text} : ${UI.rsvp.dietDetails}`}
+          placeholder={`${RSVP.dietary.help} ${UI.rsvp.dietExample}`} className={`${field} mt-2 resize-y`} style={fieldStyle} />
       )}
     </div>
   )
@@ -996,6 +1134,7 @@ function MomentAnswers({ moments, value, onChange, onChangeAll, compact = false 
   onChangeAll: (answer: MomentAnswer) => void
   compact?: boolean
 }) {
+  const { RSVP } = useContent()
   return (
     <div className={compact ? "space-y-3" : "space-y-5"}>
       {moments.length > 1 && (
@@ -1039,25 +1178,30 @@ function MomentAnswers({ moments, value, onChange, onChangeAll, compact = false 
 }
 
 /** Réponse déjà envoyée : résumé par personne et par moment. */
-function PreviousAnswer({ response: r, moments, onEdit }: { response: RsvpResponse; moments: (Moment & { day: string })[]; onEdit: () => void }) {
+function PreviousAnswer({ response: r, moments, onEdit, title: customTitle, note, editLabel }: {
+  response: RsvpResponse; moments: (Moment & { day: string })[]; onEdit: () => void
+  /** Réponse envoyée par un proche : titre, explication et bouton propres. */
+  title?: string; note?: string; editLabel?: string
+}) {
+  const { RSVP, UI } = useContent()
   const presence = fromAttendance(r.attendance)
   const party = r.party ?? []
-  const title = { yes: "Merci, à très bientôt !", no: "Merci de nous avoir répondu.", unsure: "Merci, tiens-nous au courant !" }[presence]
+  const title = customTitle ?? UI.rsvp.done[presence]
   return (
     <div className="border p-6 text-center sm:p-8" style={{ borderColor: MATTE_GOLD }} role="status">
       <p className="text-3xl" style={heading}>{title}</p>
       <p className="mt-4 text-sm leading-relaxed" style={muted}>
-        Réponse enregistrée le {new Date(r.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} :{" "}
+        {UI.rsvp.savedOn(new Date(r.createdAt).toLocaleDateString(UI.locale, { day: "numeric", month: "long", year: "numeric" }))}{" "}
         {RSVP.attendance[presence].toLowerCase()}
-        {presence !== "no" && party.length > 0 && ` · ${party.length} personne${party.length > 1 ? "s" : ""}`}.
+        {presence !== "no" && party.length > 0 && ` · ${UI.rsvp.people(party.length)}`}.
       </p>
       {presence !== "no" && party.length > 0 && moments.length > 0 && (
         <ul className="mx-auto mt-5 max-w-md space-y-3 text-left text-sm">
           {party.map((p, i) => (
             <li key={i}>
               <span style={heading} className="text-lg">{p.firstName} {p.lastName}</span>
-              {p.under10 && <span className="ml-2 text-xs" style={muted}>moins de 10 ans</span>}
-              {p.diet && <span className="block text-xs italic" style={muted}>Restrictions : {p.diet}</span>}
+              {p.under10 && <span className="ml-2 text-xs" style={muted}>{UI.rsvp.under10}</span>}
+              {p.diet && <span className="block text-xs italic" style={muted}>{UI.rsvp.restrictions} {p.diet}</span>}
               <span className="block text-xs leading-relaxed" style={muted}>
                 {moments.map((m) => `${m.title} : ${RSVP.answers[p.moments[m.sequenceId] ?? "unsure"].toLowerCase()}`).join(" · ")}
               </span>
@@ -1065,8 +1209,9 @@ function PreviousAnswer({ response: r, moments, onEdit }: { response: RsvpRespon
           ))}
         </ul>
       )}
+      {note && <p className="mx-auto mt-5 max-w-md text-xs italic leading-relaxed" style={muted}>{note}</p>}
       <button type="button" className="mt-6 text-xs underline" style={muted} onClick={onEdit}>
-        Modifier ma réponse
+        {editLabel ?? UI.rsvp.edit}
       </button>
     </div>
   )
@@ -1111,8 +1256,9 @@ function Choice({ selected, onClick, children }: { selected: boolean; onClick: (
 const script = { fontFamily: "'Nickainley', var(--p-heading)", color: MATTE_GOLD }
 
 function ThanksSection() {
+  const { THANKS, UI } = useContent()
   return (
-    <section aria-label="Merci" className="px-4 pb-6 pt-14 sm:pt-20">
+    <section aria-label={UI.thanks.aria} className="px-4 pb-6 pt-14 sm:pt-20">
       <div className="relative mx-auto max-w-sm sm:max-w-md">
         {/* Ruban derrière le polaroïd et le mot (pas de z-index), comme posé dessous. */}
         <Reveal from="up" delay={200} className="pointer-events-none absolute -right-8 -top-6 h-[96%] sm:-right-24"><Ribbon className="h-full w-auto" /></Reveal>
@@ -1136,14 +1282,16 @@ function ThanksSection() {
 // ── Pied de page ──────────────────────────────────────────────────────────────
 
 function Footer() {
+  const { UI } = useContent()
   const { member, signOut } = useGalleryAuth()
   return (
     <footer className="px-6 pb-12 pt-6 text-center">
       <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs" style={muted}>
-        <Link to={INVITATION_ROUTES.opened} className="underline">Revoir la lettre</Link>
-        {member?.role === "admin" && <Link to={INVITATION_ROUTES.admin} className="underline">Administration</Link>}
-        <button type="button" className="underline" onClick={() => void signOut()}>Se déconnecter</button>
+        <Link to={INVITATION_ROUTES.opened} className="underline">{UI.footer.letter}</Link>
+        {member?.role === "admin" && <Link to={INVITATION_ROUTES.admin} className="underline">{UI.common.admin}</Link>}
+        <button type="button" className="underline" onClick={() => void signOut()}>{UI.common.signOut}</button>
       </div>
+      <LangSwitch className="mt-4 justify-center" />
     </footer>
   )
 }

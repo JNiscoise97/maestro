@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { ExternalLink, FlaskConical, Search } from "lucide-react"
 
@@ -81,8 +81,7 @@ function statusIn(coverage: Map<string, Coverage>, guestId: string, momentId?: s
   return "yes"
 }
 
-/** Personnes d'une réponse (formulaire par étapes), ou à défaut son nombre de personnes. */
-const partyOf = (r: RsvpResponse) => r.party ?? []
+/** Nombre de personnes d'une réponse : ses personnes (formulaire par étapes), ou à défaut le nombre indiqué. */
 const peopleOf = (r: RsvpResponse) => (r.party ? r.party.length : (r.partySize ?? r.adults ?? 1))
 
 function formatDate(iso: string) {
@@ -127,6 +126,20 @@ export function InvitationEnLigneTab() {
     [responses, demoResponses],
   )
 
+  // Invité de la liste correspondant à une personne d'une réponse : par sa fiche, sinon par nom unique.
+  const memberGuestId = useMemo(() => {
+    const byName = new Map<string, Guest[]>()
+    for (const g of guests) {
+      const k = normalize(`${g.firstName}${g.lastName}`)
+      byName.set(k, [...(byName.get(k) ?? []), g])
+    }
+    return (m: PartyMember): string | null => {
+      if (m.guestId && guestById.has(m.guestId)) return m.guestId
+      const found = byName.get(normalize(`${m.firstName}${m.lastName}`))
+      return found?.length === 1 ? found[0].id : null
+    }
+  }, [guests, guestById])
+
   const coverage = useMemo(() => {
     const byName = new Map<string, Guest[]>()
     for (const g of guests) {
@@ -138,11 +151,12 @@ export function InvitationEnLigneTab() {
     for (const r of invitationResponses) {
       const self = r.guestId ? guestById.get(r.guestId) : undefined
       if (r.party?.length) {
-        // Formulaire par étapes : la première personne est celle qui répond ; les autres, par prénom + nom.
+        // Formulaire par étapes : la première personne est celle qui répond ; les autres, par leur fiche
+        // (membres du foyer proposés), sinon par prénom + nom.
         cover(self?.id, { response: r, via: "self", member: r.party[0] })
         for (const m of r.party.slice(self ? 1 : 0)) {
-          const found = byName.get(normalize(`${m.firstName}${m.lastName}`))
-          if (found?.length === 1) cover(found[0].id, { response: r, via: "party", member: m })
+          const id = memberGuestId(m)
+          if (id) cover(id, { response: r, via: "party", member: m })
         }
         continue
       }
@@ -155,7 +169,15 @@ export function InvitationEnLigneTab() {
       }
     }
     return map
-  }, [invitationResponses, guests, guestById])
+  }, [invitationResponses, guests, guestById, memberGuestId])
+
+  // Personnes d'une réponse qui en dépendent encore : un membre qui a répondu depuis (lui-même ou via un proche)
+  // est compté avec cette réponse plus récente, pas deux fois.
+  const activeParty = useCallback((r: RsvpResponse) => (r.party ?? []).filter((m, i) => {
+    const id = i === 0 && r.guestId ? r.guestId : memberGuestId(m)
+    return !id || !coverage.has(id) || coverage.get(id)!.response.id === r.id
+  }), [coverage, memberGuestId])
+  const peopleIn = useCallback((r: RsvpResponse) => (r.party ? activeParty(r).length : peopleOf(r)), [activeParty])
 
   const knownNames = useMemo(() => new Set(guests.map((g) => normalize(`${g.firstName}${g.lastName}`))), [guests])
 
@@ -171,10 +193,10 @@ export function InvitationEnLigneTab() {
     // Réponses retenues : la plus récente de chaque invité qui répond (les anciennes versions sont ignorées).
     const kept = invitationResponses.filter((r) => !r.guestId || coverage.get(r.guestId)?.response.id === r.id)
     t.responses = kept.length
-    t.people = kept.filter((r) => !isNo(r)).reduce((n, r) => n + peopleOf(r), 0)
-    t.under10 = kept.filter((r) => !isNo(r)).reduce((n, r) => n + partyOf(r).filter((m) => m.under10).length, 0)
+    t.people = kept.filter((r) => !isNo(r)).reduce((n, r) => n + peopleIn(r), 0)
+    t.under10 = kept.filter((r) => !isNo(r)).reduce((n, r) => n + activeParty(r).filter((m) => m.under10).length, 0)
     return t
-  }, [invited, coverage, invitationResponses])
+  }, [invited, coverage, invitationResponses, peopleIn, activeParty])
 
   const byMoment: MomentStat[] = useMemo(() => MOMENTS.map((m) => {
     const guestsOfMoment = invited.filter((g) => (assigned[g.id] ?? []).includes(m.id))
@@ -189,14 +211,15 @@ export function InvitationEnLigneTab() {
       if (!c || counted.has(c.response.id) || isNo(c.response)) continue
       counted.add(c.response.id)
       if (c.response.party) {
-        people += c.response.party.filter((p) => p.moments[m.id] === "yes").length
-        maybe += c.response.party.filter((p) => p.moments[m.id] === "unsure").length
+        const party = activeParty(c.response)
+        people += party.filter((p) => p.moments[m.id] === "yes").length
+        maybe += party.filter((p) => p.moments[m.id] === "unsure").length
       } else if (statusIn(coverage, g.id, m.id) === "yes") people += peopleOf(c.response)
       else if (statusIn(coverage, g.id, m.id) === "unsure") maybe += peopleOf(c.response)
     }
     const seq = sequences.find((s) => s.id === m.id)
     return { ...m, color: seq ? sequenceColor(seq) : "#9ca3af", invited: guestsOfMoment.length, ...counts, people, maybe }
-  }), [invited, assigned, coverage, sequences])
+  }), [invited, assigned, coverage, sequences, activeParty])
 
   const byList: Slice[] = useMemo(() => PROSPECT_LISTS.map((l) => ({
     key: l.value, label: l.label, color: LIST_COLORS[l.value] ?? "#9ca3af",
@@ -503,6 +526,7 @@ function GuestRow({ guest: g, coverage: c, assigned, status, momentStatus, respo
           {g.isChild && <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">Enfant</span>}
         </div>
         <NameInput guest={g} />
+        <LanguageToggle guest={g} />
       </div>
       <div className="space-y-1 text-sm">
         <p className="flex flex-wrap gap-1">
@@ -572,6 +596,29 @@ function Progress({ yes, no, unsure, total }: { yes: number; no: number; unsure:
       <span className="bg-emerald-500" style={{ width: pct(yes) }} />
       <span className="bg-muted-foreground/30" style={{ width: pct(no) }} />
       <span className="bg-sky-500/60" style={{ width: pct(unsure) }} />
+    </div>
+  )
+}
+
+/** Langue de l'invitation en ligne (FR par défaut) : enregistrée au clic. */
+function LanguageToggle({ guest }: { guest: Guest }) {
+  const update = useUpdateGuest()
+  const current = guest.invitationLanguage ?? "fr"
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Langue de l'invitation</span>
+      <div className="inline-flex overflow-hidden rounded-md border" role="radiogroup" aria-label={`Langue de l'invitation de ${guest.firstName} ${guest.lastName}`}>
+        {(["fr", "en"] as const).map((l) => (
+          <button key={l} type="button" role="radio" aria-checked={current === l}
+            className={cn("px-2 py-0.5 text-[11px] font-medium uppercase", current === l ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+            onClick={() => {
+              if (l === current) return
+              update.mutate({ id: guest.id, patch: { invitationLanguage: l === "fr" ? null : l } }, { onError: () => toast.error("Langue non enregistrée.") })
+            }}>
+            {l}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

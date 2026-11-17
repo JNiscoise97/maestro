@@ -44,6 +44,8 @@ export interface PartyMember {
   moments: Record<string, MomentAnswer>
   /** Allergies ou restrictions alimentaires (null : aucune). */
   diet?: string | null
+  /** Invité de la liste (la personne qui répond, ou un membre de son foyer proposé) ; absent : nom saisi librement. */
+  guestId?: string | null
 }
 
 export interface RsvpInput {
@@ -224,6 +226,24 @@ export const rsvpService = {
     const rows = (await mockRsvp.getAll()).filter((r) => r.guest_id === guestId && r.wave === "invitation")
     rows.sort((a, b) => b.created_at.localeCompare(a.created_at))
     return rows[0] ? rowToRsvp(rows[0]) : null
+  },
+
+  /** Réponses « invitation » envoyées par ces invités (ex. les membres d'un foyer), la plus récente d'abord. */
+  async listForGuests(guestIds: string[], table = tbl("rsvp_responses")): Promise<RsvpResponse[]> {
+    if (guestIds.length === 0) return []
+    if (USE_SUPABASE) {
+      const { data, error } = await (supabase! as any)
+        .from(table as any)
+        .select("*")
+        .in("guest_id", guestIds)
+        .eq("wave", "invitation")
+        .order("created_at", { ascending: false })
+      if (error) return []
+      return ((data ?? []) as RsvpRow[]).map(rowToRsvp)
+    }
+    const rows = (await mockRsvp.getAll()).filter((r) => r.guest_id && guestIds.includes(r.guest_id) && r.wave === "invitation")
+    rows.sort((a, b) => b.created_at.localeCompare(a.created_at))
+    return rows.map(rowToRsvp)
   },
 
   async list(): Promise<RsvpResponse[]> {

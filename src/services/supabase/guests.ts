@@ -68,6 +68,7 @@ function toGuest(row: {
   paper_sent: boolean
   postal_address: string | null
   invitation_name?: string | null
+  invitation_language?: "fr" | "en" | null
   household_id?: string | null
 }): Guest {
   return {
@@ -132,6 +133,7 @@ function toGuest(row: {
     paperSent: row.paper_sent,
     postalAddress: row.postal_address,
     invitationName: row.invitation_name ?? null,
+    invitationLanguage: row.invitation_language ?? null,
     householdId: row.household_id ?? null,
   }
 }
@@ -237,6 +239,7 @@ export const guestsSupabaseService: GuestsService = {
       paper_sent: boolean
       postal_address: string | null
       invitation_name: string | null
+      invitation_language: "fr" | "en" | null
       household_id: string | null
     }> = {}
     if (patch.groupId !== undefined) row.group_id = patch.groupId
@@ -295,6 +298,7 @@ export const guestsSupabaseService: GuestsService = {
     if (patch.paperSent !== undefined) row.paper_sent = patch.paperSent
     if (patch.postalAddress !== undefined) row.postal_address = patch.postalAddress ?? null
     if (patch.invitationName !== undefined) row.invitation_name = patch.invitationName ?? null
+    if (patch.invitationLanguage !== undefined) row.invitation_language = patch.invitationLanguage ?? null
     if (patch.householdId !== undefined) row.household_id = patch.householdId ?? null
     if (Object.keys(row).length > 0) {
       const { error } = await (db as any).from(tbl("guests") as any).update(row).eq("id", id)

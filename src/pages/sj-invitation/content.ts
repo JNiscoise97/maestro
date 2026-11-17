@@ -156,25 +156,34 @@ export const AMBIANCE = {
   days: [
     {
       date: "2027-06-25", mood: "Solennelle et chic",
-      text: "Pour le « oui » officiel et le goûter d'honneur, une ambiance cocktail : robe, costume ou tenue habillée.",
+      text: "Pour {moments}, une ambiance cocktail : robe, costume ou tenue habillée.",
+      moments: { "443599cb-aec3-4071-9e55-5af87663ca58": "le « oui » officiel", "579716f5-2616-4dc0-ba77-133ed8826510": "le goûter d'honneur" },
       tenues: ["cocktail-courte"],
     },
     {
       date: "2027-06-26", mood: "Détente",
-      text: "Pique-nique et soirée jeux : une tenue décontractée, dans laquelle tu te sens à l'aise.",
+      text: "Pour {moments}, une tenue décontractée, dans laquelle tu te sens à l'aise.",
+      moments: { "52990fa4-fc1e-4b99-b51d-50b1efef38a9": "le pique-nique", "5347d0f2-31b0-4e69-9a8f-f6f3d10c0969": "la soirée jeux" },
       tenues: ["detente"],
     },
     {
       date: "2027-06-27", mood: "Indienne",
-      text: "Pour le Nikkah, une tenue indienne si tu le souhaites : sari, lehenga, kurta…",
+      text: "Pour {moments}, une tenue indienne si tu le souhaites : sari, lehenga, kurta…",
+      moments: { "493c6164-7ff2-4c87-a037-b59c6bcfe008": "le Nikkah" },
       tenues: ["indienne-sari"],
     },
     {
       date: "2027-06-28", mood: "Élégante et festive",
       text: "Nous imaginons une ambiance élégante et festive, qui mêlera des influences gujaraties, malgaches, réunionnaises et guadeloupéennes. Les tenues traditionnelles ou inspirées de tes origines sont les bienvenues, sans être obligatoires : costume, robe élégante, sari, kurta, lamba, tenue créole ou tenue de soirée.",
-      tenues: ["creole-fleurie", "cocktail-courte", "indienne-lehenga", "cocktail-drapee", "creole-madras", "cocktail-longue", "malgache-lamba"],
+      tenues: ["creole-fleurie", "indienne-lehenga", "cocktail-drapee", "creole-madras", "malgache-lamba"],
     },
-  ] as { date: string; mood: string; text: string; note?: string; tenues: Tenue[] }[],
+  ] as {
+    date: string; mood: string
+    /** « {moments} » = moments du jour auxquels l'invité est convié, d'après `moments` (« le pique-nique et la soirée jeux »). */
+    text: string
+    moments?: Record<string, string>
+    note?: string; tenues: Tenue[]
+  }[],
 }
 
 // ── 5. Le cortège (facultatif : mettre show à false pour masquer la section) ───
@@ -200,11 +209,26 @@ export const TRAVEL = {
     { title: "En avion", text: "Aéroport Montpellier Méditerranée, à une vingtaine de minutes du centre en navette ou en taxi." },
     { title: "En voiture", text: "Les lieux sont répartis autour de Montpellier : une voiture facilite les déplacements. Le **covoiturage** entre invités est vivement encouragé." },
   ],
-  /** Hébergements conseillés. */
+  /**
+   * Hébergements conseillés. « {lieux} » = lieux de `places` où l'invité est convié (« la mairie et l'église ») ;
+   * s'il n'est convié à aucun, `fallback` s'affiche à la place de `details`.
+   */
   stays: [
-    { name: "Centre-ville de Montpellier", details: "Le plus pratique pour la mairie et l'église, avec de nombreux hôtels et locations.", url: "" },
-    { name: "Quartier Odysseum et Port Marianne", details: "Proche des grands axes, pratique pour rejoindre les lieux situés hors de la ville.", url: "" },
-  ],
+    {
+      name: "Centre-ville de Montpellier",
+      details: "Le plus pratique pour {lieux}, avec de nombreux hôtels et locations.",
+      fallback: "Au cœur de la ville, avec de nombreux hôtels et locations.",
+      places: { mairie: "la mairie", eglise: "l'église" },
+      url: "",
+    },
+    {
+      name: "Quartier Odysseum et Port Marianne",
+      details: "Proche des grands axes et {lieux}, pratique pour rejoindre les lieux situés hors de la ville.",
+      fallback: "Proche des grands axes, pratique pour rejoindre les lieux situés hors de la ville.",
+      places: { doppio: "du Doppio Malto" },
+      url: "",
+    },
+  ] as { name: string; details: string; fallback: string; places: Record<string, string>; url: string }[],
 }
 
 // ── 7. Liste de mariage ───────────────────────────────────────────────────────
@@ -277,4 +301,126 @@ export const THANKS = {
   text: "Ta présence rendra notre mariage encore plus beau. Nous avons tellement hâte de vivre ces moments avec toi.",
   closing: "Avec tout notre amour,",
   signature: "Sarah & Jordan",
+}
+
+// ── Textes d'interface (boutons, formulaire, enveloppe, messages) ─────────────
+// Même structure dans content-en.ts (version anglaise).
+
+export const UI = {
+  subtitle: "Mariage · juin 2027",
+  common: {
+    loading: "Chargement…",
+    signOut: "Se déconnecter",
+    admin: "Administration",
+    unavailable: "Invitation indisponible",
+    missingConfig: "Configuration Supabase manquante.",
+    notFound: "Page introuvable",
+    accountMissing: "Compte introuvable",
+    accountMissingText: "Ton accès n'est pas (ou plus) actif.",
+    suspended: "Accès suspendu",
+    suspendedText: "Ton compte a été désactivé. Contacte Sarah ou Jordan si besoin.",
+    and: "et",
+    langLabel: "Langue",
+  },
+  landing: { cta: "Accéder à mon invitation" },
+  envelope: {
+    open: "Ouvrir l'enveloppe",
+    letterFor: (name: string) => `Une lettre pour ${name || "toi"}`,
+    hello: (name: string) => `Bonjour ${name || "à toi"},`,
+    /** **texte** = en gras. */
+    letter: [
+      "Nous avons la joie de t'inviter à notre mariage, le **lundi 28 juin 2027** à **Montpellier**.",
+      "Sur ce site, tu trouveras le déroulé des festivités et tout ce qu'il faut savoir pour profiter pleinement de ce moment avec nous.",
+    ],
+    close: "Refermer l'enveloppe",
+    discover: "Découvrir l'invitation",
+  },
+  nav: {
+    aria: "Rubriques de l'invitation",
+    invitation: "Invitation", mot: "Un mot", programme: "Programme", lieux: "Lieux", ambiance: "Tenues",
+    cortege: "Cortège", venir: "Venir & dormir", liste: "Liste", faq: "Questions", reply: "Répondre",
+  },
+  hero: {
+    intro: (first: string) => (first ? `${first}, voici tout ce qu'il faut savoir sur notre mariage.` : "Voici tout ce qu'il faut savoir sur notre mariage."),
+    reply: "Répondre à l'invitation",
+  },
+  preview: { label: "Aperçu administrateur", all: "Tout le programme" },
+  sections: {
+    invitation: { eyebrow: "Faire-part", title: "L'invitation" },
+    mot: { eyebrow: "De tout cœur", title: "Un mot de nous" },
+    programme: { eyebrow: "Programme", title: "Le programme", loadingTitle: "Ton programme", loading: "Chargement de ton programme…" },
+    lieux: { eyebrow: "Où nous retrouver", title: "Les lieux" },
+    ambiance: { eyebrow: "Ambiance & tenues", title: "Comment s'habiller ?" },
+    cortege: { eyebrow: "À nos côtés", title: "Le cortège" },
+    venir: { eyebrow: "Infos pratiques", title: "Venir & se loger" },
+    liste: { eyebrow: "Si le cœur t'en dit", title: "Liste de mariage" },
+    faq: { eyebrow: "Tes questions", title: "Questions fréquentes" },
+    reponse: { eyebrow: "Confirmation de présence", title: "Seras-tu des nôtres ?" },
+  },
+  programme: {
+    days: ["", "Un jour", "Deux jours", "Trois jours", "Quatre jours"],
+    dress: "Tenue :",
+    limited: "Places limitées",
+  },
+  places: { directions: "Itinéraire", mapAria: "Plan des lieux autour de Montpellier" },
+  ambiance: { record: "Mettons l'ambiance" },
+  travel: { stay: "Où dormir", book: "Réserver" },
+  polaroids: { first: "1ère photo de nous, 2020 !", mexico: "Mexique, 2023 !", reunion: "La Réunion, 2023 !", us: "À nous !" },
+  rsvp: {
+    before: "Merci de nous répondre avant le",
+    stepsAria: "Étapes du formulaire",
+    stepStatus: (n: number, total: number, name: string) => `Étape ${n} sur ${total} : ${name}`,
+    firstName: "Prénom",
+    lastName: "Nom",
+    unlockName: "Modifier le nom",
+    lockName: "Verrouiller le nom",
+    total: (n: number) => `personne${n > 1 ? "s" : ""} au total, toi compris`,
+    under10Count: (n: number) => ` · dont ${n} de moins de 10 ans`,
+    you: "Toi",
+    person: (n: number) => `Personne ${n}`,
+    remove: "Retirer",
+    firstNameOf: (n: number) => `Prénom de la personne ${n}`,
+    lastNameOf: (n: number) => `Nom de la personne ${n}`,
+    thisPerson: "Cette personne",
+    messagePlaceholder: "Ton message",
+    previous: "Précédent",
+    next: "Suivant",
+    sending: "Envoi…",
+    send: "Envoyer ma réponse",
+    cancel: "Annuler",
+    dietDetails: "précisions",
+    dietExample: "Ex. : allergie aux fruits à coque",
+    errors: {
+      name: "Merci d'indiquer ton prénom et ton nom.",
+      presence: "Merci d'indiquer si tu seras présent.",
+      moments: "Merci de répondre pour chacun des moments.",
+      personName: (n: number) => `Merci d'indiquer le prénom et le nom de la personne ${n}.`,
+      personMoments: (name: string) => `Merci d'indiquer la présence de ${name} à chacun des moments.`,
+      diet: "Merci de préciser tes restrictions alimentaires, ou de décocher la case.",
+      personDiet: (name: string) => `Merci de préciser les restrictions alimentaires de ${name}, ou de décocher la case.`,
+      send: "L'envoi n'a pas abouti. Merci de réessayer.",
+    },
+    done: { yes: "Merci, à très bientôt !", no: "Merci de nous avoir répondu.", unsure: "Merci, tiens-nous au courant !" },
+    savedOn: (date: string) => `Réponse enregistrée le ${date} :`,
+    people: (n: number) => `${n} personne${n > 1 ? "s" : ""}`,
+    under10: "moins de 10 ans",
+    restrictions: "Restrictions :",
+    edit: "Modifier ma réponse",
+    /** Membres du foyer proposés à l'étape « Qui vient avec toi ? ». */
+    household: "De ton foyer :",
+    alreadyAnswered: "a déjà répondu",
+    answeredBy: (by: string) => `réponse de ${by}`,
+    /** Réponse envoyée par un proche pour l'invité connecté. */
+    answeredFor: (by: string) => `${by} a répondu pour toi`,
+    answeredForNote: "Tu peux la modifier : ta réponse remplacera alors celle-ci, pour toi seulement.",
+    answerMyself: "Répondre moi-même",
+  },
+  thanks: { aria: "Merci" },
+  footer: { letter: "Revoir la lettre" },
+  /** Nombre de moments en lettres (« Trois moments »). */
+  momentsInWords: (n: number) => `${["Aucun", "Un", "Deux", "Trois", "Quatre", "Cinq", "Six", "Sept", "Huit", "Neuf", "Dix"][n] ?? n} moment${n > 1 ? "s" : ""}`,
+  /** Format des dates (réponse enregistrée le…). */
+  locale: "fr-FR",
+  /** Étiquettes du plan (par lieu ; plusieurs épingles : dans l'ordre de MAP_PINS). */
+  mapLabels: {} as Record<string, string[]>,
 }

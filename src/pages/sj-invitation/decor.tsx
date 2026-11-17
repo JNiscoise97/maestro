@@ -93,13 +93,13 @@ export function FlowerCluster({ className = "", flip = false, kind = "bouquet-ro
 // ── Tourne-disque ─────────────────────────────────────────────────────────────
 
 /** Valise tourne-disque ouverte ; le disque tourne doucement (sauf « réduire les animations »). */
-export function RecordPlayer({ className = "" }: { className?: string }) {
+export function RecordPlayer({ className = "", caption = "Mettons l'ambiance" }: { className?: string; caption?: string }) {
   return (
     <svg viewBox="0 0 240 230" aria-hidden className={`pointer-events-none ${className}`} style={{ filter: "drop-shadow(0 12px 14px rgba(70,52,25,.25))" }}>
       {/* Couvercle ouvert */}
       <path d="M30 18h180l-6 70H36Z" fill="#f8f4ec" stroke="#cfc4b0" strokeWidth="1.5" />
       <path d="M40 26h160l-5 54H45Z" fill="none" stroke={MATTE_GOLD} strokeWidth=".8" opacity=".6" />
-      <text x="120" y="60" textAnchor="middle" fontFamily="'Cormorant Garamond', serif" fontStyle="italic" fontSize="17" fill={MATTE_GOLD}>Mettons l'ambiance</text>
+      <text x="120" y="60" textAnchor="middle" fontFamily="'Cormorant Garamond', serif" fontStyle="italic" fontSize="17" fill={MATTE_GOLD}>{caption}</text>
       {/* Charnières */}
       <rect x="60" y="86" width="14" height="6" rx="1" fill="#c7a160" />
       <rect x="166" y="86" width="14" height="6" rx="1" fill="#c7a160" />

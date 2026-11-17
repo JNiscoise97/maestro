@@ -1,5 +1,6 @@
 import { supabase, USE_SUPABASE } from "@/supabase/client"
 import type { GalleryMember } from "@/features/gallery/types"
+import type { PartyMember, RsvpResponse } from "@/services/rsvp.service"
 import { DAYS, type Day } from "./content"
 
 /**
@@ -17,7 +18,11 @@ export const weddingTable = (name: string) => `${WEDDING_PREFIX}${name}`
 // Le client anonyme : les tables de l'appli sont ouvertes en anon (politique anon_all).
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
-export type WeddingGuest = { id: string; first_name: string | null; last_name: string | null; household_id: string | null }
+export type WeddingGuest = {
+  id: string; first_name: string | null; last_name: string | null; household_id: string | null
+  /** Langue de l'invitation (Invités › Invitations) ; null = français. */
+  invitation_language: "fr" | "en" | null
+}
 
 export type Programme =
   /** Invité retrouvé : sequenceIds = séquences de son foyer (vide possible : aucune séquence cochée). */
@@ -28,17 +33,47 @@ export type Programme =
 const normalize = (s: string | null | undefined) =>
   (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z]/g, "")
 
-/** Liste des invités du mariage (quelques centaines de lignes). */
-export async function loadWeddingGuests(): Promise<WeddingGuest[]> {
+/** Membres du foyer de l'invité, lui excepté (vide sans foyer). */
+export function householdOf(guest: WeddingGuest, guests: WeddingGuest[]): WeddingGuest[] {
+  return guest.household_id ? guests.filter((g) => g.household_id === guest.household_id && g.id !== guest.id) : []
+}
+
+export type Covering = { response: RsvpResponse; member: PartyMember | null }
+
+/**
+ * Réponse qui vaut pour l'invité : la plus récente qui le concerne, la sienne ou celle d'un proche qui l'a inclus
+ * (par identifiant, sinon par prénom + nom pour les réponses sans identifiant). Une réponse envoyée par l'invité
+ * lui-même remplace donc, pour lui seul, celle qu'un proche avait envoyée avant. responses : la plus récente d'abord.
+ */
+export function coveringResponse(responses: RsvpResponse[], guest: WeddingGuest): Covering | null {
+  const name = normalize(`${guest.first_name}${guest.last_name}`)
+  for (const r of responses) {
+    if (r.guestId === guest.id) return { response: r, member: r.party?.[0] ?? null }
+    const m = r.party?.slice(1).find((p) => (p.guestId ? p.guestId === guest.id : normalize(`${p.firstName}${p.lastName}`) === name))
+    if (m) return { response: r, member: m }
+  }
+  return null
+}
+
+/** Liste des invités du mariage (quelques centaines de lignes), chargée une fois par visite. */
+let guestsCache: Promise<WeddingGuest[]> | null = null
+export function loadWeddingGuests(): Promise<WeddingGuest[]> {
+  guestsCache ??= fetchWeddingGuests().catch((e) => { guestsCache = null; throw e })
+  return guestsCache
+}
+
+async function fetchWeddingGuests(): Promise<WeddingGuest[]> {
   if (!USE_SUPABASE) return []
   const query = (columns: string) => db.from(weddingTable("guests")).select(columns).range(0, 4999)
-  let { data, error } = await query("id, first_name, last_name, household_id, is_active")
-  // Colonne household_id absente tant que 0179_retour_foyers.sql n'est pas exécutée : chacun reste seul.
+  // Colonnes household_id (0179) et invitation_language (0180) absentes tant que leurs migrations ne sont
+  // pas exécutées : on retente sans elles (chacun reste seul, invitation en français).
+  let { data, error } = await query("id, first_name, last_name, household_id, invitation_language, is_active")
+  if (error) ({ data, error } = await query("id, first_name, last_name, household_id, is_active"))
   if (error) ({ data, error } = await query("id, first_name, last_name, is_active"))
   if (error) throw error
   return ((data ?? []) as (WeddingGuest & { is_active: boolean | null })[])
     .filter((g) => g.is_active !== false)
-    .map((g) => ({ ...g, household_id: g.household_id ?? null }))
+    .map((g) => ({ ...g, household_id: g.household_id ?? null, invitation_language: g.invitation_language ?? null }))
 }
 
 /** Retrouve l'invité du compte : même identifiant (listes fiançailles et mariage partagées), sinon nom unique. */
@@ -76,16 +111,12 @@ export async function loadGuestIdsWithSequences(): Promise<Set<string>> {
   }
 }
 
-/** Jours et moments visibles. null = tout le programme (administrateur sans aperçu). */
-export function visibleDays(sequenceIds: Set<string> | null, onlyOpen = false): Day[] {
-  return DAYS
+/** Jours et moments visibles. null = tout le programme (administrateur sans aperçu). days : programme dans la langue en cours. */
+export function visibleDays(sequenceIds: Set<string> | null, onlyOpen = false, days: Day[] = DAYS): Day[] {
+  return days
     .map((d) => ({
       ...d,
       moments: d.moments.filter((m) => (sequenceIds ? sequenceIds.has(m.sequenceId) : true) && (!onlyOpen || !m.limited)),
     }))
     .filter((d) => d.moments.length > 0)
 }
-
-const NUMBERS = ["Aucun", "Un", "Deux", "Trois", "Quatre", "Cinq", "Six", "Sept", "Huit", "Neuf", "Dix"]
-/** « Trois moments », « Un moment ». */
-export const momentsInWords = (n: number) => `${NUMBERS[n] ?? n} moment${n > 1 ? "s" : ""}`

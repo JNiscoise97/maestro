@@ -4,6 +4,7 @@ import "@fontsource/cormorant-garamond/500.css"
 import { Navigate, Route, Routes, useLocation } from "react-router-dom"
 
 import { GalleryAuthProvider, useGalleryAuth } from "@/context/GalleryAuthContext"
+import { InvitationLangProvider, useInvitationLang } from "@/context/InvitationLangContext"
 import { useGallerySettings } from "@/features/gallery/api"
 import { galleryClient } from "@/features/gallery/client"
 import { themeStyle } from "@/features/gallery/theme"
@@ -13,7 +14,10 @@ import { Notice } from "@/pages/photos/GalleryChrome"
 import { LoginScreen } from "@/pages/photos/LoginScreen"
 import { InvitationAdmin } from "./admin"
 import { MATTE_GOLD } from "@/features/gallery/gilded"
-import { INVITATION_ROUTES, INVITATION_SUBTITLE } from "./paths"
+import { findGuest, loadWeddingGuests } from "./guest-programme"
+import { useContent, type Content } from "./i18n"
+import { LangSwitch } from "./lang-switch"
+import { INVITATION_ROUTES } from "./paths"
 import { DevicePreview } from "./preview"
 import { DetailsScreen } from "./details"
 import { EnvelopeScreen, LandingScreen, OpenedEnvelopeScreen } from "./screens"
@@ -38,7 +42,9 @@ export function SjInvitationPage() {
   useNoIndex()
   return (
     <GalleryAuthProvider source="invitation">
-      <InvitationRouter />
+      <InvitationLangProvider>
+        <InvitationRouter />
+      </InvitationLangProvider>
     </GalleryAuthProvider>
   )
 }
@@ -48,10 +54,11 @@ function InvitationRouter() {
   const { data: settings } = useGallerySettings(!!session)
   const theme = settings?.theme ?? "cinema"
   const location = useLocation()
+  const { UI } = useContent()
   useResetZoomOn([!!session, location.pathname].join("|"))
 
   const content = !galleryClient
-    ? <Notice title="Invitation indisponible" subtitle={INVITATION_SUBTITLE} gilded>Configuration Supabase manquante.</Notice>
+    ? <Notice title={UI.common.unavailable} subtitle={UI.subtitle} gilded>{UI.common.missingConfig}</Notice>
     : (
       <Routes>
         <Route index element={<LandingScreen />} />
@@ -62,7 +69,7 @@ function InvitationRouter() {
         <Route path="admin/*" element={
           <RequireMember>{(m) => m.role === "admin" ? <InvitationAdmin /> : <Navigate to={INVITATION_ROUTES.envelope} replace />}</RequireMember>
         } />
-        <Route path="*" element={<Notice title="Page introuvable" subtitle={INVITATION_SUBTITLE} gilded />} />
+        <Route path="*" element={<Notice title={UI.common.notFound} subtitle={UI.subtitle} gilded />} />
       </Routes>
     )
 
@@ -96,12 +103,19 @@ type FromState = { from?: string } | null
 function LoginRoute() {
   const { session, member, loading, signOut } = useGalleryAuth()
   const location = useLocation()
+  const { UI } = useContent()
+  const { lang } = useInvitationLang()
   const from = (location.state as FromState)?.from
 
-  if (loading) return <Notice title="Chargement…" subtitle={INVITATION_SUBTITLE} gilded />
+  if (loading) return <Notice title={UI.common.loading} subtitle={UI.subtitle} gilded />
   // Fond blanc fixe : pas de bascule clair / sombre (masquée par LoginScreen pour l'invitation).
-  if (!session) return <LoginScreen mode="light" onToggleMode={() => {}} source="invitation" />
-  const blocked = accountProblem(member, () => void signOut())
+  if (!session) return (
+    <div className="relative">
+      <LangSwitch className="absolute right-4 top-4 z-10" />
+      <LoginScreen mode="light" onToggleMode={() => {}} source="invitation" lang={lang} subtitle={UI.subtitle} />
+    </div>
+  )
+  const blocked = accountProblem(member, () => void signOut(), UI)
   if (blocked) return blocked
   return <Navigate to={from ?? INVITATION_ROUTES.envelope} replace />
 }
@@ -110,24 +124,41 @@ function LoginRoute() {
 function RequireMember({ children }: { children: (member: GalleryMember) => React.ReactNode }) {
   const { session, member, loading, signOut } = useGalleryAuth()
   const location = useLocation()
-  if (loading) return <Notice title="Chargement…" subtitle={INVITATION_SUBTITLE} gilded />
+  const { UI } = useContent()
+  if (loading) return <Notice title={UI.common.loading} subtitle={UI.subtitle} gilded />
   if (!session) return <Navigate to={INVITATION_ROUTES.login} replace state={{ from: location.pathname } satisfies FromState} />
-  const blocked = accountProblem(member, () => void signOut())
+  const blocked = accountProblem(member, () => void signOut(), UI)
   if (blocked) return blocked
-  return <>{children(member!)}</>
+  return <><GuestLanguage member={member!} />{children(member!)}</>
+}
+
+/**
+ * Langue de l'invitation réglée dans la fiche de l'invité (Invités › Invitations) : appliquée dès qu'il
+ * est retrouvé, sauf s'il a choisi une langue avec le sélecteur FR / EN sur cet appareil.
+ */
+function GuestLanguage({ member }: { member: GalleryMember }) {
+  const { applyGuestLang } = useInvitationLang()
+  useEffect(() => {
+    let alive = true
+    loadWeddingGuests()
+      .then((guests) => { if (alive) applyGuestLang(findGuest(guests, member)?.invitation_language) })
+      .catch(() => { /* liste indisponible : on garde la langue en cours */ })
+    return () => { alive = false }
+  }, [member, applyGuestLang])
+  return null
 }
 
 /** Session ouverte mais compte absent ou désactivé : message, comme sur /photos. */
-function accountProblem(member: GalleryMember | null, signOut: () => void): React.ReactNode | null {
+function accountProblem(member: GalleryMember | null, signOut: () => void, UI: Content["UI"]): React.ReactNode | null {
   if (!member) return (
-    <Notice title="Compte introuvable" subtitle={INVITATION_SUBTITLE} gilded>
-      Ton accès n'est pas (ou plus) actif. <button type="button" className="underline" onClick={signOut}>Se déconnecter</button>
+    <Notice title={UI.common.accountMissing} subtitle={UI.subtitle} gilded>
+      {UI.common.accountMissingText} <button type="button" className="underline" onClick={signOut}>{UI.common.signOut}</button>
     </Notice>
   )
   if (member.status !== "active") return (
-    <Notice title="Accès suspendu" subtitle={INVITATION_SUBTITLE} gilded>
-      Ton compte a été désactivé. Contacte Sarah ou Jordan si besoin.{" "}
-      <button type="button" className="underline" onClick={signOut}>Se déconnecter</button>
+    <Notice title={UI.common.suspended} subtitle={UI.subtitle} gilded>
+      {UI.common.suspendedText}{" "}
+      <button type="button" className="underline" onClick={signOut}>{UI.common.signOut}</button>
     </Notice>
   )
   return null

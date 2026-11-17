@@ -7,7 +7,9 @@ import { useGalleryAuth } from "@/context/GalleryAuthContext"
 import type { GalleryMember } from "@/features/gallery/types"
 import { GOLD_TEXT, MATTE_GOLD } from "@/features/gallery/gilded"
 import { Masthead } from "@/pages/photos/GalleryChrome"
-import { INVITATION_ROUTES, INVITATION_SUBTITLE, LANDING_PHOTO_DESKTOP, LANDING_PHOTO_MOBILE } from "./paths"
+import { useContent } from "./i18n"
+import { LangSwitch } from "./lang-switch"
+import { INVITATION_ROUTES, LANDING_PHOTO_DESKTOP, LANDING_PHOTO_MOBILE } from "./paths"
 
 // Bouton or mat : contour fin et texte dorés, rempli d'or au survol.
 const primary = "inline-block border px-8 py-3 text-xs uppercase tracking-[0.24em] transition-colors hover:bg-[#a8844f]! hover:text-white! disabled:opacity-40"
@@ -20,13 +22,15 @@ function fullName(m: GalleryMember): string {
 /** Cadre commun : fond blanc (porté par le conteneur), contenu centré, pied (admin, déconnexion) si connecté. */
 function Frame({ children, footer = true }: { children: React.ReactNode; footer?: boolean }) {
   const { member, signOut } = useGalleryAuth()
+  const { UI } = useContent()
   return (
     <div className="relative flex min-h-svh flex-col items-center justify-center px-6 py-12 text-center">
+      <LangSwitch className="absolute right-4 top-4" />
       {children}
       {footer && member && (
         <div className="mt-10 flex gap-4 text-xs" style={{ color: "var(--p-muted)" }}>
-          {member.role === "admin" && <Link to={INVITATION_ROUTES.admin} className="underline">Administration</Link>}
-          <button type="button" className="underline" onClick={() => void signOut()}>Se déconnecter</button>
+          {member.role === "admin" && <Link to={INVITATION_ROUTES.admin} className="underline">{UI.common.admin}</Link>}
+          <button type="button" className="underline" onClick={() => void signOut()}>{UI.common.signOut}</button>
         </div>
       )}
     </div>
@@ -37,6 +41,7 @@ function Frame({ children, footer = true }: { children: React.ReactNode; footer?
 
 export function LandingScreen() {
   const { session, member } = useGalleryAuth()
+  const { UI } = useContent()
   // Déjà connecté : le bouton mène directement à l'enveloppe.
   const target = session && member?.status === "active" ? INVITATION_ROUTES.envelope : INVITATION_ROUTES.login
   // Ordinateur (640 px et plus) : bloc de texte descendu de 100 px (200 px de marge haute en plus, contenu centré).
@@ -51,8 +56,9 @@ export function LandingScreen() {
       </picture>
       <div aria-hidden className="absolute inset-0 -z-10"
         style={{ background: "linear-gradient(180deg, rgba(0,0,0,.25) 0%, rgba(0,0,0,.35) 55%, rgba(0,0,0,.5) 100%)" }} />
+      <LangSwitch tone="light" className="absolute right-4 top-4" />
 
-      <p className="text-xs uppercase tracking-[0.4em] sm:text-sm" style={{ textShadow: SHADOW }}>{INVITATION_SUBTITLE}</p>
+      <p className="text-xs uppercase tracking-[0.4em] sm:text-sm" style={{ textShadow: SHADOW }}>{UI.subtitle}</p>
       <h1 className="mt-6 flex flex-col items-center gap-x-[0.35em] text-6xl font-medium uppercase leading-none sm:flex-row sm:text-7xl lg:text-8xl"
         style={{ fontFamily: "var(--p-names-font, var(--p-heading))", letterSpacing: "0.08em", textShadow: SHADOW }}>
         <span>Sarah</span>
@@ -62,7 +68,7 @@ export function LandingScreen() {
       <Link to={target}
         className="mt-12 inline-block border border-white px-8 py-3 text-xs uppercase tracking-[0.25em] text-white transition-colors hover:bg-white hover:text-neutral-900"
         style={{ textShadow: SHADOW }}>
-        Accéder à mon invitation
+        {UI.landing.cta}
       </Link>
     </div>
   )
@@ -73,6 +79,7 @@ const SHADOW = "0 1px 12px rgba(0,0,0,.35)"
 // ── 3. Enveloppe fermée ───────────────────────────────────────────────────────
 
 export function EnvelopeScreen(props: { member: GalleryMember }) {
+  const { UI } = useContent()
   const navigate = useNavigate()
   const [opening, setOpening] = useState(false)
   function open() {
@@ -84,9 +91,9 @@ export function EnvelopeScreen(props: { member: GalleryMember }) {
   return (
     <Frame>
       <EnvelopeHeader member={props.member} />
-      <Envelope open={opening} onClick={open} />
+      <Envelope open={opening} onClick={open} label={UI.envelope.open} />
       <button type="button" onClick={open} className={`${primary} mt-10`} style={primaryStyle} disabled={opening}>
-        Ouvrir l'enveloppe
+        {UI.envelope.open}
       </button>
     </Frame>
   )
@@ -101,13 +108,14 @@ function EnvelopeHeader({ member, hidden = false, headerRef }: {
   hidden?: boolean
   headerRef?: React.Ref<HTMLDivElement>
 }) {
+  const { UI } = useContent()
   return (
     <div ref={headerRef} aria-hidden={hidden || undefined}
       className="flex flex-col items-center transition-opacity duration-500 motion-reduce:transition-none" style={{ opacity: hidden ? 0 : 1 }}>
       {/* Même en-tête que la connexion : sous-titre et « Sarah & Jordan » en or mat. */}
-      <Masthead compact subtitle={INVITATION_SUBTITLE} gilded />
+      <Masthead compact subtitle={UI.subtitle} gilded />
       <p className="mb-8 mt-2 text-[10px] uppercase tracking-[0.35em]" style={{ color: "var(--p-muted)" }}>
-        Une lettre pour {member.first_name || "toi"}
+        {UI.envelope.letterFor(member.first_name ?? "")}
       </p>
     </div>
   )
@@ -116,6 +124,7 @@ function EnvelopeHeader({ member, hidden = false, headerRef }: {
 // ── 4. Enveloppe ouverte ──────────────────────────────────────────────────────
 
 export function OpenedEnvelopeScreen(props: { member: GalleryMember }) {
+  const { UI } = useContent()
   const name = fullName(props.member)
   const navigate = useNavigate()
   // Refermer : la lettre redescend dans la poche, puis retour à l'enveloppe fermée.
@@ -152,17 +161,12 @@ export function OpenedEnvelopeScreen(props: { member: GalleryMember }) {
       <EnvelopeHeader member={props.member} hidden headerRef={headerRef} />
       <OpenEnvelope cardIn={closing} envelopeRef={envelopeRef} letterRef={letterRef}>
         <p className="text-2xl italic leading-tight sm:text-3xl" style={{ fontFamily: "var(--p-names-font, var(--p-heading))" }}>
-          Bonjour {name || "à toi"},
+          {UI.envelope.hello(name)}
         </p>
         <div className="mt-4 space-y-3 text-base leading-snug sm:text-lg" style={{ fontFamily: "var(--p-heading)" }}>
-          <p>
-            Nous avons la joie de t'inviter à notre mariage, le <strong className="font-semibold">lundi 28&nbsp;juin 2027</strong> à{" "}
-            <strong className="font-semibold">Montpellier</strong>.
-          </p>
-          <p>
-            Sur ce site, tu trouveras le déroulé des festivités et tout ce qu'il faut savoir pour profiter pleinement de
-            ce moment avec nous.
-          </p>
+          {UI.envelope.letter.map((para) => (
+            <p key={para}>{para.split(/\*\*(.+?)\*\*/g).map((t, i) => (i % 2 ? <strong key={i} className="font-semibold">{t}</strong> : t))}</p>
+          ))}
         </div>
         {/* Signature : mots espacés par un écart fixe (l'espacement des lettres ne s'applique qu'aux noms). */}
         <p className="mt-5 flex items-baseline justify-center gap-[0.6em] text-xl font-light uppercase"
@@ -176,15 +180,15 @@ export function OpenedEnvelopeScreen(props: { member: GalleryMember }) {
         {/* Refermer : icône seule (enveloppe fermée), à gauche, libellé en infobulle. */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <button type="button" onClick={close} disabled={closing} aria-label="Refermer l'enveloppe"
+            <button type="button" onClick={close} disabled={closing} aria-label={UI.envelope.close}
               className="flex aspect-square items-center justify-center border px-3 transition-colors hover:border-[#a8844f]! hover:text-[#a8844f]! disabled:opacity-40"
               style={{ borderColor: "var(--p-line)", color: "var(--p-muted)", borderRadius: "var(--p-radius)" }}>
               <Mail className="size-4" strokeWidth={1.5} />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">Refermer l'enveloppe</TooltipContent>
+          <TooltipContent side="bottom">{UI.envelope.close}</TooltipContent>
         </Tooltip>
-        <Link to={INVITATION_ROUTES.details} className={primary} style={primaryStyle}>Découvrir l'invitation</Link>
+        <Link to={INVITATION_ROUTES.details} className={primary} style={primaryStyle}>{UI.envelope.discover}</Link>
       </div>
     </Frame>
   )
@@ -255,7 +259,7 @@ const CLOSED_IMAGES = [ENVELOPE_CLOSED, ENVELOPE_OPEN]
  * Enveloppe fermée. À l'ouverture (open), fondu vers la photo de l'enveloppe ouverte au même endroit ;
  * l'écran suivant fait ensuite sortir la lettre. Toute la surface est cliquable.
  */
-function Envelope({ open, onClick }: { open: boolean; onClick?: () => void }) {
+function Envelope({ open, onClick, label }: { open: boolean; onClick?: () => void; label: string }) {
   const loaded = useImagesReady(CLOSED_IMAGES)
   // Préparation de l'écran suivant : la poche est déjà décodée quand on ouvre.
   useEffect(() => { void preload(ENVELOPE_POCKET) }, [])
@@ -267,7 +271,7 @@ function Envelope({ open, onClick }: { open: boolean; onClick?: () => void }) {
       <div aria-hidden className="absolute inset-0 transition-opacity duration-700 ease-in-out motion-reduce:transition-none"
         style={{ ...photoOf(ENVELOPE_CLOSED), opacity: open ? 0 : 1 }} />
       {!open && onClick && (
-        <button type="button" onClick={onClick} aria-label="Ouvrir l'enveloppe"
+        <button type="button" onClick={onClick} aria-label={label}
           className="absolute inset-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#a8844f]" />
       )}
     </div>

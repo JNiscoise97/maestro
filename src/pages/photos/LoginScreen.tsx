@@ -14,6 +14,80 @@ type IdentifyResult =
   | { status: "signed"; tokenHash: string }
   | { status: "wrong_year"; remaining: number }
 
+/** Textes de la connexion : français (galerie et invitation) ou anglais (invitation des invités anglophones). */
+const TEXTS = {
+  fr: {
+    tooMany: "Trop de demandes. Patientez une minute avant de redemander un code.",
+    sendFailed: "L'envoi du code a échoué. Réessayez dans un instant.",
+    errorAddress: "Une erreur est survenue. Vérifiez votre adresse et réessayez.",
+    loginFailed: "La connexion a échoué. Réessayez dans un instant.",
+    wrongYear: (n: number) => `Année incorrecte. Il vous reste ${n} essai${n > 1 ? "s" : ""}.`,
+    yearLocked: "Pour votre sécurité, la connexion par année est suspendue pendant 1 heure.",
+    error: "Une erreur est survenue. Réessayez dans un instant.",
+    badCode: "Code incorrect ou expiré. Vérifiez-le ou demandez-en un nouveau.",
+    emailIntro: "Indiquez votre adresse e-mail : nous vous envoyons un code de connexion.",
+    emailLabel: "Adresse e-mail",
+    emailPlaceholder: "vous@exemple.com",
+    wait: "Un instant…",
+    getCode: "Recevoir mon code",
+    unknown: "Nous ne connaissons pas encore cette adresse. Indiquez votre prénom et votre nom.",
+    firstName: "Prénom",
+    lastName: "Nom",
+    continue: "Continuer",
+    yearBefore: "Saisissez votre ",
+    yearStrong: "année de naissance",
+    yearAfter: " pour vous connecter.",
+    yearPlaceholder: "AAAA",
+    yearLabel: "Année de naissance",
+    checking: "Vérification…",
+    signIn: "Se connecter",
+    changeAddress: "Changer d'adresse",
+    codeInstead: "Recevoir plutôt un code par mail",
+    pending1: "Votre demande a bien été transmise à Sarah et Jordan.",
+    pending2: "Vous recevrez un e-mail dès qu'elle sera acceptée ; vous pourrez alors vous connecter avec cette adresse.",
+    codeBefore: "Saisissez le code envoyé à ",
+    codeAfter: ". Il est valable 15 minutes.",
+    codeLabel: "Code à 6 chiffres",
+    resend: "Renvoyer un code",
+    back: "← Revenir",
+  },
+  en: {
+    tooMany: "Too many requests. Please wait a minute before asking for a new code.",
+    sendFailed: "The code could not be sent. Please try again in a moment.",
+    errorAddress: "Something went wrong. Please check your address and try again.",
+    loginFailed: "Sign-in failed. Please try again in a moment.",
+    wrongYear: (n: number) => `Incorrect year. You have ${n} attempt${n > 1 ? "s" : ""} left.`,
+    yearLocked: "For your security, signing in with your birth year is suspended for 1 hour.",
+    error: "Something went wrong. Please try again in a moment.",
+    badCode: "Incorrect or expired code. Please check it or ask for a new one.",
+    emailIntro: "Enter your email address: we will send you a sign-in code.",
+    emailLabel: "Email address",
+    emailPlaceholder: "you@example.com",
+    wait: "One moment…",
+    getCode: "Get my code",
+    unknown: "We don't know this address yet. Please enter your first name and surname.",
+    firstName: "First name",
+    lastName: "Surname",
+    continue: "Continue",
+    yearBefore: "Enter your ",
+    yearStrong: "year of birth",
+    yearAfter: " to sign in.",
+    yearPlaceholder: "YYYY",
+    yearLabel: "Year of birth",
+    checking: "Checking…",
+    signIn: "Sign in",
+    changeAddress: "Change address",
+    codeInstead: "Get a code by email instead",
+    pending1: "Your request has been sent to Sarah and Jordan.",
+    pending2: "You will receive an email as soon as it is accepted; you can then sign in with this address.",
+    codeBefore: "Enter the code sent to ",
+    codeAfter: ". It is valid for 15 minutes.",
+    codeLabel: "6-digit code",
+    resend: "Send a new code",
+    back: "← Back",
+  },
+}
+
 const input = "w-full border-b bg-transparent py-2 text-base outline-none sm:text-sm focus:border-[var(--p-accent)]"
 const primary = "w-full py-3 text-xs uppercase tracking-[0.2em] disabled:opacity-40"
 
@@ -22,9 +96,13 @@ const primary = "w-full py-3 text-xs uppercase tracking-[0.2em] disabled:opacity
  * Liste blanche : e-mail → année de naissance au lieu du code (2 erreurs → code par mail).
  * Aucun compte n'est créé par le navigateur (shouldCreateUser: false) : c'est gallery-identify qui décide.
  */
-export function LoginScreen({ mode, onToggleMode, compact = false, source = "photos" }: {
+export function LoginScreen({ mode, onToggleMode, compact = false, source = "photos", lang = "fr", subtitle }: {
   mode: ColorMode
   onToggleMode: () => void
+  /** Langue des textes (anglais : invitation des invités anglophones). */
+  lang?: "fr" | "en"
+  /** Sous-titre au-dessus des prénoms (invitation) ; sinon celui de l'interface. */
+  subtitle?: string
   /**
    * Interface d'où l'invité se connecte (mêmes comptes) : adapte l'e-mail du code
    * et les e-mails envoyés aux administrateurs (gallery-identify).
@@ -34,6 +112,7 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
   compact?: boolean
 }) {
   // Invitation : bouton à contour or mat (rempli au survol), comme les autres écrans ; galerie : bouton plein.
+  const t = TEXTS[lang]
   const outlined = source === "invitation"
   const btnClass = outlined ? `${primary} border transition-colors hover:bg-[var(--p-accent)]! hover:text-white!` : `${primary} text-white`
   const btnStyle: React.CSSProperties = outlined
@@ -59,8 +138,8 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
     })
     if (otpError) {
       setError(otpError.status === 429
-        ? "Trop de demandes. Patientez une minute avant de redemander un code."
-        : "L'envoi du code a échoué. Réessayez dans un instant.")
+        ? t.tooMany
+        : t.sendFailed)
       return
     }
     setStep("code")
@@ -78,7 +157,7 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
       else if (res.status === "need_name") setStep("name")
       else setStep("pending")
     } catch {
-      setError("Une erreur est survenue. Vérifiez votre adresse et réessayez.")
+      setError(t.errorAddress)
     } finally {
       setBusy(false)
     }
@@ -91,17 +170,17 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
       const res = await callGalleryFunction<IdentifyResult>("gallery-identify", { email, birthYear: Number(year), source })
       if (res.status === "signed") {
         const { error: verifyError } = await galleryClient!.auth.verifyOtp({ token_hash: res.tokenHash, type: "magiclink" })
-        if (verifyError) setError("La connexion a échoué. Réessayez dans un instant.")
+        if (verifyError) setError(t.loginFailed)
       } else if (res.status === "wrong_year") {
         setYear("")
-        setError(`Année incorrecte. Il vous reste ${res.remaining} essai${res.remaining > 1 ? "s" : ""}.`)
+        setError(t.wrongYear(res.remaining))
       } else {
         // Bloqué (2 erreurs) ou plus sur liste blanche : code par mail.
-        setNotice(res.status === "locked" ? "Pour votre sécurité, la connexion par année est suspendue pendant 1 heure." : null)
+        setNotice(res.status === "locked" ? t.yearLocked : null)
         await sendCode()
       }
     } catch {
-      setError("Une erreur est survenue. Réessayez dans un instant.")
+      setError(t.error)
     } finally {
       setBusy(false)
     }
@@ -114,28 +193,28 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
       email: email.trim().toLowerCase(), token: code.trim(), type: "email",
     })
     setBusy(false)
-    if (verifyError) setError("Code incorrect ou expiré. Vérifiez-le ou demandez-en un nouveau.")
+    if (verifyError) setError(t.badCode)
   }
 
   return (
     <div className={`relative flex flex-col items-center justify-center px-6 py-10 ${compact ? "min-h-[26rem]" : "min-h-svh"}`}>
       {!compact && source !== "invitation" && <ModeToggle mode={mode} onToggle={onToggleMode} className="absolute right-4 top-4" />}
       <div className="w-full max-w-sm space-y-6">
-        <Masthead compact subtitle={source === "invitation" ? INVITATION_SUBTITLE : undefined} gilded={source === "invitation"} />
+        <Masthead compact subtitle={source === "invitation" ? subtitle ?? INVITATION_SUBTITLE : undefined} gilded={source === "invitation"} />
 
         {step === "email" && (
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void identify(false) }}>
             <p className="text-sm" style={{ color: "var(--p-muted)" }}>
-              Indiquez votre adresse e-mail : nous vous envoyons un code de connexion.
+              {t.emailIntro}
             </p>
             <label className="block">
-              <span className="sr-only">Adresse e-mail</span>
+              <span className="sr-only">{t.emailLabel}</span>
               <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                placeholder="vous@exemple.com" className={input} style={{ borderColor: "var(--p-line)" }} />
+                placeholder={t.emailPlaceholder} className={input} style={{ borderColor: "var(--p-line)" }} />
             </label>
             <button type="submit" disabled={busy || !email.trim()} className={btnClass}
               style={btnStyle}>
-              {busy ? "Un instant…" : "Recevoir mon code"}
+              {busy ? t.wait : t.getCode}
             </button>
           </form>
         )}
@@ -143,36 +222,36 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
         {step === "name" && (
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void identify(true) }}>
             <p className="text-sm" style={{ color: "var(--p-muted)" }}>
-              Nous ne connaissons pas encore cette adresse. Indiquez votre prénom et votre nom.
+              {t.unknown}
             </p>
             <input required autoComplete="given-name" value={firstName} onChange={(e) => setFirstName(e.target.value)}
-              placeholder="Prénom" aria-label="Prénom" className={input} style={{ borderColor: "var(--p-line)" }} />
+              placeholder={t.firstName} aria-label={t.firstName} className={input} style={{ borderColor: "var(--p-line)" }} />
             <input required autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)}
-              placeholder="Nom" aria-label="Nom" className={input} style={{ borderColor: "var(--p-line)" }} />
+              placeholder={t.lastName} aria-label={t.lastName} className={input} style={{ borderColor: "var(--p-line)" }} />
             <button type="submit" disabled={busy || !firstName.trim() || !lastName.trim()} className={btnClass}
               style={btnStyle}>
-              {busy ? "Un instant…" : "Continuer"}
+              {busy ? t.wait : t.continue}
             </button>
-            <BackLink onClick={() => setStep("email")} />
+            <BackLink onClick={() => setStep("email")} label={t.back} />
           </form>
         )}
 
         {step === "year" && (
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void verifyYear() }}>
             <p className="text-sm" style={{ color: "var(--p-muted)" }}>
-              Saisissez votre <b style={{ color: "var(--p-fg)" }}>année de naissance</b> pour vous connecter.
+              {t.yearBefore}<b style={{ color: "var(--p-fg)" }}>{t.yearStrong}</b>{t.yearAfter}
             </p>
             <input inputMode="numeric" autoComplete="off" maxLength={4} required value={year}
-              onChange={(e) => setYear(e.target.value.replace(/\D/g, ""))} placeholder="AAAA" aria-label="Année de naissance"
+              onChange={(e) => setYear(e.target.value.replace(/\D/g, ""))} placeholder={t.yearPlaceholder} aria-label={t.yearLabel}
               className={`${input} text-center text-2xl tracking-[0.5em]`} style={{ borderColor: "var(--p-line)" }} />
             <button type="submit" disabled={busy || year.length !== 4} className={btnClass}
               style={btnStyle}>
-              {busy ? "Vérification…" : "Se connecter"}
+              {busy ? t.checking : t.signIn}
             </button>
             <div className="flex justify-between text-xs" style={{ color: "var(--p-muted)" }}>
-              <button type="button" className="underline" onClick={() => { setError(null); setStep("email") }}>Changer d'adresse</button>
+              <button type="button" className="underline" onClick={() => { setError(null); setStep("email") }}>{t.changeAddress}</button>
               <button type="button" className="underline" disabled={busy} onClick={() => { setError(null); setNotice(null); void sendCode() }}>
-                Recevoir plutôt un code par mail
+                {t.codeInstead}
               </button>
             </div>
           </form>
@@ -180,11 +259,11 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
 
         {step === "pending" && (
           <div className="space-y-4 text-sm">
-            <p>Votre demande a bien été transmise à Sarah et Jordan.</p>
+            <p>{t.pending1}</p>
             <p style={{ color: "var(--p-muted)" }}>
-              Vous recevrez un e-mail dès qu'elle sera acceptée ; vous pourrez alors vous connecter avec cette adresse.
+              {t.pending2}
             </p>
-            <BackLink onClick={() => setStep("email")} />
+            <BackLink onClick={() => setStep("email")} label={t.back} />
           </div>
         )}
 
@@ -192,18 +271,18 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void verify() }}>
             {notice && <p className="text-sm">{notice}</p>}
             <p className="text-sm" style={{ color: "var(--p-muted)" }}>
-              Saisissez le code envoyé à <b style={{ color: "var(--p-fg)" }}>{email}</b>. Il est valable 15 minutes.
+              {t.codeBefore}<b style={{ color: "var(--p-fg)" }}>{email}</b>{t.codeAfter}
             </p>
             <input inputMode="numeric" autoComplete="one-time-code" maxLength={6} required value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="••••••" aria-label="Code à 6 chiffres"
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="••••••" aria-label={t.codeLabel}
               className={`${input} text-center text-2xl tracking-[0.5em]`} style={{ borderColor: "var(--p-line)" }} />
             <button type="submit" disabled={busy || code.length !== 6} className={btnClass}
               style={btnStyle}>
-              {busy ? "Vérification…" : "Se connecter"}
+              {busy ? t.checking : t.signIn}
             </button>
             <div className="flex justify-between text-xs" style={{ color: "var(--p-muted)" }}>
-              <button type="button" className="underline" onClick={() => { setCode(""); setNotice(null); setStep("email") }}>Changer d'adresse</button>
-              <button type="button" className="underline" disabled={busy} onClick={() => void sendCode()}>Renvoyer un code</button>
+              <button type="button" className="underline" onClick={() => { setCode(""); setNotice(null); setStep("email") }}>{t.changeAddress}</button>
+              <button type="button" className="underline" disabled={busy} onClick={() => void sendCode()}>{t.resend}</button>
             </div>
           </form>
         )}
@@ -214,10 +293,10 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
   )
 }
 
-function BackLink({ onClick }: { onClick: () => void }) {
+function BackLink({ onClick, label }: { onClick: () => void; label: string }) {
   return (
     <button type="button" onClick={onClick} className="text-xs underline" style={{ color: "var(--p-muted)" }}>
-      ← Revenir
+      {label}
     </button>
   )
 }

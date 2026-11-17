@@ -13,13 +13,18 @@ const LABEL_POS = {
   right: { x: 17, y: 5, anchor: "start" },
 } as const
 
-/** placeIds : lieux de l'invité, dans l'ordre ; number : numéro de chaque lieu. */
-export function PlacesMap({ placeIds, number }: { placeIds: string[]; number: Map<string, number> }) {
-  const pins = placeIds.flatMap((id) => (MAP_PINS[id] ?? []).map((p) => ({ ...p, id, n: number.get(id) ?? 0 })))
+/**
+ * placeIds : lieux de l'invité, dans l'ordre ; number : numéro de chaque lieu ;
+ * labels : étiquettes traduites par lieu (une par épingle, dans l'ordre de MAP_PINS), sinon celles du plan.
+ */
+export function PlacesMap({ placeIds, number, labels = {}, ariaLabel = "Plan des lieux autour de Montpellier" }: {
+  placeIds: string[]; number: Map<string, number>; labels?: Record<string, string[]>; ariaLabel?: string
+}) {
+  const pins = placeIds.flatMap((id) => (MAP_PINS[id] ?? []).map((p, i) => ({ ...p, label: labels[id]?.[i] ?? p.label, id, n: number.get(id) ?? 0 })))
   if (pins.length === 0) return null
   return (
     <figure className="mx-auto mb-12 max-w-2xl">
-      <svg viewBox="0 0 640 458" role="img" aria-label="Plan des lieux autour de Montpellier" className="h-auto w-full"
+      <svg viewBox="0 0 640 458" role="img" aria-label={ariaLabel} className="h-auto w-full"
         style={{ maskImage: "radial-gradient(ellipse 72% 70% at 50% 50%, #000 62%, transparent 100%)", WebkitMaskImage: "radial-gradient(ellipse 72% 70% at 50% 50%, #000 62%, transparent 100%)" }}>
         <style>{`
           .sjmap .com { fill: #fbf9f5; stroke: #e6dfd2; stroke-width: 1; }

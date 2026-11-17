@@ -1,4 +1,4 @@
-import type { Guest, ProspectStatus } from "@/types/domain"
+import type { Guest, Household, ProspectStatus } from "@/types/domain"
 
 /** Nom par défaut sur l'invitation : le surnom s'il existe, sinon le prénom. */
 export function defaultInvitationName(g: Guest): string {
@@ -8,6 +8,22 @@ export function defaultInvitationName(g: Guest): string {
 /** Nom qui figurera sur l'invitation : celui saisi, sinon le nom par défaut. */
 export function invitationName(g: Guest): string {
   return g.invitationName?.trim() || defaultInvitationName(g)
+}
+
+/** « A », « A et B », « A, B et C ». */
+export function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? ""
+  return `${names.slice(0, -1).join(", ")} et ${names.at(-1)}`
+}
+
+/** Membres d'un foyer dans l'ordre de l'invitation : adultes puis enfants, ordre donné sinon conservé. */
+export function orderMembers(members: Guest[]): Guest[] {
+  return [...members.filter((m) => !m.isChild), ...members.filter((m) => m.isChild)]
+}
+
+/** Texte de l'invitation pour un foyer : celui saisi, sinon les noms des membres. */
+export function householdText(h: Household, members: Guest[]): string {
+  return h.label?.trim() || joinNames(orderMembers(members).map(invitationName)) || "Foyer vide"
 }
 
 /** Statut de prospection effectif (null = historique, traité comme Liste A). */

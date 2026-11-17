@@ -12,6 +12,8 @@ import type { BudgetDevis, BudgetItem, BudgetPayment, DevisLine, GiftAllocation 
  *     ligne + part des affectations à son poste (au prorata du coût des sous-postes) + part des
  *     affectations aux devis qui la couvrent (au prorata de sa part dans le devis).
  *   · Coût d'une ligne = réel s'il est connu, sinon estimé. Reste à charge = coût − offert (min. 0).
+ *   · Coût d'un poste = somme des coûts de ses lignes (et non « réel du poste sinon estimé du poste » :
+ *     un sous-poste chiffré par devis ne doit pas faire oublier l'estimé des autres).
  */
 
 /** Cadeaux anticipés : affectations, et cadeaux qui comptent (reçus, pas seulement promis). */
@@ -38,7 +40,17 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   paye: "Payé",
 }
 
-export type LineFigures = { estimated: number; real: number | null; paid: number; hasPaidDeposit: boolean }
+export type LineFigures = {
+  estimated: number
+  /** Réel connu (pour un poste : somme des réels connus de ses lignes, null si aucun). */
+  real: number | null
+  paid: number
+  hasPaidDeposit: boolean
+  /** Coût : réel s'il est connu, sinon estimé — ligne par ligne pour un poste. */
+  cost: number
+  /** Estimé des seules lignes dont le réel est connu (pour comparer réel et estimé à périmètre égal). */
+  engagedEstimate: number
+}
 
 export class BudgetModel {
   readonly itemsById: Map<string, BudgetItem>
@@ -112,8 +124,7 @@ export class BudgetModel {
 
   /** Coût d'une ligne : réel s'il est connu, sinon estimé. */
   cost(item: BudgetItem): number {
-    const f = this.line(item)
-    return f.real ?? f.estimated
+    return this.line(item).cost
   }
 
   /** Part des cadeaux anticipés reçus qui finance une ligne (poste sans sous-poste ou sous-poste). */
@@ -169,7 +180,7 @@ export class BudgetModel {
   /** Chiffres d'une ligne (poste simple ou sous-poste). */
   line(item: BudgetItem): LineFigures {
     // Inclus dans une autre ligne : 0 €, rien à payer. Pas encore estimable : 0 € estimé (signalé ailleurs).
-    if (item.amountStatus === "included") return { estimated: 0, real: 0, paid: 0, hasPaidDeposit: false }
+    if (item.amountStatus === "included") return { estimated: 0, real: 0, paid: 0, hasPaidDeposit: false, cost: 0, engagedEstimate: 0 }
     const estimated = item.amountStatus === "to_estimate"
       ? 0
       : item.estimatedTotal ?? (item.quantity != null && item.unitPrice != null ? item.quantity * item.unitPrice : 0)
@@ -179,10 +190,14 @@ export class BudgetModel {
       const base = this.devisLinesTotal(r.devis.id) || r.devis.totalAmount || 0
       const devisPayments = (this.paymentsByDevis.get(r.devis.id) ?? []).filter((p) => p.paid)
       const paid = base > 0 ? this.devisPaid(r.devis.id) * (share / base) : 0
-      return { estimated, real: share, paid, hasPaidDeposit: devisPayments.some((p) => p.kind === "acompte") }
+      return { estimated, real: share, paid, hasPaidDeposit: devisPayments.some((p) => p.kind === "acompte"), cost: share, engagedEstimate: estimated }
     }
     const own = (this.paymentsByItem.get(item.id) ?? []).filter((p) => p.paid)
-    return { estimated, real: item.actualTotal, paid: sum(own.map((p) => p.amount)), hasPaidDeposit: own.some((p) => p.kind === "acompte") }
+    const real = item.actualTotal
+    return {
+      estimated, real, paid: sum(own.map((p) => p.amount)), hasPaidDeposit: own.some((p) => p.kind === "acompte"),
+      cost: real ?? estimated, engagedEstimate: real == null ? 0 : estimated,
+    }
   }
 
   /** Chiffres d'un poste, éventuellement limités aux sous-postes d'une séquence et/ou filtrés. */
@@ -201,6 +216,8 @@ export class BudgetModel {
       real: reals.every((r) => r == null) ? null : sum(reals),
       paid,
       hasPaidDeposit,
+      cost: sum(figures.map((f) => f.cost)),
+      engagedEstimate: sum(figures.map((f) => f.engagedEstimate)),
       depositRequired: poste.depositRequired || leaves.some((l) => l.depositRequired),
       offered: sum(leaves.map((l) => this.offered(l))),
     }
@@ -227,8 +244,8 @@ export class BudgetModel {
   }
 }
 
-export function paymentStatus(f: { estimated: number; real: number | null; paid: number; hasPaidDeposit: boolean; depositRequired?: boolean }): PaymentStatus {
-  const due = f.real ?? f.estimated
+export function paymentStatus(f: { estimated: number; real: number | null; paid: number; hasPaidDeposit: boolean; depositRequired?: boolean; cost?: number }): PaymentStatus {
+  const due = f.cost ?? f.real ?? f.estimated
   if (!due && !f.paid) return "none"
   if (due > 0 && f.paid >= due - 0.005) return "paye"
   if (f.paid > 0) return f.hasPaidDeposit ? "acompte_paye" : "partiel"
@@ -330,6 +347,6 @@ export function sequenceLabel(model: BudgetModel, item: BudgetItem, sequences: {
 }
 
 /** Reste à notre charge : coût (réel sinon estimé) moins la part offerte, jamais négatif. */
-export function remaining(f: { estimated: number; real: number | null; offered: number }): number {
-  return Math.max(0, (f.real ?? f.estimated) - f.offered)
+export function remaining(f: { estimated: number; real: number | null; offered: number; cost?: number }): number {
+  return Math.max(0, (f.cost ?? f.real ?? f.estimated) - f.offered)
 }

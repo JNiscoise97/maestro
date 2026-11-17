@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { guestsService, type CreateGuestGroupInput, type CreateGuestInput } from "@/services/guests.service"
 import type { Guest, GuestGroup } from "@/types/domain"
+import { householdsService, type HouseholdPatch } from "@/services/households.service"
 
 export function useGuestGroups() {
   return useQuery({
@@ -176,5 +177,51 @@ export function useResetCheckInsForAll() {
   return useMutation({
     mutationFn: () => guestsService.resetCheckInsForAll(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["guests"] }),
+  })
+}
+
+// ── Foyers (une invitation par foyer) ─────────────────────────────────────────
+
+export function useHouseholds() {
+  return useQuery({ queryKey: ["households"], queryFn: () => householdsService.list() })
+}
+
+function useInvalidateHouseholds() {
+  const queryClient = useQueryClient()
+  return () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["households"] }),
+    queryClient.invalidateQueries({ queryKey: ["guests"] }),
+  ])
+}
+
+export function useCreateHousehold() {
+  const invalidate = useInvalidateHouseholds()
+  return useMutation({
+    mutationFn: ({ groupId, label, sortOrder, memberIds }: { groupId: string | null; label?: string | null; sortOrder?: number; memberIds: string[] }) =>
+      householdsService.create({ groupId, label, sortOrder }, memberIds),
+    onSettled: invalidate,
+  })
+}
+
+export function useUpdateHousehold() {
+  const invalidate = useInvalidateHouseholds()
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: HouseholdPatch }) => householdsService.update(id, patch),
+    onSettled: invalidate,
+  })
+}
+
+export function useDeleteHousehold() {
+  const invalidate = useInvalidateHouseholds()
+  return useMutation({ mutationFn: (id: string) => householdsService.remove(id), onSettled: invalidate })
+}
+
+/** Rattache des invités à un foyer, ou les en retire (householdId null). */
+export function useSetGuestsHousehold() {
+  const invalidate = useInvalidateHouseholds()
+  return useMutation({
+    mutationFn: ({ guestIds, householdId }: { guestIds: string[]; householdId: string | null }) =>
+      householdsService.setGuestsHousehold(guestIds, householdId),
+    onSettled: invalidate,
   })
 }

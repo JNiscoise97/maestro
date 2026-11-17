@@ -187,7 +187,6 @@ function GiftSheet({ gift, model, items, poles, sequences, guests, onClose }: {
       value: `d:${d.id}`,
       label: `${d.vendor ?? d.title ?? "Devis"}${d.status === "retenu" ? " (retenu)" : d.status === "refuse" ? " (refusé)" : ""}`,
       group: "Devis",
-      hint: (model.linesByDevis.get(d.id) ?? []).map((l) => model.fullLabel(l.itemId)).join(", ") || undefined,
     }))
     return [...devis, ...lines]
   }, [items, model, poles, sequences])
@@ -306,7 +305,8 @@ function GiftSheet({ gift, model, items, poles, sequences, guests, onClose }: {
               « Couvrir » met ce qu'il reste à votre charge sur la cible.
             </p>
             {rows.map((r, i) => (
-              <div key={r.key} className="flex items-center gap-2">
+              <div key={r.key} className="space-y-1">
+              <div className="flex items-center gap-2">
                 <SearchableSelect value={r.target || null} clearable={false} className="h-9 min-w-0 flex-1 text-sm" ariaLabel="Cible de l'affectation"
                   placeholder="Choisir une ligne, un poste ou un devis…" searchPlaceholder="Rechercher un poste, un sous-poste, un devis…"
                   options={options} onChange={(v) => setRows(rows.map((x, j) => (j === i ? { ...x, target: v ?? "" } : x)))} />
@@ -318,6 +318,8 @@ function GiftSheet({ gift, model, items, poles, sequences, guests, onClose }: {
                   className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive">
                   <Trash2 className="size-3.5" />
                 </button>
+              </div>
+              {r.target && <Coverage figures={targetFigures(model, others, r.target)} amount={parseAmount(r.amount)} />}
               </div>
             ))}
             <Button type="button" variant="ghost" size="sm" onClick={() => setRows([...rows, { key: crypto.randomUUID(), target: "", amount: "" }])}>
@@ -444,6 +446,54 @@ export function FundingNote({ model, poste }: { model: BudgetModel; poste: Budge
           </span>
         )
       })}
+    </p>
+  )
+}
+
+// ── Couverture d'une cible ────────────────────────────────────────────────────
+
+type TargetFigures = { estimated: number; real: number | null; cost: number; need: number }
+
+/**
+ * Chiffres d'une cible d'affectation : estimé, réel, coût (réel sinon estimé) et ce qu'il reste à couvrir
+ * une fois comptés les autres cadeaux reçus (`others` = budget sans le cadeau en cours d'édition).
+ * Devis : estimé des lignes qu'il couvre, réel = somme de leurs parts (sinon montant du devis).
+ */
+function targetFigures(model: BudgetModel, others: BudgetModel, key: string): TargetFigures {
+  const target = parseTarget(key)
+  const need = others.remainingFor(target)
+  if (target.itemId) {
+    const item = model.itemsById.get(target.itemId)
+    if (!item) return { estimated: 0, real: null, cost: 0, need }
+    const f = model.children(item.id).length ? model.poste(item) : model.line(item)
+    return { estimated: f.estimated, real: f.real, cost: f.cost, need }
+  }
+  const d = target.devisId ? model.devisById.get(target.devisId) : undefined
+  const lines = target.devisId ? model.linesByDevis.get(target.devisId) ?? [] : []
+  const estimated = lines.reduce((t, l) => { const it = model.itemsById.get(l.itemId); return t + (it ? model.line(it).estimated : 0) }, 0)
+  const real = (target.devisId ? model.devisLinesTotal(target.devisId) : 0) || d?.totalAmount || null
+  return { estimated, real, cost: real ?? estimated, need }
+}
+
+/** Sous une affectation : estimé, réel, déjà offert par d'autres cadeaux, et part couverte par ce montant. */
+function Coverage({ figures: f, amount }: { figures: TargetFigures; amount: number | null }) {
+  const already = Math.max(0, f.cost - f.need)
+  const a = amount ?? 0
+  const pct = f.need > 0 ? Math.round((a / f.need) * 100) : null
+  const status = f.need <= 0.005
+    ? { text: "déjà entièrement financé", tone: "text-emerald-700 dark:text-emerald-400" }
+    : a >= f.need - 0.005 && a <= f.need + 0.005
+      ? { text: "couvert à 100 %", tone: "text-emerald-700 dark:text-emerald-400" }
+      : a > f.need
+        ? { text: `dépasse de ${fmt(a - f.need)}`, tone: "text-destructive" }
+        : { text: `couvert à ${pct} % · il manque ${fmt(f.need - a)}`, tone: "text-amber-700 dark:text-amber-400" }
+  return (
+    <p className="flex flex-wrap gap-x-3 gap-y-0.5 pl-1 text-[11px] tabular-nums text-muted-foreground">
+      <span>Estimé <b className="text-foreground">{fmt(f.estimated)}</b></span>
+      <span>Réel <b className="text-foreground">{f.real == null ? "—" : fmt(f.real)}</b></span>
+      {already > 0.005 && <span>Déjà offert par d'autres <b className="text-foreground">{fmt(already)}</b></span>}
+      <span>À couvrir <b className="text-foreground">{fmt(f.need)}</b></span>
+      {(amount != null || f.need <= 0.005) && <span className={cn("font-medium", status.tone)}>{status.text}</span>}
     </p>
   )
 }

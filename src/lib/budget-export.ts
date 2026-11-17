@@ -74,7 +74,7 @@ export function exportBudgetXlsx({ items, model, poles, sequences, gifts = [] }:
     const retained = model.retained.get(item.id)
     const allDevis = (model.linesByItem.get(item.id) ?? []).map((l) => model.devisById.get(l.devisId)).filter(Boolean)
     const prio = effectivePriority(model, item)
-    const due = f.real ?? f.estimated
+    const due = f.cost
     const review = effectiveReview(model, item)
     const total = review ? reviewTotal(review.scores) : null
     const perPoint = total == null || item.amountStatus !== "estimated" ? null : costPerPoint(due, total)
@@ -110,7 +110,7 @@ export function exportBudgetXlsx({ items, model, poles, sequences, gifts = [] }:
     return [
       poleName(p.poleId), p.label, kids.length, model.sequencesOf(p).map(seqName).join(", "),
       p.priority ? PRIORITY_LABELS[p.priority] : "Non priorisé",
-      f.estimated, f.real, f.paid, Math.max(0, (f.real ?? f.estimated) - f.paid), PAYMENT_STATUS_LABELS[paymentStatus(f)],
+      f.estimated, f.real, f.paid, Math.max(0, f.cost - f.paid), PAYMENT_STATUS_LABELS[paymentStatus(f)],
       leavesOf.filter((l) => l.amountStatus === "to_estimate").length, yesNo(leavesOf.some((l) => l.guestDependent)),
       p.notes ?? "", f.offered, remaining(f),
     ]

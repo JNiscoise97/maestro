@@ -23,12 +23,28 @@ export interface RsvpResponse {
   partyNames: string | null
   arrivalAck: ArrivalAck | null
   sequencesAttending: string[] | null
+  /** Invitation en ligne : chaque personne (la première est celle qui répond) et sa réponse pour chaque moment. */
+  party: PartyMember[] | null
   processed: boolean
   createdAt: string
 }
 
 /** Confirmation horaire : « C'est bien noté » ou « Nous risquons d'arriver plus tard ». */
 export type ArrivalAck = "ok" | "late"
+
+/** Réponse pour un moment : oui, non ou « je ne sais pas encore ». */
+export type MomentAnswer = "yes" | "no" | "unsure"
+
+export interface PartyMember {
+  firstName: string
+  lastName: string
+  /** Moins de 10 ans. */
+  under10: boolean
+  /** Réponse par séquence (event_sequences.id). */
+  moments: Record<string, MomentAnswer>
+  /** Allergies ou restrictions alimentaires (null : aucune). */
+  diet?: string | null
+}
 
 export interface RsvpInput {
   wave: Wave
@@ -47,6 +63,7 @@ export interface RsvpInput {
   partyNames?: string | null
   arrivalAck?: ArrivalAck | null
   sequencesAttending?: string[] | null
+  party?: PartyMember[] | null
 }
 
 interface RsvpRow {
@@ -66,6 +83,7 @@ interface RsvpRow {
   party_names?: string | null
   arrival_ack?: string | null
   sequences_attending?: string[] | null
+  party?: PartyMember[] | null
   processed: boolean
   created_at: string
 }
@@ -90,6 +108,7 @@ function rowToRsvp(row: RsvpRow): RsvpResponse {
     partyNames: row.party_names ?? null,
     arrivalAck: (row.arrival_ack as ArrivalAck | null) ?? null,
     sequencesAttending: row.sequences_attending ?? null,
+    party: Array.isArray(row.party) ? row.party : null,
     processed: row.processed,
     createdAt: row.created_at,
   }
@@ -113,13 +132,14 @@ export const rsvpService = {
       dietary_constraints:  input.dietaryConstraints ?? null,
     }
 
-    // Colonnes ajoutées par la migration 0177 : envoyées seulement si renseignées.
+    // Colonnes ajoutées par les migrations 0177 et 0178 : envoyées seulement si renseignées.
     const extra = Object.fromEntries(Object.entries({
       guest_id:            input.guestId,
       party_size:          input.partySize,
       party_names:         input.partyNames,
       arrival_ack:         input.arrivalAck,
       sequences_attending: input.sequencesAttending,
+      party:               input.party,
     }).filter(([, v]) => v != null))
 
     if (USE_SUPABASE) {
@@ -129,12 +149,15 @@ export const rsvpService = {
         .select()
         .single()
       let { data, error } = await insert({ ...payload, ...extra })
-      // Colonnes absentes (migration 0177 pas encore appliquée) : on enregistre quand même la réponse,
+      // Colonnes absentes (migrations 0177 / 0178 pas encore appliquées) : on enregistre quand même la réponse,
       // les informations supplémentaires recopiées dans le message pour ne rien perdre.
-      if (error && /guest_id|party_|arrival_ack|sequences_attending/.test(error.message ?? "")) {
+      if (error && /guest_id|party|arrival_ack|sequences_attending/.test(error.message ?? "")) {
+        const answer = { yes: "oui", no: "non", unsure: "?" } as const
         const notes = [
           input.partySize != null && `Personnes : ${input.partySize}`,
-          input.partyNames && `Noms : ${input.partyNames.replace(/\n+/g, ", ")}`,
+          input.party?.length
+            ? `Détail : ${input.party.map((m) => `${m.firstName} ${m.lastName}${m.under10 ? " (-10 ans)" : ""}${m.diet ? ` {${m.diet}}` : ""} [${Object.values(m.moments).map((a) => answer[a]).join(" ")}]`).join(", ")}`
+            : input.partyNames && `Noms : ${input.partyNames.replace(/\n+/g, ", ")}`,
           input.arrivalAck && `Horaire : ${input.arrivalAck === "ok" ? "bien noté" : "risque d'arriver plus tard"}`,
         ].filter(Boolean).join(" · ")
         const message = [payload.message, notes && `[${notes}]`].filter(Boolean).join("\n\n") || null
@@ -152,6 +175,7 @@ export const rsvpService = {
       party_names: input.partyNames ?? null,
       arrival_ack: input.arrivalAck ?? null,
       sequences_attending: input.sequencesAttending ?? null,
+      party: input.party ?? null,
       processed: false,
       created_at: new Date().toISOString(),
     }

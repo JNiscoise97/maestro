@@ -25,7 +25,8 @@ import { MessageSuiviPage } from "@/pages/invites/MessageSuiviPage"
 import { RsvpSuiviTab } from "@/pages/invites/RsvpSuiviTab"
 import { AtelierTab } from "@/pages/invites/AtelierTab"
 import { PapeterieTab } from "@/pages/invites/PapeterieTab"
-import { InvitationsTab } from "@/pages/invites/InvitationsTab"
+import { InvitationEnLigneTab } from "@/pages/invites/InvitationEnLigneTab"
+import { FoyersTab } from "@/pages/invites/FoyersTab"
 import { SequencesTab } from "@/pages/invites/SequencesTab"
 import { CortegeTab } from "@/pages/invites/CortegeTab"
 import { GuestExportDialog } from "@/components/invites/GuestExportDialog"
@@ -436,7 +437,7 @@ export function InvitesList() {
 
 // ── Page composite ─────────────────────────────────────────────────────────────
 
-type InvitesTab = "liste" | "rsvp" | "plan-table" | "enfants" | "accessibilite" | "messages" | "atelier" | "invitations" | "papeterie" | "sequences" | "cortege"
+type InvitesTab = "liste" | "rsvp" | "plan-table" | "enfants" | "accessibilite" | "messages" | "atelier" | "invitations" | "foyers" | "papeterie" | "sequences" | "cortege"
 
 export function InvitesPage() {
   const [tab, setTab] = useState<InvitesTab>("liste")
@@ -462,6 +463,7 @@ export function InvitesPage() {
           <TabsTrigger value="accessibilite">Besoins spéciaux</TabsTrigger>
           <TabsTrigger value="messages">Communications</TabsTrigger>
           <TabsTrigger value="invitations">Invitations</TabsTrigger>
+          <TabsTrigger value="foyers">Foyers</TabsTrigger>
           <TabsTrigger value="papeterie">Papeterie</TabsTrigger>
           <TabsTrigger value="sequences">Séquences</TabsTrigger>
           <TabsTrigger value="cortege">Cortège</TabsTrigger>
@@ -474,7 +476,8 @@ export function InvitesPage() {
       {tab === "enfants" && <EnfantsPage />}
       {tab === "accessibilite" && <PersonnesAgeesPage />}
       {tab === "messages" && <MessageSuiviPage />}
-      {tab === "invitations" && <InvitationsTab />}
+      {tab === "invitations" && <InvitationEnLigneTab />}
+      {tab === "foyers" && <FoyersTab />}
       {tab === "papeterie" && <PapeterieTab />}
       {tab === "sequences" && <SequencesTab />}
       {tab === "cortege"   && <CortegeTab />}

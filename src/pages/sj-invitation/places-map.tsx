@@ -33,7 +33,7 @@ export function PlacesMap({ placeIds, number }: { placeIds: string[]; number: Ma
           return (
             <g key={`${p.id}-${p.label}`} transform={`translate(${p.x} ${p.y})`}>
               <circle r={13} fill={MATTE_GOLD} stroke="#fff" strokeWidth={2} style={{ filter: "drop-shadow(0 2px 2px rgba(70,52,25,.3))" }} />
-              <text y={4.5} textAnchor="middle" fill="#fff" fontSize={12} fontFamily="'Cormorant Garamond', serif" fontWeight={600}>{p.n}</text>
+              <text y={4.5} textAnchor="middle" fill="#fff" fontSize={12} fontFamily="'Geist Variable', sans-serif" fontWeight={600}>{p.n}</text>
               <text x={l.x} y={l.y} textAnchor={l.anchor} fill="#2e2a25" fontSize={14} fontFamily="'Cormorant Garamond', serif"
                 stroke="#fff" strokeWidth={4} paintOrder="stroke" strokeLinejoin="round">{p.label}</text>
             </g>
@@ -48,7 +48,7 @@ export function PlacesMap({ placeIds, number }: { placeIds: string[]; number: Ma
 export function PinNumber({ n }: { n: number }) {
   return (
     <span aria-hidden className="mr-2 inline-flex size-6 items-center justify-center rounded-full align-middle text-xs font-semibold text-white"
-      style={{ background: MATTE_GOLD, fontFamily: "var(--p-heading)" }}>
+      style={{ background: MATTE_GOLD, fontFamily: "'Geist Variable', sans-serif" }}>
       {n}
     </span>
   )

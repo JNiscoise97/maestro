@@ -351,6 +351,18 @@ export interface Guest {
   postalAddress?: string | null
   /** Nom sur l'invitation (ex. « Tatie Monique ») ; null = surnom, sinon prénom — voir 0176_invitations_foyers.sql. */
   invitationName?: string | null
+  /** Foyer (une invitation par foyer) ; null = pas encore rattaché — voir 0179_retour_foyers.sql. */
+  householdId?: string | null
+}
+
+/** Foyer : invités qui reçoivent une même invitation, constitué dans un groupe d'invités. */
+export interface Household {
+  id: string
+  groupId: string | null
+  /** Texte de l'invitation pour le foyer ; null = noms des membres (calculé). */
+  label: string | null
+  notes: string | null
+  sortOrder: number
 }
 
 

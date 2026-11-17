@@ -410,8 +410,10 @@ function BudgetSummary({ postes, model }: { postes: BudgetItem[]; model: BudgetM
   const estimated = figs.reduce((t, f) => t + f.estimated, 0)
   const real = figs.reduce((t, f) => t + (f.real ?? 0), 0)
   const paid = figs.reduce((t, f) => t + f.paid, 0)
-  // Reste à payer : sur le réel quand il est connu, sinon sur l'estimé.
-  const due = figs.reduce((t, f) => t + (f.real ?? f.estimated), 0)
+  // Reste à payer : ligne par ligne, sur le réel quand il est connu, sinon sur l'estimé.
+  const due = figs.reduce((t, f) => t + f.cost, 0)
+  // Écart réel / estimé, à périmètre égal : les seules lignes dont le réel est connu.
+  const drift = real - figs.reduce((t, f) => t + f.engagedEstimate, 0)
   // Cadeaux anticipés reçus affectés au budget, et ce qu'il reste à financer nous-mêmes.
   const offered = figs.reduce((t, f) => t + f.offered, 0)
   const ourShare = figs.reduce((t, f) => t + remaining(f), 0)
@@ -443,7 +445,7 @@ function BudgetSummary({ postes, model }: { postes: BudgetItem[]; model: BudgetM
         {card("Budget estimé", fmt(estimated), `${postes.length} poste${postes.length > 1 ? "s" : ""}`)}
         {card("Engagé", fmt(real), "devis retenus et montants réels")}
         {card("Payé", fmt(paid))}
-        {card("Reste à payer", fmt(Math.max(0, due - paid)), estimated - real >= 0 ? `marge ${fmt(estimated - real)} sur l'estimé` : "réel au-dessus de l'estimé",
+        {card("Reste à payer", fmt(Math.max(0, due - paid)), Math.abs(drift) < 0.005 ? "engagé conforme à l'estimé" : drift < 0 ? `engagé ${fmt(-drift)} sous l'estimé` : `engagé ${fmt(drift)} au-dessus de l'estimé`,
           due - paid > 0 ? "" : "text-emerald-600 dark:text-emerald-400")}
         {card("Offert", fmt(offered), "cadeaux anticipés reçus", offered > 0 ? "text-emerald-600 dark:text-emerald-400" : undefined)}
         {card("Reste à notre charge", fmt(ourShare), "réel (sinon estimé) moins l'offert")}

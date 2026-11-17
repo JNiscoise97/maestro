@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
-import { ChevronDown, MapPin } from "lucide-react"
+import { ChevronDown, Lock, LockOpen, MapPin } from "lucide-react"
 
 import { useGalleryAuth } from "@/context/GalleryAuthContext"
 import { MATTE_GOLD } from "@/features/gallery/gilded"
 import type { GalleryMember } from "@/features/gallery/types"
 import { Masthead } from "@/pages/photos/GalleryChrome"
-import { rsvpService, type RsvpResponse } from "@/services/rsvp.service"
+import { rsvpService, type MomentAnswer, type PartyMember, type RsvpResponse } from "@/services/rsvp.service"
 import {
-  AMBIANCE, CORTEGE, DAYS, FAQ, GIFTS, HERO, INVITATION, OUR_WORD, PLACES, PROGRAMME, RSVP, THANKS, TRAVEL, isTodo, type Day,
+  AMBIANCE, CORTEGE, DAYS, FAQ, GIFTS, INVITATION, OUR_WORD, PLACES, PROGRAMME, RSVP, THANKS, TRAVEL, isTodo, type Day, type Moment,
 } from "./content"
 import {
   findGuest, loadGuestIdsWithSequences, loadProgramme, loadWeddingGuests, momentsInWords, visibleDays, weddingTable,
@@ -109,7 +109,8 @@ function useGuestView(member: GalleryMember): GuestView {
   const isAdmin = member.role === "admin"
   const [guests, setGuests] = useState<WeddingGuest[] | null>(null)
   const [previewable, setPreviewable] = useState<Set<string>>(new Set())
-  const [previewId, setPreviewId] = useState("")
+  // Aperçu demandé depuis l'appli (Invités › Invitation en ligne › « Voir sa page ») : ?apercu=<id invité>.
+  const [previewId, setPreviewId] = useState(() => (isAdmin ? new URLSearchParams(window.location.search).get("apercu") ?? "" : ""))
   const [loaded, setLoaded] = useState<{ id: string; programme: Programme | null } | null>(null)
 
   useEffect(() => {
@@ -127,7 +128,7 @@ function useGuestView(member: GalleryMember): GuestView {
   useEffect(() => {
     if (!guests || !target) return
     let alive = true
-    loadProgramme(target)
+    loadProgramme(target, guests)
       .then((programme) => { if (alive) setLoaded({ id: target.id, programme }) })
       .catch((e) => { console.error("[invitation] programme", e); if (alive) setLoaded({ id: target.id, programme: null }) })
     return () => { alive = false }
@@ -186,9 +187,7 @@ function Hero({ member }: { member: GalleryMember }) {
       <div className="[&_h1_span]:text-white!" style={{ "--p-gold": "#fff", textShadow: HERO_SHADOW } as React.CSSProperties}>
         <Masthead subtitle={INVITATION_SUBTITLE} gilded />
       </div>
-      <p className="-mt-4 text-lg sm:text-xl" style={{ ...heading, textShadow: HERO_SHADOW }}><T>{HERO.dates}</T></p>
-      <p className="mt-1 text-[11px] uppercase tracking-[0.3em]" style={{ textShadow: HERO_SHADOW }}>{HERO.place}</p>
-      <p className="mt-8 max-w-md text-sm leading-relaxed text-white/90" style={{ textShadow: HERO_SHADOW }}>
+      <p className="mt-2 max-w-md text-sm leading-relaxed text-white/90" style={{ textShadow: HERO_SHADOW }}>
         {member.first_name ? `${member.first_name}, voici` : "Voici"} tout ce qu'il faut savoir sur notre mariage.
       </p>
       <button type="button" onClick={() => scrollToId("reponse")}
@@ -324,7 +323,10 @@ function InvitationSection() {
         <p className="my-6 text-4xl font-light uppercase tracking-[0.18em] sm:text-5xl" style={{ color: MATTE_GOLD }}>
           Sarah <span className="text-[0.6em] normal-case italic tracking-normal">&amp;</span> Jordan
         </p>
-        <p className="text-lg sm:text-xl"><T>{INVITATION.invite}</T></p>
+        <p className="text-lg sm:text-xl"><T>{INVITATION.date}</T></p>
+        <Fleuron className="my-8" />
+        <p className="mx-auto max-w-xl text-lg leading-relaxed sm:text-xl"><T>{INVITATION.context}</T></p>
+        <p className="mt-6 text-lg sm:text-xl"><T>{INVITATION.invite}</T></p>
       </div>
     </Section>
   )
@@ -332,13 +334,34 @@ function InvitationSection() {
 
 // ── 2. Un mot de nous ─────────────────────────────────────────────────────────
 
-/** Polaroïds de « Un mot de nous » (photos des mariés : 1, 6, 4 et 5, recadrées dans public/sj-invitation/). */
-const POLAROIDS: { src: string; rotate: number; shift: string; caption?: string }[] = [
-  { src: "/sj-invitation/polaroid-1.webp", rotate: -6, shift: "sm:translate-x-2" },
-  { src: "/sj-invitation/polaroid-2.webp", rotate: 4, shift: "translate-y-3 sm:-translate-x-1" },
-  { src: "/sj-invitation/polaroid-3.webp", rotate: -3, shift: "sm:translate-x-1 sm:translate-y-2" },
-  { src: "/sj-invitation/polaroid-4.webp", rotate: 6, shift: "translate-y-3 sm:-translate-x-2", caption: "À nous !" },
+type PolaroidPhoto = { src: string; rotate: number; caption?: string }
+
+/** Polaroïds sous « Un mot de nous » (photos des mariés 1 et 6, recadrées dans public/sj-invitation/). */
+const POLAROIDS_MOT: [PolaroidPhoto, PolaroidPhoto] = [
+  { src: "/sj-invitation/polaroid-1.webp", rotate: -6 },
+  { src: "/sj-invitation/polaroid-2.webp", rotate: 5 },
 ]
+
+/** Polaroïds plus bas, dans « Liste de mariage » (photos 4 et 5). */
+const POLAROIDS_LISTE: [PolaroidPhoto, PolaroidPhoto] = [
+  { src: "/sj-invitation/polaroid-3.webp", rotate: -4 },
+  { src: "/sj-invitation/polaroid-4.webp", rotate: 6, caption: "À nous !" },
+]
+
+/** Deux polaroïds qui se chevauchent légèrement, le second un peu plus bas ; ils arrivent de chaque côté. */
+function PolaroidPair({ photos }: { photos: [PolaroidPhoto, PolaroidPhoto] }) {
+  const [a, b] = photos
+  return (
+    <div className="mx-auto mt-12 flex max-w-md justify-center">
+      <Reveal from="left" delay={150} className="relative z-10 w-1/2">
+        <Polaroid src={a.src} rotate={a.rotate} caption={a.caption} className="translate-x-3" />
+      </Reveal>
+      <Reveal from="right" delay={350} className="w-1/2">
+        <Polaroid src={b.src} rotate={b.rotate} caption={b.caption} className="-translate-x-3 translate-y-4" />
+      </Reveal>
+    </div>
+  )
+}
 
 function OurWordSection() {
   return (
@@ -347,14 +370,7 @@ function OurWordSection() {
         {OUR_WORD.paragraphs.map((p) => <p key={p}><T>{p}</T></p>)}
         <p className="pt-4 text-2xl italic" style={{ color: MATTE_GOLD }}>{OUR_WORD.signature}</p>
       </div>
-      {/* Quatre polaroïds éparpillés : 2 × 2 sur téléphone, en ligne sur ordinateur. */}
-      <div className="mx-auto mt-12 grid max-w-xl grid-cols-2 gap-x-2 gap-y-6 sm:grid-cols-4 sm:gap-x-0">
-        {POLAROIDS.map((p, i) => (
-          <Reveal key={p.src} from={i % 2 ? "right" : "left"} delay={120 + i * 140} className={i % 2 ? "relative z-10" : ""}>
-            <Polaroid src={p.src} rotate={p.rotate} caption={p.caption} className={p.shift} />
-          </Reveal>
-        ))}
-      </div>
+      <PolaroidPair photos={POLAROIDS_MOT} />
     </Section>
   )
 }
@@ -393,8 +409,9 @@ function ProgrammeSection({ view }: { view: GuestView }) {
           <div className="mt-12 space-y-14">
             {days.map((day) => (
               <div key={day.date}>
-                <h3 className="mb-6 border-b pb-3 text-center text-[11px] uppercase tracking-[0.3em] sm:text-left"
-                  style={{ color: MATTE_GOLD, borderColor: "var(--p-line)" }}>{day.label}</h3>
+                {/* Jour : bien visible (grand titre doré, filet en dessous) pour repérer d'un coup d'œil le découpage. */}
+                <h3 className="mb-8 border-b pb-3 text-center text-3xl sm:text-left sm:text-4xl"
+                  style={{ ...heading, color: MATTE_GOLD, borderColor: MATTE_GOLD }}>{day.label}</h3>
                 <ol className="space-y-8">
                   {day.moments.map((m) => (
                     <li key={m.sequenceId} className="grid gap-x-8 gap-y-1 sm:grid-cols-[9rem_1fr]">
@@ -586,6 +603,7 @@ function GiftsSection() {
           <a href={GIFTS.url} target="_blank" rel="noreferrer" className={button} style={buttonStyle}>{GIFTS.label}</a>
         </p>
       )}
+      <PolaroidPair photos={POLAROIDS_LISTE} />
     </Section>
   )
 }
@@ -615,29 +633,57 @@ function FaqSection() {
 
 const field = "w-full border-0 border-b bg-transparent py-2.5 text-base focus:outline-none"
 const fieldStyle = { borderColor: "#d8d2c8", borderRadius: 0 }
-const label = "mb-3 block text-[10.5px] uppercase tracking-[0.16em]"
 
 const RSVP_TABLE = weddingTable("rsvp_responses")
 
+type Presence = "yes" | "no" | "unsure"
+type Answers = Record<string, MomentAnswer | null>
+type Person = { key: string; firstName: string; lastName: string; under10: boolean; moments: Answers; hasDiet: boolean; diet: string }
+type StepId = "presence" | "moments" | "party" | "word"
+
+const ANSWER_ORDER: MomentAnswer[] = ["yes", "no", "unsure"]
+const toAttendance = { yes: "yes", no: "no", unsure: "probably" } as const
+const fromAttendance = (a: string): Presence => (a === "no" || a === "probably-not" ? "no" : a === "probably" ? "unsure" : "yes")
+const newKey = () => Math.random().toString(36).slice(2)
+
+/**
+ * Formulaire de réponse, étape par étape :
+ *   1. Ta présence (nom, oui / non / je ne sais pas encore) ;
+ *   2. Tes moments : oui / non / je ne sais pas encore pour chacun (si l'invité est convié à plusieurs) ;
+ *   3. Qui vient avec toi : personnes ajoutées une à une (prénom, nom, moins de 10 ans, présence par moment),
+ *      avec le compteur de personnes ;
+ *   4. Un petit mot (restrictions alimentaires, message), puis envoi.
+ * Une réponse « non » passe directement à l'étape 4.
+ */
 function RsvpSection({ member, days: programmeDays, guestId }: { member: GalleryMember; days: Day[]; guestId: string | null }) {
-  const accountName = `${member.first_name ?? ""} ${member.last_name ?? ""}`.trim()
   const moments = programmeDays.flatMap((d) => d.moments.map((m) => ({ ...m, day: d.label, date: d.date })))
   const askMoments = moments.length > 1
 
   const [previous, setPrevious] = useState<RsvpResponse | null>(null)
   const [editing, setEditing] = useState(true)
-  const [name, setName] = useState(accountName)
-  const [attending, setAttending] = useState<"yes" | "no" | "">("")
-  // null = tous les moments de l'invité (cochés par défaut).
-  const [chosen, setChosen] = useState<string[] | null>(null)
-  const [partySize, setPartySize] = useState(1)
-  const [partyNames, setPartyNames] = useState(accountName)
+  const [step, setStep] = useState(0)
+  // Prénom puis NOM DE FAMILLE en capitales (comme sur le faire-part).
+  const accountFirst = member.first_name?.trim() ?? ""
+  const accountLast = member.last_name?.trim().toLocaleUpperCase("fr-FR") ?? ""
+  const [firstName, setFirstName] = useState(accountFirst)
+  const [lastName, setLastName] = useState(accountLast)
+  // Nom repris du compte : verrouillé par défaut (cadenas pour le modifier) ; libre s'il est inconnu.
+  const [nameLocked, setNameLocked] = useState(accountFirst !== "" && accountLast !== "")
+  const nameRef = useRef<HTMLInputElement>(null)
+  const [presence, setPresence] = useState<Presence | null>(null)
+  const [mine, setMine] = useState<Answers>({})
+  const [others, setOthers] = useState<Person[]>([])
+  // Restrictions alimentaires de la personne qui répond (celles des autres sont dans others).
+  const [hasDiet, setHasDiet] = useState(false)
   const [dietary, setDietary] = useState("")
   const [message, setMessage] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const isYes = attending === "yes"
-  const selected = chosen ?? moments.map((m) => m.sequenceId)
+
+  const steps: StepId[] = presence === "no" ? ["presence", "word"] : ["presence", ...(askMoments ? ["moments" as const] : []), "party", "word"]
+  const current = steps[Math.min(step, steps.length - 1)]
+  const isLast = step >= steps.length - 1
+  const count = 1 + others.length
 
   // Réponse déjà envoyée par cet invité : on l'affiche et on pré-remplit le formulaire pour la modifier.
   useEffect(() => {
@@ -650,51 +696,89 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
       fill(r)
     })
     return () => { alive = false }
+    // Recharger seulement quand l'invité change (fill ne fait que remplir le formulaire).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guestId])
 
   function fill(r: RsvpResponse) {
-    setName(r.name)
-    setAttending(r.attendance === "no" || r.attendance === "probably-not" ? "no" : "yes")
-    setChosen(r.sequencesAttending)
-    setPartySize(r.partySize ?? r.adults ?? 1)
-    setPartyNames(r.partyNames ?? r.name)
-    setDietary(r.dietaryConstraints ?? "")
+    const [self, ...rest] = r.party ?? []
+    setFirstName(self?.firstName ?? accountFirst)
+    setLastName(self?.lastName ?? accountLast)
+    setPresence(fromAttendance(r.attendance))
+    setMine(self?.moments ?? {})
+    setOthers(rest.map((p) => ({ ...p, key: newKey(), hasDiet: !!p.diet?.trim(), diet: p.diet ?? "" })))
+    // Anciennes réponses : une seule restriction pour tout le monde, reprise pour la personne qui répond.
+    const myDiet = self ? (self.diet ?? "") : (r.dietaryConstraints ?? "")
+    setHasDiet(!!myDiet.trim())
+    setDietary(myDiet)
     setMessage(r.message ?? "")
+    setStep(0)
   }
 
-  const nameLines = partyNames.split("\n").map((l) => l.trim()).filter(Boolean)
+  /** Réponses d'une personne pour tous les moments (un seul moment : la présence globale). */
+  const answersOf = (a: Answers): Record<string, MomentAnswer> =>
+    Object.fromEntries(moments.map((m) => [m.sequenceId, a[m.sequenceId] ?? (askMoments ? "unsure" : (presence ?? "unsure"))]))
 
-  function validate(): string | null {
-    if (!name.trim()) return "Merci d'indiquer votre nom."
-    if (!attending) return "Merci d'indiquer si vous serez présents."
-    if (!isYes) return null
-    if (askMoments && selected.length === 0) return "Merci de cocher au moins un moment, ou de répondre « Non »."
-    if (nameLines.length === 0) return "Merci d'indiquer le nom des personnes concernées."
-    if (nameLines.length !== partySize)
-      return `Vous avez indiqué ${partySize} personne${partySize > 1 ? "s" : ""} et ${nameLines.length} nom${nameLines.length > 1 ? "s" : ""} : merci de vérifier.`
+  function validate(id: StepId): string | null {
+    if (id === "presence") {
+      if (!firstName.trim() || !lastName.trim()) return "Merci d'indiquer ton prénom et ton nom."
+      if (!presence) return "Merci d'indiquer si tu seras présent."
+    }
+    if (id === "moments" && moments.some((m) => !mine[m.sequenceId])) return "Merci de répondre pour chacun des moments."
+    if (id === "party") {
+      const i = others.findIndex((p) => !p.firstName.trim() || !p.lastName.trim())
+      if (i >= 0) return `Merci d'indiquer le prénom et le nom de la personne ${i + 2}.`
+      const j = others.findIndex((p) => moments.some((m) => !p.moments[m.sequenceId]))
+      if (j >= 0) return `Merci d'indiquer la présence de ${others[j].firstName.trim()} à chacun des moments.`
+      if (hasDiet && !dietary.trim()) return "Merci de préciser tes restrictions alimentaires, ou de décocher la case."
+      const k = others.findIndex((p) => p.hasDiet && !p.diet.trim())
+      if (k >= 0) return `Merci de préciser les restrictions alimentaires de ${others[k].firstName.trim()}, ou de décocher la case.`
+    }
     return null
+  }
+
+  function go(delta: number) {
+    if (delta > 0) {
+      const problem = validate(current)
+      if (problem) { setError(problem); return }
+    }
+    setError(null)
+    setStep((s) => Math.max(0, Math.min(steps.length - 1, s + delta)))
+    scrollToId("reponse")
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    const problem = validate()
+    if (!isLast) { go(1); return }
+    const problem = steps.map(validate).find(Boolean)
     if (problem) { setError(problem); return }
     setLoading(true)
     setError(null)
-    const sequences = isYes ? moments.filter((m) => selected.includes(m.sequenceId)) : []
+    const coming = presence !== "no"
+    const party: PartyMember[] = coming ? [
+      { firstName: firstName.trim(), lastName: lastName.trim(), under10: false, moments: answersOf(mine), diet: hasDiet && dietary.trim() ? dietary.trim() : null },
+      ...others.map((p) => ({
+        firstName: p.firstName.trim(), lastName: p.lastName.trim(), under10: p.under10, moments: answersOf(p.moments),
+        diet: p.hasDiet && p.diet.trim() ? p.diet.trim() : null,
+      })),
+    ] : []
+    // Récapitulatif des restrictions (colonne existante, lue par l'onglet Réponses) : « Prénom Nom : … ».
+    const diets = party.filter((p) => p.diet).map((p) => `${p.firstName} ${p.lastName} : ${p.diet}`).join(" · ")
+    const attended = moments.filter((m) => party.some((p) => p.moments[m.sequenceId] === "yes"))
     try {
       const saved = await rsvpService.create({
         wave: "invitation",
-        name: name.trim(),
+        name: `${firstName.trim()} ${lastName.trim()}`,
         guestId,
-        attendance: attending as "yes" | "no",
-        adults: null,
-        children: null,
-        partySize: isYes ? partySize : null,
-        partyNames: isYes ? nameLines.join("\n") : null,
-        sequencesAttending: isYes ? sequences.map((m) => m.sequenceId) : null,
-        daysAttending: isYes ? [...new Set(sequences.map((m) => m.date))] : null,
-        dietaryConstraints: isYes && dietary.trim() ? dietary.trim() : null,
+        attendance: toAttendance[presence!],
+        adults: coming ? party.filter((p) => !p.under10).length : null,
+        children: coming ? party.filter((p) => p.under10).length : null,
+        party: coming ? party : null,
+        partySize: coming ? party.length : null,
+        partyNames: coming ? party.map((p) => `${p.firstName} ${p.lastName}`).join("\n") : null,
+        sequencesAttending: coming ? attended.map((m) => m.sequenceId) : null,
+        daysAttending: coming ? [...new Set(attended.map((m) => m.date))] : null,
+        dietaryConstraints: coming && diets ? diets : null,
         message: message.trim() || null,
       }, RSVP_TABLE)
       setPrevious(saved)
@@ -707,12 +791,11 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
     }
   }
 
-  const answered = previous && (previous.attendance === "no" || previous.attendance === "probably-not") ? "no" : "yes"
-  const previousCount = previous?.partySize ?? previous?.adults ?? null
+  const updateOther = (key: string, patch: Partial<Person>) => setOthers((list) => list.map((p) => (p.key === key ? { ...p, ...patch } : p)))
 
   return (
-    <Section id="reponse" eyebrow="Confirmation de présence" title="Serez-vous des nôtres ?" narrow picto="enveloppe" decor={
-      <Deco className="-right-10 -top-10 w-36 sm:-right-28 sm:w-52"><FlowerCluster flip kind="coin-hortensia" className="w-full" /></Deco>
+    <Section id="reponse" eyebrow="Confirmation de présence" title="Seras-tu des nôtres ?" narrow picto="enveloppe" decor={
+      <Deco className="-right-6 -top-10 w-32 sm:-right-12 sm:-top-14 sm:w-48"><FlowerCluster flip kind="coin-hortensia" className="w-full" /></Deco>
     }>
       <div className="-mt-4 mb-10 space-y-3 text-center text-sm leading-relaxed" style={muted}>
         <p><T>{RSVP.intro}</T></p>
@@ -720,86 +803,135 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
       </div>
 
       {previous && !editing ? (
-        <div className="border p-8 text-center" style={{ borderColor: MATTE_GOLD }} role="status">
-          <p className="text-3xl" style={heading}>
-            {answered === "no" ? "Merci de nous avoir répondu." : "Merci, à très bientôt !"}
-          </p>
-          <p className="mt-4 text-sm leading-relaxed" style={muted}>
-            Réponse enregistrée le {new Date(previous.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} :{" "}
-            {answered === "no" ? "absent(e)" : "présent(e)"}
-            {answered === "yes" && previousCount ? ` · ${previousCount} personne${previousCount > 1 ? "s" : ""}` : ""}.
-          </p>
-          {answered === "yes" && previous.sequencesAttending && askMoments && (
-            <p className="mt-2 text-sm" style={muted}>
-              {moments.filter((m) => previous.sequencesAttending!.includes(m.sequenceId)).map((m) => m.title).join(" · ")}
-            </p>
-          )}
-          <button type="button" className="mt-6 text-xs underline" style={muted} onClick={() => setEditing(true)}>
-            Modifier ma réponse
-          </button>
-        </div>
+        <PreviousAnswer response={previous} moments={moments} onEdit={() => { fill(previous); setEditing(true) }} />
       ) : (
-        <form onSubmit={submit} noValidate className="space-y-10 text-left">
-          <p className="text-xs" style={muted}><span style={{ color: MATTE_GOLD }}>*</span> Question obligatoire</p>
+        <form onSubmit={submit} noValidate className="text-left">
+          {/* Étapes */}
+          <ol className="mb-10 flex items-center gap-2" aria-label="Étapes du formulaire">
+            {steps.map((id, i) => (
+              <li key={id} className="flex flex-1 flex-col items-center gap-1.5 text-center" aria-current={i === step ? "step" : undefined}>
+                <span className="h-0.5 w-full" style={{ background: i <= step ? MATTE_GOLD : "#e5dfd5" }} />
+                <span className="text-[10px] uppercase tracking-[0.14em]" style={{ color: i === step ? MATTE_GOLD : "var(--p-muted)" }}>
+                  {RSVP.steps[id]}
+                </span>
+              </li>
+            ))}
+          </ol>
+          <p className="sr-only" aria-live="polite">Étape {step + 1} sur {steps.length} : {RSVP.steps[current]}</p>
 
-          <Question id="rsvp-name" label={RSVP.name.label} help={RSVP.name.help} required>
-            <input id="rsvp-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={field} style={fieldStyle} />
-          </Question>
-
-          <Question label={RSVP.attendance.label} help={RSVP.attendance.help} required group>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {([["yes", RSVP.attendance.yes], ["no", RSVP.attendance.no]] as const).map(([v, l]) => (
-                <Choice key={v} selected={attending === v} onClick={() => setAttending(v)}>{l}</Choice>
-              ))}
-            </div>
-          </Question>
-
-          {isYes && (
-            <>
-              {askMoments && (
-                <Question label={RSVP.moments.label} help={RSVP.moments.help} required group>
-                  <div className="space-y-2.5">
-                    {moments.map((m) => (
-                      <label key={m.sequenceId} className="flex cursor-pointer items-start gap-3 text-base">
-                        <input type="checkbox" checked={selected.includes(m.sequenceId)} className="mt-1 size-4 shrink-0" style={{ accentColor: MATTE_GOLD }}
-                          onChange={() => setChosen(selected.includes(m.sequenceId) ? selected.filter((x) => x !== m.sequenceId) : [...selected, m.sequenceId])} />
-                        <span>
-                          {m.title}
-                          <span className="block text-xs" style={muted}>{m.day}{isTodo(m.time) ? "" : ` · ${m.time}`}</span>
-                        </span>
-                      </label>
+          <div className="space-y-10">
+            {current === "presence" && (
+              <>
+                <Question label={RSVP.name.label} help={RSVP.name.help} required group>
+                  {/* Nom déjà connu (compte de l'invité) : en lecture seule, le cadenas permet de le modifier. */}
+                  <div className="relative grid gap-4 pr-10 sm:grid-cols-2">
+                    {([["Prénom", firstName, setFirstName, "given-name"], ["Nom", lastName, setLastName, "family-name"]] as const).map(([text, value, set, auto], i) => (
+                      <input key={text} ref={i === 0 ? nameRef : undefined} value={value} onChange={(e) => set(e.target.value)} placeholder={text} aria-label={text}
+                        autoComplete={auto} readOnly={nameLocked} aria-readonly={nameLocked || undefined}
+                        className={`${field} ${nameLocked ? "cursor-default" : ""}`} style={{ ...fieldStyle, color: nameLocked ? "var(--p-muted)" : undefined }} />
+                    ))}
+                    <button type="button" onClick={() => { setNameLocked((v) => !v); if (nameLocked) requestAnimationFrame(() => nameRef.current?.focus()) }}
+                      aria-label={nameLocked ? "Modifier le nom" : "Verrouiller le nom"} title={nameLocked ? "Modifier le nom" : "Verrouiller le nom"}
+                      className="absolute right-0 top-1 flex size-8 items-center justify-center transition-colors hover:text-[#a8844f]"
+                      style={{ color: nameLocked ? "var(--p-muted)" : MATTE_GOLD }}>
+                      {nameLocked ? <Lock className="size-4" aria-hidden /> : <LockOpen className="size-4" aria-hidden />}
+                    </button>
+                  </div>
+                </Question>
+                <Question label={RSVP.attendance.label} help={RSVP.attendance.help} required group>
+                  <div className="flex flex-wrap gap-3">
+                    {(["yes", "no", "unsure"] as const).map((v) => (
+                      <Choice key={v} selected={presence === v} onClick={() => setPresence(v)}>{RSVP.attendance[v]}</Choice>
                     ))}
                   </div>
                 </Question>
-              )}
+              </>
+            )}
 
-              <Question label={RSVP.partySize.label} help={RSVP.partySize.help} required group>
-                <Counter label="Personnes" value={partySize} min={1} onChange={setPartySize} hideLabel />
+            {current === "moments" && (
+              <Question label={RSVP.moments.label} help={RSVP.moments.help} required group>
+                <MomentAnswers moments={moments} value={mine} onChange={(id, a) => setMine((p) => ({ ...p, [id]: a }))}
+                  onChangeAll={(a) => setMine(Object.fromEntries(moments.map((m) => [m.sequenceId, a])))} />
               </Question>
+            )}
 
-              <Question id="rsvp-names" label={RSVP.partyNames.label} help={RSVP.partyNames.help} required>
-                <textarea id="rsvp-names" rows={Math.max(2, partySize)} value={partyNames} onChange={(e) => setPartyNames(e.target.value)}
-                  placeholder={"Prénom Nom\nPrénom Nom"} className={`${field} resize-y`} style={fieldStyle} />
+            {current === "party" && (
+              <Question label={RSVP.party.label} help={RSVP.party.help} group>
+                <p className="mb-5 text-center text-sm" role="status" style={{ color: MATTE_GOLD }}>
+                  <strong className="text-2xl font-normal" style={heading}>{count}</strong> personne{count > 1 ? "s" : ""} au total, toi compris
+                  {others.some((p) => p.under10) && ` · dont ${others.filter((p) => p.under10).length} de moins de 10 ans`}
+                </p>
+                <div className="space-y-5">
+                  {/* La personne qui répond : ses restrictions alimentaires. */}
+                  <div className="border p-4 sm:p-5" style={{ borderColor: "#e5dfd5", borderRadius: "var(--p-radius)" }}>
+                    <div className="mb-3 flex items-baseline justify-between gap-3">
+                      <span className="text-[10.5px] uppercase tracking-[0.16em]" style={muted}>Toi</span>
+                      <span className="text-lg" style={heading}>{firstName} {lastName}</span>
+                    </div>
+                    <DietField id="rsvp-diet-0" label={RSVP.dietary.checkSelf} checked={hasDiet} value={dietary}
+                      onCheck={setHasDiet} onChange={setDietary} />
+                  </div>
+                  {others.length === 0 && <p className="text-center text-sm italic" style={muted}>{RSVP.party.alone}</p>}
+                  {others.map((p, i) => (
+                    <div key={p.key} className="border p-4 sm:p-5" style={{ borderColor: "#e5dfd5", borderRadius: "var(--p-radius)" }}>
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="text-[10.5px] uppercase tracking-[0.16em]" style={muted}>Personne {i + 2}</span>
+                        <button type="button" className="text-xs underline" style={muted}
+                          onClick={() => setOthers((list) => list.filter((x) => x.key !== p.key))}>Retirer</button>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <input value={p.firstName} onChange={(e) => updateOther(p.key, { firstName: e.target.value })} placeholder="Prénom"
+                          aria-label={`Prénom de la personne ${i + 2}`} className={field} style={fieldStyle} />
+                        <input value={p.lastName} onChange={(e) => updateOther(p.key, { lastName: e.target.value })} placeholder="Nom"
+                          aria-label={`Nom de la personne ${i + 2}`} className={field} style={fieldStyle} />
+                      </div>
+                      <label className="mt-4 flex cursor-pointer items-center gap-2.5 text-sm">
+                        <input type="checkbox" checked={p.under10} onChange={(e) => updateOther(p.key, { under10: e.target.checked })}
+                          className="size-4" style={{ accentColor: MATTE_GOLD }} />
+                        {RSVP.party.under10}
+                      </label>
+                      <div className="mt-3">
+                        <DietField id={`rsvp-diet-${p.key}`} label={`${p.firstName.trim() || "Cette personne"} ${RSVP.dietary.checkOther.toLowerCase()}`}
+                          checked={p.hasDiet} value={p.diet}
+                          onCheck={(v) => updateOther(p.key, { hasDiet: v })} onChange={(v) => updateOther(p.key, { diet: v })} />
+                      </div>
+                      <div className="mt-5">
+                        <MomentAnswers moments={moments} value={p.moments} compact
+                          onChange={(id, a) => updateOther(p.key, { moments: { ...p.moments, [id]: a } })}
+                          onChangeAll={(a) => updateOther(p.key, { moments: Object.fromEntries(moments.map((m) => [m.sequenceId, a])) })} />
+                      </div>
+                    </div>
+                  ))}
+                  <div className="text-center">
+                    <button type="button" className={button} style={buttonStyle}
+                      onClick={() => setOthers((list) => [...list, { key: newKey(), firstName: "", lastName: lastName.trim(), under10: false, moments: {}, hasDiet: false, diet: "" }])}>
+                      + {RSVP.party.add}
+                    </button>
+                  </div>
+                </div>
               </Question>
+            )}
 
-              <Question id="rsvp-diet" label={RSVP.dietary.label} help={RSVP.dietary.help}>
-                <textarea id="rsvp-diet" rows={2} value={dietary} onChange={(e) => setDietary(e.target.value)} placeholder="Facultatif"
-                  className={`${field} resize-y`} style={fieldStyle} />
-              </Question>
+            {current === "word" && (
+              <>
+                <Question id="rsvp-msg" label={RSVP.message.label} help={RSVP.message.help}>
+                  <textarea id="rsvp-msg" rows={3} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Ton message"
+                    className={`${field} resize-y`} style={fieldStyle} />
+                </Question>
+              </>
+            )}
+          </div>
 
-            </>
-          )}
+          {error && <p className="mt-8 text-sm" style={{ color: "#9b2c2c" }} role="alert">{error}</p>}
 
-          <Question id="rsvp-msg" label={RSVP.message.label} help={RSVP.message.help}>
-            <textarea id="rsvp-msg" rows={3} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Votre message"
-              className={`${field} resize-y`} style={fieldStyle} />
-          </Question>
-
-          {error && <p className="text-sm" style={{ color: "#9b2c2c" }} role="alert">{error}</p>}
-
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+            {step > 0 && (
+              <button type="button" className="px-4 py-3 text-xs uppercase tracking-[0.24em] underline-offset-4 hover:underline" style={muted} onClick={() => go(-1)}>
+                Précédent
+              </button>
+            )}
             <button type="submit" disabled={loading} className={button} style={buttonStyle}>
-              {loading ? "Envoi…" : "Envoyer ma réponse"}
+              {isLast ? (loading ? "Envoi…" : "Envoyer ma réponse") : "Suivant"}
             </button>
             {previous && (
               <button type="button" className="text-xs underline" style={muted} onClick={() => { fill(previous); setEditing(false) }}>
@@ -810,6 +942,109 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
         </form>
       )}
     </Section>
+  )
+}
+
+/** Allergies ou restrictions alimentaires d'une personne : case à cocher, zone de texte si cochée. */
+function DietField({ id, label: text, checked, value, onCheck, onChange }: {
+  id: string; label: string; checked: boolean; value: string; onCheck: (v: boolean) => void; onChange: (v: string) => void
+}) {
+  return (
+    <div>
+      <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+        <input type="checkbox" checked={checked} onChange={(e) => onCheck(e.target.checked)}
+          className="size-4" style={{ accentColor: MATTE_GOLD }} aria-controls={id} aria-expanded={checked} />
+        {text}
+      </label>
+      {checked && (
+        <textarea id={id} rows={2} value={value} onChange={(e) => onChange(e.target.value)} autoFocus aria-label={`${text} : précisions`}
+          placeholder={`${RSVP.dietary.help} Ex. : allergie aux fruits à coque`} className={`${field} mt-2 resize-y`} style={fieldStyle} />
+      )}
+    </div>
+  )
+}
+
+/** Oui / Non / Je ne sais pas encore pour chaque moment ; rien de sélectionné par défaut. Sélection rapide en tête. */
+function MomentAnswers({ moments, value, onChange, onChangeAll, compact = false }: {
+  moments: (Moment & { day: string })[]
+  value: Answers
+  onChange: (sequenceId: string, answer: MomentAnswer) => void
+  onChangeAll: (answer: MomentAnswer) => void
+  compact?: boolean
+}) {
+  return (
+    <div className={compact ? "space-y-3" : "space-y-5"}>
+      {moments.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5 border-b pb-3" style={{ borderColor: "#e5dfd5" }}>
+          <span className="mr-1 text-xs" style={muted}>{RSVP.answersAll.label}</span>
+          {ANSWER_ORDER.map((a) => {
+            const all = moments.every((m) => value[m.sequenceId] === a)
+            return (
+              <button key={a} type="button" aria-pressed={all} onClick={() => onChangeAll(a)}
+                className="whitespace-nowrap border border-dashed px-2.5 py-1 text-xs transition-colors"
+                style={{ borderColor: MATTE_GOLD, color: all ? "#fff" : MATTE_GOLD, background: all ? MATTE_GOLD : "transparent", borderRadius: "var(--p-radius)" }}>
+                {RSVP.answersAll[a]}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {moments.map((m) => (
+        <div key={m.sequenceId} role="radiogroup" aria-label={m.title}
+          className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4">
+          <span className={compact ? "text-sm" : "text-base"}>
+            {m.title}
+            <span className="block text-xs" style={muted}>{m.day}{isTodo(m.time) ? "" : ` · ${m.time}`}</span>
+          </span>
+          <span className="flex flex-wrap gap-1.5">
+            {ANSWER_ORDER.map((a) => {
+              const on = value[m.sequenceId] === a
+              return (
+                <button key={a} type="button" role="radio" aria-checked={on} onClick={() => onChange(m.sequenceId, a)}
+                  className="whitespace-nowrap border px-2.5 py-1.5 text-xs leading-tight transition-colors"
+                  style={{ borderColor: on ? MATTE_GOLD : "#d8d2c8", background: on ? MATTE_GOLD : "transparent", color: on ? "#fff" : "#2e2a25", borderRadius: "var(--p-radius)" }}>
+                  {RSVP.answers[a]}
+                </button>
+              )
+            })}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Réponse déjà envoyée : résumé par personne et par moment. */
+function PreviousAnswer({ response: r, moments, onEdit }: { response: RsvpResponse; moments: (Moment & { day: string })[]; onEdit: () => void }) {
+  const presence = fromAttendance(r.attendance)
+  const party = r.party ?? []
+  const title = { yes: "Merci, à très bientôt !", no: "Merci de nous avoir répondu.", unsure: "Merci, tiens-nous au courant !" }[presence]
+  return (
+    <div className="border p-6 text-center sm:p-8" style={{ borderColor: MATTE_GOLD }} role="status">
+      <p className="text-3xl" style={heading}>{title}</p>
+      <p className="mt-4 text-sm leading-relaxed" style={muted}>
+        Réponse enregistrée le {new Date(r.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} :{" "}
+        {RSVP.attendance[presence].toLowerCase()}
+        {presence !== "no" && party.length > 0 && ` · ${party.length} personne${party.length > 1 ? "s" : ""}`}.
+      </p>
+      {presence !== "no" && party.length > 0 && moments.length > 0 && (
+        <ul className="mx-auto mt-5 max-w-md space-y-3 text-left text-sm">
+          {party.map((p, i) => (
+            <li key={i}>
+              <span style={heading} className="text-lg">{p.firstName} {p.lastName}</span>
+              {p.under10 && <span className="ml-2 text-xs" style={muted}>moins de 10 ans</span>}
+              {p.diet && <span className="block text-xs italic" style={muted}>Restrictions : {p.diet}</span>}
+              <span className="block text-xs leading-relaxed" style={muted}>
+                {moments.map((m) => `${m.title} : ${RSVP.answers[p.moments[m.sequenceId] ?? "unsure"].toLowerCase()}`).join(" · ")}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button type="button" className="mt-6 text-xs underline" style={muted} onClick={onEdit}>
+        Modifier ma réponse
+      </button>
+    </div>
   )
 }
 
@@ -840,27 +1075,10 @@ function Question({ id, label: text, help, required = false, group = false, chil
 
 function Choice({ selected, onClick, children }: { selected: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" aria-pressed={selected} onClick={onClick} className="border px-4 py-3.5 text-lg transition-colors"
+    <button type="button" aria-pressed={selected} onClick={onClick} className="whitespace-nowrap border px-4 py-3.5 text-lg transition-colors"
       style={{ ...heading, borderColor: selected ? MATTE_GOLD : "#d8d2c8", background: selected ? MATTE_GOLD : "transparent", color: selected ? "#fff" : "#2e2a25", borderRadius: "var(--p-radius)" }}>
       {children}
     </button>
-  )
-}
-
-function Counter({ label: text, value, min, onChange, hideLabel = false }: {
-  label: string; value: number; min: number; onChange: (n: number) => void; hideLabel?: boolean
-}) {
-  const btn = "flex size-9 items-center justify-center border text-lg disabled:opacity-30"
-  const btnStyle = { borderColor: "#d8d2c8", borderRadius: "var(--p-radius)" }
-  return (
-    <div>
-      {!hideLabel && <p className={label} style={muted}>{text}</p>}
-      <div className="flex items-center gap-4">
-        <button type="button" className={btn} style={btnStyle} disabled={value <= min} onClick={() => onChange(value - 1)} aria-label={`${text} : moins`}>−</button>
-        <span className="w-6 text-center text-2xl" style={heading} aria-live="polite">{value}</span>
-        <button type="button" className={btn} style={btnStyle} disabled={value >= 20} onClick={() => onChange(value + 1)} aria-label={`${text} : plus`}>+</button>
-      </div>
-    </div>
   )
 }
 

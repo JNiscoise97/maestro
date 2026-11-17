@@ -2,7 +2,7 @@
 -- Préparation des invitations (page Invités › Invitations) :
 --   · guests.invitation_name : nom qui figure sur l'invitation (ex. « Tatie Monique ») ;
 --     null = surnom s'il existe, sinon prénom.
--- (La notion de foyer, ajoutée un temps ici, a été abandonnée : voir 0178_suppression_foyers.sql.)
+-- (La notion de foyer, ajoutée un temps ici, a été abandonnée par 0178_suppression_foyers.sql, puis rétablie par 0179_retour_foyers.sql.)
 -- Pour chaque déploiement ayant des invités. Réexécutable sans risque.
 
 do $$

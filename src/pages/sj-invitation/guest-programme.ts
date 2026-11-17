@@ -3,11 +3,12 @@ import type { GalleryMember } from "@/features/gallery/types"
 import { DAYS, type Day } from "./content"
 
 /**
- * Programme personnalisé : chaque invité ne voit que les moments auxquels il est convié.
+ * Programme personnalisé : chaque invité ne voit que les moments auxquels son foyer est convié.
  *
  * Source : l'appli mariage (préfixe _20270628_), quel que soit le déploiement qui sert la page.
- *   · guests            → l'invité connecté (par guest_id, sinon par prénom + nom) ;
+ *   · guests            → l'invité connecté (par guest_id, sinon par prénom + nom) et son foyer (household_id) ;
  *   · guest_sequences   → les séquences cochées pour chaque invité (Invités › Séquences).
+ * Le foyer reçoit l'union des séquences de ses membres : une invitation par foyer.
  */
 
 export const WEDDING_PREFIX = "_20270628_"
@@ -16,10 +17,10 @@ export const weddingTable = (name: string) => `${WEDDING_PREFIX}${name}`
 // Le client anonyme : les tables de l'appli sont ouvertes en anon (politique anon_all).
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
-export type WeddingGuest = { id: string; first_name: string | null; last_name: string | null }
+export type WeddingGuest = { id: string; first_name: string | null; last_name: string | null; household_id: string | null }
 
 export type Programme =
-  /** Invité retrouvé : sequenceIds = ses séquences (vide possible : aucune séquence cochée). */
+  /** Invité retrouvé : sequenceIds = séquences de son foyer (vide possible : aucune séquence cochée). */
   | { status: "found"; guest: WeddingGuest; sequenceIds: Set<string> }
   /** Invité introuvable dans la liste du mariage (ou mode démo sans base). */
   | { status: "unknown" }
@@ -30,11 +31,14 @@ const normalize = (s: string | null | undefined) =>
 /** Liste des invités du mariage (quelques centaines de lignes). */
 export async function loadWeddingGuests(): Promise<WeddingGuest[]> {
   if (!USE_SUPABASE) return []
-  const { data, error } = await db.from(weddingTable("guests"))
-    .select("id, first_name, last_name, is_active")
-    .range(0, 4999)
+  const query = (columns: string) => db.from(weddingTable("guests")).select(columns).range(0, 4999)
+  let { data, error } = await query("id, first_name, last_name, household_id, is_active")
+  // Colonne household_id absente tant que 0179_retour_foyers.sql n'est pas exécutée : chacun reste seul.
+  if (error) ({ data, error } = await query("id, first_name, last_name, is_active"))
   if (error) throw error
-  return ((data ?? []) as (WeddingGuest & { is_active: boolean | null })[]).filter((g) => g.is_active !== false)
+  return ((data ?? []) as (WeddingGuest & { is_active: boolean | null })[])
+    .filter((g) => g.is_active !== false)
+    .map((g) => ({ ...g, household_id: g.household_id ?? null }))
 }
 
 /** Retrouve l'invité du compte : même identifiant (listes fiançailles et mariage partagées), sinon nom unique. */
@@ -50,9 +54,11 @@ export function findGuest(guests: WeddingGuest[], member: Pick<GalleryMember, "g
   return matches.length === 1 ? matches[0] : null
 }
 
-/** Séquences de l'invité. */
-export async function loadProgramme(guest: WeddingGuest): Promise<Programme> {
-  const { data, error } = await db.from(weddingTable("guest_sequences")).select("sequence_id").eq("guest_id", guest.id)
+/** Séquences du foyer de l'invité. */
+export async function loadProgramme(guest: WeddingGuest, guests: WeddingGuest[]): Promise<Programme> {
+  const ids = guest.household_id ? guests.filter((g) => g.household_id === guest.household_id).map((g) => g.id) : [guest.id]
+  if (!ids.includes(guest.id)) ids.push(guest.id)
+  const { data, error } = await db.from(weddingTable("guest_sequences")).select("sequence_id").in("guest_id", ids)
   if (error) throw error
   return { status: "found", guest, sequenceIds: new Set(((data ?? []) as { sequence_id: string }[]).map((r) => r.sequence_id)) }
 }

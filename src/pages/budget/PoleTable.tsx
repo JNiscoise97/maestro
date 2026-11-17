@@ -164,7 +164,7 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, priority
                         {visibleCols.has("pu") && <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{kids.length ? "" : fmt(p.unitPrice)}</td>}
                         <td className="px-3 py-2.5 text-right tabular-nums"><EstimateCell model={model} lines={kids.length ? kids : [p]} estimated={f.estimated} /></td>
                         <td className="px-3 py-2.5 text-right tabular-nums">{f.real == null ? "—" : fmt(f.real)}</td>
-                        <td className="px-3 py-2.5 text-right tabular-nums"><ChargeCell cost={f.real ?? f.estimated} offered={f.offered} /></td>
+                        <td className="px-3 py-2.5 text-right tabular-nums"><ChargeCell cost={f.cost} offered={f.offered} /></td>
                         <td className="px-3 py-2.5"><StatusBadge status={paymentStatus(f)} paid={f.paid} /></td>
                         <td className="truncate px-3 py-2.5 text-muted-foreground" title={vendors.join(", ")}>
                           {vendors.join(", ") || "—"}{devis && <span className="ml-1 text-[10px]">(devis)</span>}
@@ -186,7 +186,7 @@ export function PoleTable({ title, postes, model, sequences, seqFilter, priority
                             {visibleCols.has("pu") && <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{fmt(k.unitPrice)}</td>}
                             <td className="px-3 py-2 text-right tabular-nums"><EstimateCell model={model} lines={[k]} estimated={kf.estimated} /></td>
                             <td className="px-3 py-2 text-right tabular-nums">{kf.real == null ? "—" : fmt(kf.real)}</td>
-                            <td className="px-3 py-2 text-right tabular-nums"><ChargeCell cost={kf.real ?? kf.estimated} offered={model.offered(k)} /></td>
+                            <td className="px-3 py-2 text-right tabular-nums"><ChargeCell cost={kf.cost} offered={model.offered(k)} /></td>
                             <td className="px-3 py-2"><StatusBadge status={paymentStatus({ ...kf, depositRequired: k.depositRequired })} paid={kf.paid} /></td>
                             <td className="truncate px-3 py-2 text-muted-foreground">{model.retained.get(k.id)?.devis.vendor ?? k.vendor ?? "—"}</td>
                             {visibleCols.has("account") && <td className="truncate px-3 py-2 text-muted-foreground">{k.account ?? "—"}</td>}

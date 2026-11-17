@@ -79,7 +79,7 @@ export const PROGRAMME = {
   introAll: "Du vendredi au lundi, neuf moments pour célébrer ensemble : des plus officiels aux plus festifs.",
   /** Invité à une partie des moments : « {n} » est remplacé par le nombre en lettres (« Trois moments »…). */
   titleSome: "{n} à partager",
-  introSome: "Voici les moments que nous serions heureux de vivre avec vous.",
+  introSome: "Voici les moments que nous serions heureux de vivre avec toi.",
   /** Affiché quand au moins un des moments de l'invité est à places limitées. */
   limitedNote: "Les moments marqués « places limitées » se déroulent en comité restreint : merci de nous confirmer votre présence au plus tôt.",
   /** Compte non rattaché à la liste des invités : seuls les moments sans places limitées s'affichent. */

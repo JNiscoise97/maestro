@@ -107,7 +107,7 @@ function EnvelopeHeader({ member, hidden = false, headerRef }: {
       {/* Même en-tête que la connexion : sous-titre et « Sarah & Jordan » en or mat. */}
       <Masthead compact subtitle={INVITATION_SUBTITLE} gilded />
       <p className="mb-8 mt-2 text-[10px] uppercase tracking-[0.35em]" style={{ color: "var(--p-muted)" }}>
-        Une lettre pour {member.first_name || "vous"}
+        Une lettre pour {member.first_name || "toi"}
       </p>
     </div>
   )

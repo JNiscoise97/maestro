@@ -167,12 +167,12 @@ export const AMBIANCE = {
     {
       date: "2027-06-27", mood: "Indienne",
       text: "Pour le Nikkah, une tenue indienne si tu le souhaites : sari, lehenga, kurta…",
-      tenues: ["indienne-lehenga", "indienne-sari"],
+      tenues: ["indienne-sari"],
     },
     {
       date: "2027-06-28", mood: "Élégante et festive",
       text: "Nous imaginons une ambiance élégante et festive, qui mêlera des influences gujaraties, malgaches, réunionnaises et guadeloupéennes. Les tenues traditionnelles ou inspirées de tes origines sont les bienvenues, sans être obligatoires : costume, robe élégante, sari, kurta, lamba, tenue créole ou tenue de soirée.",
-      tenues: ["creole-madras", "cocktail-drapee", "indienne-sari", "malgache-lamba", "cocktail-longue", "creole-fleurie", "indienne-lehenga", "cocktail-courte"],
+      tenues: ["creole-fleurie", "cocktail-courte", "indienne-lehenga", "cocktail-drapee", "creole-madras", "cocktail-longue", "malgache-lamba"],
     },
   ] as { date: string; mood: string; text: string; note?: string; tenues: Tenue[] }[],
 }

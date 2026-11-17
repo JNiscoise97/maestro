@@ -545,10 +545,10 @@ function AmbianceSection({ days }: { days: Day[] }) {
             <Reveal key={a.date} delay={k * 120} className={`flex flex-col items-center text-center ${wide ? "sm:col-span-2 lg:col-span-3" : ""}`}>
               <p className="text-[11px] uppercase tracking-[0.3em]" style={{ color: MATTE_GOLD }}>{label.get(a.date)}</p>
               <h3 className="mt-1 text-3xl sm:text-4xl" style={heading}>{a.mood}</h3>
-              <div className={wide ? "mt-6 grid w-full max-w-5xl grid-cols-4 gap-2 sm:gap-4 lg:grid-cols-8" : "mt-6 flex justify-center gap-2"}>
+              <div className={wide ? "mt-6 flex w-full max-w-5xl flex-wrap justify-center gap-2 sm:gap-4" : "mt-6 flex justify-center gap-2"}>
                 {a.tenues.map((t) => (
                   <img key={t} src={tenue(t)} alt="" aria-hidden loading="lazy" decoding="async"
-                    className={wide ? "aspect-square w-full object-contain" : "size-36 object-contain sm:size-44"} />
+                    className={wide ? "aspect-square w-[22%] object-contain lg:w-[12%]" : "size-36 object-contain sm:size-44"} />
                 ))}
               </div>
               <p className={`mt-5 text-base leading-relaxed sm:text-lg ${wide ? "max-w-3xl" : "max-w-sm"}`} style={heading}><T>{a.text}</T></p>

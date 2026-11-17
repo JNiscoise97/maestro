@@ -49,9 +49,10 @@ const muted = { color: "var(--p-muted)" }
 
 /** Texte du contenu : « À compléter… » s'affiche en italique grisé. */
 function T({ children, className = "" }: { children: string; className?: string }) {
-  return isTodo(children)
-    ? <span className={`italic ${className}`} style={{ color: "#b3aca2" }}>{children}</span>
-    : <span className={className}>{children}</span>
+  if (isTodo(children)) return <span className={`italic ${className}`} style={{ color: "#b3aca2" }}>{children}</span>
+  // **texte** = en gras (ex. « pense au **covoiturage** »).
+  const parts = children.split(/\*\*(.+?)\*\*/g)
+  return <span className={className}>{parts.map((p, i) => (i % 2 ? <strong key={i} className="font-semibold">{p}</strong> : p))}</span>
 }
 
 function scrollToId(id: string) {
@@ -340,13 +341,13 @@ type PolaroidPhoto = { src: string; rotate: number; caption?: string }
 
 /** Polaroïds sous « Un mot de nous » (photos des mariés 1 et 6, recadrées dans public/sj-invitation/). */
 const POLAROIDS_MOT: [PolaroidPhoto, PolaroidPhoto] = [
-  { src: "/sj-invitation/polaroid-1.webp", rotate: -6, caption: "Première photo de nous !" },
+  { src: "/sj-invitation/polaroid-1.webp", rotate: -6, caption: "1ère photo de nous, 2020 !" },
   { src: "/sj-invitation/polaroid-2.webp", rotate: 5, caption: "Mexique, 2023 !" },
 ]
 
 /** Polaroïds plus bas, dans « Liste de mariage » (photos 4 et 5). */
 const POLAROIDS_LISTE: [PolaroidPhoto, PolaroidPhoto] = [
-  { src: "/sj-invitation/polaroid-3.webp", rotate: -4 },
+  { src: "/sj-invitation/polaroid-3.webp", rotate: -4, caption: "La Réunion, 2023 !" },
   { src: "/sj-invitation/polaroid-4.webp", rotate: 6, caption: "À nous !" },
 ]
 
@@ -390,11 +391,11 @@ function ProgrammeSection({ view }: { view: GuestView }) {
   const title = mode === "all" ? PROGRAMME.titleAll : count ? PROGRAMME.titleSome.replace("{n}", momentsInWords(count)) : "Le programme"
   const eyebrow = days.length > 1 ? `${["", "Un jour", "Deux jours", "Trois jours", "Quatre jours"][days.length] ?? `${days.length} jours`}` : days[0]?.label ?? "Programme"
   return (
-    <Section id="programme" eyebrow={eyebrow} title={loading ? "Votre programme" : title} decor={
+    <Section id="programme" eyebrow={eyebrow} title={loading ? "Ton programme" : title} decor={
       <Deco className="-bottom-10 -right-8 w-32 sm:-right-20 sm:w-48"><FlowerCluster kind="arums" className="w-full" /></Deco>
     }>
       {loading ? (
-        <p className="text-center text-sm" style={muted} role="status">Chargement de votre programme…</p>
+        <p className="text-center text-sm" style={muted} role="status">Chargement de ton programme…</p>
       ) : (
         <>
           <p className="mx-auto max-w-xl text-center text-sm leading-relaxed" style={muted}>
@@ -428,11 +429,7 @@ function ProgrammeSection({ view }: { view: GuestView }) {
                         </h4>
                         <p className="mt-1 text-sm leading-relaxed" style={muted}><T>{m.text}</T></p>
                         {m.warning && (
-                          <p className="mt-2">
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-                              <TriangleAlert aria-hidden className="size-3 shrink-0" /><T>{m.warning}</T>
-                            </span>
-                          </p>
+                          <p className="mt-2"><NoticePill>{m.warning}</NoticePill></p>
                         )}
                         <p className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs">
                           {placeName(m.placeId) && (
@@ -453,6 +450,15 @@ function ProgrammeSection({ view }: { view: GuestView }) {
         </>
       )}
     </Section>
+  )
+}
+
+/** Pastille d'avertissement (moment sous réserve, lieu pas encore connu…). */
+function NoticePill({ children }: { children: string }) {
+  return (
+    <span className="inline-flex items-start gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-left text-xs font-medium text-amber-800">
+      <TriangleAlert aria-hidden className="mt-0.5 size-3 shrink-0" /><T>{children}</T>
+    </span>
   )
 }
 
@@ -486,7 +492,9 @@ function PlacesSection({ days }: { days: Day[] }) {
             <article key={place.id} id={`lieu-${place.id}`} className="text-center sm:text-left"
               style={{ scrollMarginTop: NAV_HEIGHT + 16 }}>
               <h3 className="text-2xl" style={heading}>{number.has(place.id) && <PinNumber n={number.get(place.id)!} />}<T>{place.name}</T></h3>
-              <p className="mt-2 text-sm" style={muted}><T>{place.address}</T></p>
+              {/prochainement/i.test(place.address)
+                ? <p className="mt-2"><NoticePill>{place.address}</NoticePill></p>
+                : <p className="mt-2 text-sm" style={muted}><T>{place.address}</T></p>}
               {place.access && <p className="mt-2 text-sm" style={muted}><T>{place.access}</T></p>}
               <ul className="mt-5 space-y-2 border-t pt-4 text-sm" style={{ borderColor: "var(--p-line)" }}>
                 {moments.map((m) => (
@@ -607,7 +615,7 @@ function TravelSection() {
 
 function GiftsSection() {
   return (
-    <Section id="liste" eyebrow="Si le cœur vous en dit" title="Liste de mariage" narrow picto="cadeau">
+    <Section id="liste" eyebrow="Si le cœur t'en dit" title="Liste de mariage" narrow picto="cadeau">
       <p className="text-center text-lg leading-relaxed sm:text-xl" style={heading}><T>{GIFTS.text}</T></p>
       {GIFTS.url && (
         <p className="mt-8 text-center">

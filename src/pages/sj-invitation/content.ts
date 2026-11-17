@@ -39,9 +39,9 @@ export const INVITATION = {
 
 export const OUR_WORD = {
   paragraphs: [
-    "Il y a des moments qu'on ne veut vivre qu'entourés de ceux qu'on aime. Notre mariage en fait partie, et vous en faites partie.",
+    "Il y a des moments qu'on ne veut vivre qu'entourés de ceux qu'on aime. Notre mariage en fait partie, et tu en fais partie.",
     "Nos familles, nos amis et nos origines ont fait de nous ce que nous sommes. Pour notre mariage, nous voulons tout réunir : la tradition, l'émotion, les rires et une grande fête.",
-    "Venez comme vous êtes, avec votre bonne humeur et l'envie de danser. Nous avons hâte de vous retrouver.",
+    "Viens comme tu es, avec ta bonne humeur et l'envie de danser. Nous avons hâte de te retrouver.",
   ],
   signature: "Sarah & Jordan",
 }
@@ -63,7 +63,7 @@ export type Moment = {
   dressCode?: string
   /** Capacité limitée : affiche la mention « Places limitées ». */
   limited?: boolean
-  /** Pastille d'avertissement affichée sous le texte (ex. « Lieu communiqué prochainement »). */
+  /** Pastille d'avertissement affichée sous le texte (ex. moment sous réserve). */
   warning?: string
 }
 
@@ -83,9 +83,9 @@ export const PROGRAMME = {
   titleSome: "{n} à partager",
   introSome: "Voici les moments que nous serions heureux de vivre avec toi.",
   /** Affiché quand au moins un des moments de l'invité est à places limitées. */
-  limitedNote: "Les moments marqués « places limitées » se déroulent en comité restreint : merci de nous confirmer votre présence au plus tôt.",
+  limitedNote: "Les moments marqués « places limitées » se déroulent en comité restreint : merci de nous confirmer ta présence au plus tôt.",
   /** Compte non rattaché à la liste des invités : seuls les moments sans places limitées s'affichent. */
-  unknownNote: "Nous n'avons pas encore retrouvé votre invitation personnalisée : seuls les moments ouverts à tous s'affichent. N'hésitez pas à nous écrire.",
+  unknownNote: "Nous n'avons pas encore retrouvé ton invitation personnalisée : seuls les moments ouverts à tous s'affichent. N'hésite pas à nous écrire.",
 }
 
 export const DAYS: Day[] = [
@@ -103,7 +103,7 @@ export const DAYS: Day[] = [
   },
   {
     date: "2027-06-27", label: "Dimanche 27 juin", moments: [
-      { sequenceId: "493c6164-7ff2-4c87-a037-b59c6bcfe008", time: "14 h 30", title: "Nikkah", text: "Bénédiction religieuse indienne selon la tradition musulmane ismaélienne", placeId: "khane", dressCode: "indienne si souhaitée", limited: true, warning: "Lieu communiqué prochainement" },
+      { sequenceId: "493c6164-7ff2-4c87-a037-b59c6bcfe008", time: "14 h 30", title: "Nikkah", text: "Bénédiction religieuse indienne selon la tradition musulmane ismaélienne", placeId: "khane", dressCode: "indienne si souhaitée", limited: true, warning: "Sous réserve : faisabilité en cours d'étude, ce moment pourrait ne pas être maintenu" },
     ],
   },
   {
@@ -136,7 +136,7 @@ export const PLACES: Place[] = [
   { id: "villas", name: "Les villas des mariés", address: "Villa des filles : 191 rue Adrienne Boland, 34070 Montpellier · Villa des garçons : 14 impasse du Roitelet, Mauguio" },
   { id: "eglise", name: "Église Saint-Cléophas", address: "2 place de l'Abbé Crébassol, 34070 Montpellier" },
   { id: "photo", name: "Séance photo", address: "Lieu communiqué prochainement" },
-  { id: "ostara", name: "Domaine Ostara", address: "134 chemin de la Pierre Bleue, Castries", access: "Parking sur place. À une vingtaine de minutes de Montpellier en voiture : pensez au covoiturage et à désigner un conducteur pour le retour." },
+  { id: "ostara", name: "Domaine Ostara", address: "134 chemin de la Pierre Bleue, Castries", access: "Parking sur place. À une vingtaine de minutes de Montpellier en voiture : pense au **covoiturage** et à désigner un conducteur pour le retour." },
 ]
 
 // ── 4 bis. Ambiance & tenues ──────────────────────────────────────────────────
@@ -145,7 +145,7 @@ export const PLACES: Place[] = [
 export const AMBIANCE = {
   text: "Nous imaginons une ambiance élégante et festive, qui mêlera des influences :",
   influences: ["gujaraties", "malgaches", "réunionnaises", "guadeloupéennes"],
-  dress: "Les tenues traditionnelles ou inspirées de vos origines sont les bienvenues, sans être obligatoires :",
+  dress: "Les tenues traditionnelles ou inspirées de tes origines sont les bienvenues, sans être obligatoires :",
   examples: "costume, robe élégante, sari, kurta, lamba, tenue créole ou tenue de soirée.",
   avoid: "Merci d'éviter les tenues trop décontractées.",
   /** Précisions par moment : chacune ne s'affiche que si l'invité est convié à l'un des moments indiqués. */
@@ -153,7 +153,7 @@ export const AMBIANCE = {
     { text: "Nikkah : indienne si souhaitée.", sequenceIds: ["493c6164-7ff2-4c87-a037-b59c6bcfe008"] },
     { text: "Pique-nique : tenue décontractée.", sequenceIds: ["52990fa4-fc1e-4b99-b51d-50b1efef38a9"] },
     { text: "Soirée conviviale : tenue décontractée.", sequenceIds: ["5347d0f2-31b0-4e69-9a8f-f6f3d10c0969"] },
-    { text: "Célébration au domaine : prévoyez des chaussures confortables pour danser et une petite laine pour la nuit.", sequenceIds: ["c14a9820-2d9f-466f-9d19-1b732b2733c1"] },
+    { text: "Célébration au domaine : prévois des chaussures confortables pour danser et une petite laine pour la nuit.", sequenceIds: ["c14a9820-2d9f-466f-9d19-1b732b2733c1"] },
   ],
 }
 
@@ -162,7 +162,7 @@ export const AMBIANCE = {
 export const CORTEGE = {
   /** Masquée tant que les noms ne sont pas renseignés : remplacer les noms puis passer à true. */
   show: false,
-  intro: "Ils nous accompagnent depuis toujours et seront à nos côtés ce jour-là. N'hésitez pas à vous tourner vers eux.",
+  intro: "Ils nous accompagnent depuis toujours et seront à nos côtés ce jour-là. N'hésite pas à te tourner vers eux.",
   groups: [
     { title: "Témoins de la mariée", people: [{ name: `${TODO}`, role: "" }] },
     { title: "Témoins du marié", people: [{ name: `${TODO}`, role: "" }] },
@@ -176,9 +176,9 @@ export const CORTEGE = {
 export const TRAVEL = {
   /** Comment venir (train, avion, voiture…), un bloc par moyen. */
   getting: [
-    { title: "En train", text: "Gare de Montpellier Saint-Roch, en plein centre-ville, ou gare Montpellier Sud de France pour certains TGV. Comptez environ 3 h 30 depuis Paris." },
+    { title: "En train", text: "Gare de Montpellier Saint-Roch, en plein centre-ville, ou gare Montpellier Sud de France pour certains TGV. Compte environ 3 h 30 depuis Paris." },
     { title: "En avion", text: "Aéroport Montpellier Méditerranée, à une vingtaine de minutes du centre en navette ou en taxi." },
-    { title: "En voiture", text: "Les lieux sont répartis autour de Montpellier : une voiture facilite les déplacements. Le covoiturage entre invités est vivement encouragé." },
+    { title: "En voiture", text: "Les lieux sont répartis autour de Montpellier : une voiture facilite les déplacements. Le **covoiturage** entre invités est vivement encouragé." },
   ],
   /** Hébergements conseillés. */
   stays: [
@@ -190,7 +190,7 @@ export const TRAVEL = {
 // ── 7. Liste de mariage ───────────────────────────────────────────────────────
 
 export const GIFTS = {
-  text: "Votre présence à nos côtés est notre plus beau cadeau. Pour celles et ceux qui le souhaitent, une urne sera à votre disposition pendant la célébration.",
+  text: "Ta présence à nos côtés est notre plus beau cadeau. Si tu le souhaites, une urne sera à ta disposition pendant la célébration.",
   /** Lien vers la cagnotte ou la liste (laisser vide pour ne pas afficher de bouton). */
   url: "",
   label: "Voir la liste",
@@ -254,7 +254,7 @@ export const RSVP = {
 
 export const THANKS = {
   title: "Merci !",
-  text: "Votre présence rendra notre mariage encore plus beau. Nous avons tellement hâte de vivre ces moments avec vous.",
+  text: "Ta présence rendra notre mariage encore plus beau. Nous avons tellement hâte de vivre ces moments avec toi.",
   closing: "Avec tout notre amour,",
   signature: "Sarah & Jordan",
 }

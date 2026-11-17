@@ -121,12 +121,12 @@ function RequireMember({ children }: { children: (member: GalleryMember) => Reac
 function accountProblem(member: GalleryMember | null, signOut: () => void): React.ReactNode | null {
   if (!member) return (
     <Notice title="Compte introuvable" subtitle={INVITATION_SUBTITLE} gilded>
-      Votre accès n'est pas (ou plus) actif. <button type="button" className="underline" onClick={signOut}>Se déconnecter</button>
+      Ton accès n'est pas (ou plus) actif. <button type="button" className="underline" onClick={signOut}>Se déconnecter</button>
     </Notice>
   )
   if (member.status !== "active") return (
     <Notice title="Accès suspendu" subtitle={INVITATION_SUBTITLE} gilded>
-      Votre compte a été désactivé. Contactez Sarah ou Jordan si besoin.{" "}
+      Ton compte a été désactivé. Contacte Sarah ou Jordan si besoin.{" "}
       <button type="button" className="underline" onClick={signOut}>Se déconnecter</button>
     </Notice>
   )

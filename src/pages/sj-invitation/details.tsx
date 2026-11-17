@@ -271,8 +271,10 @@ function Nav() {
  * picto : pictogramme doré au-dessus du titre · decor : ornements placés autour de la carte (fleurs, ruban…)
  * · carte : carte de faire-part aux coins échancrés au lieu de la feuille simple.
  */
-function Section({ id, eyebrow, title, children, narrow = false, picto, decor, carte = false }: {
+function Section({ id, eyebrow, title, children, narrow = false, width, picto, decor, carte = false }: {
   id: SectionId; eyebrow?: string; title: string; children: React.ReactNode; narrow?: boolean
+  /** Largeur maximale (classe max-w-*) ; remplace celle de narrow. */
+  width?: string
   picto?: PictoName; decor?: React.ReactNode; carte?: boolean
 }) {
   const body = (
@@ -288,7 +290,7 @@ function Section({ id, eyebrow, title, children, narrow = false, picto, decor, c
   )
   return (
     <section id={id} aria-labelledby={`${id}-title`} className="px-4 py-8 sm:px-6 sm:py-12" style={{ scrollMarginTop: NAV_HEIGHT }}>
-      <div className={`relative mx-auto ${narrow ? "max-w-2xl" : "max-w-4xl"}`}>
+      <div className={`relative mx-auto ${width ?? (narrow ? "max-w-2xl" : "max-w-4xl")}`}>
         <Reveal>
           {carte ? <Carte>{body}</Carte> : (
             <div style={{ ...PAPER_STYLE, backgroundColor: PAPER_STYLE.backgroundColor }}>{body}</div>
@@ -365,7 +367,7 @@ function PolaroidPair({ photos }: { photos: [PolaroidPhoto, PolaroidPhoto] }) {
 
 function OurWordSection() {
   return (
-    <Section id="mot" eyebrow="De tout cœur" title="Un mot de nous" narrow picto="coeurs">
+    <Section id="mot" eyebrow="De tout cœur" title="Un mot de nous" width="max-w-8xl" picto="coeurs">
       <div className="space-y-5 text-center text-xl leading-relaxed sm:text-2xl" style={heading}>
         {OUR_WORD.paragraphs.map((p) => <p key={p}><T>{p}</T></p>)}
         <p className="pt-4 text-2xl italic" style={{ color: MATTE_GOLD }}>{OUR_WORD.signature}</p>

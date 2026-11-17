@@ -16,6 +16,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+    /* max-w-8xl (Tailwind s'arrête à 7xl = 80rem). */
+    --container-8xl: 88rem;
     --font-heading: 'Fraunces Variable', serif;
     --font-sans: 'Geist Variable', sans-serif;
     --color-ivoire: var(--ivoire);

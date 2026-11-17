@@ -205,8 +205,6 @@ export const FAQ: { q: string; a: string }[] = [
   { q: "Les enfants sont-ils les bienvenus ?", a: "Oui, les enfants mentionnés sur ton invitation sont les bienvenus. Ajoute-les un à un dans le formulaire de réponse (une case indique les moins de 10 ans)." },
   { q: "Puis-je venir seulement à certains moments ?", a: "Bien sûr. Le formulaire de réponse te demande ta présence moment par moment, pour chaque personne." },
   { q: "Le programme est-il le même pour tous les invités ?", a: "Non : certains lieux ont une capacité réduite. Cette page présente les moments auxquels tu es convié(e)." },
-  { q: "Comment dois-je m'habiller ?", a: "Tout est expliqué dans la rubrique « Ambiance & tenues », et les tenues particulières figurent dans le programme." },
-  { q: "Où puis-je dormir ?", a: "Nos adresses conseillées sont dans la rubrique « Venir & se loger »." },
   // Questions ajoutées, à garder ou à supprimer :
   { q: "Y a-t-il un parking sur place ?", a: "Oui au Domaine Ostara. En centre-ville, privilégie le tramway ou les parkings publics." },
   { q: "Qui contacter en cas de question ou le jour J ?", a: "Écris-nous directement pour toute question. Le jour J, nos témoins seront tes interlocuteurs." },

@@ -103,7 +103,7 @@ export const DAYS: Day[] = [
   },
   {
     date: "2027-06-27", label: "Dimanche 27 juin", moments: [
-      { sequenceId: "493c6164-7ff2-4c87-a037-b59c6bcfe008", time: "14 h 30", title: "Nikkah", text: "Bénédiction religieuse indienne selon la tradition musulmane ismaélienne", placeId: "khane", dressCode: "indienne si souhaitée", limited: true, warning: "Sous réserve : faisabilité en cours d'étude, ce moment pourrait ne pas être maintenu" },
+      { sequenceId: "493c6164-7ff2-4c87-a037-b59c6bcfe008", time: "14 h 30", title: "Nikkah", text: "Bénédiction religieuse indienne selon la tradition musulmane ismaélienne", placeId: "khane", dressCode: "indienne si souhaitée", limited: true, warning: "À confirmer : nous faisons tout pour qu'il ait lieu" },
     ],
   },
   {
@@ -141,20 +141,40 @@ export const PLACES: Place[] = [
 
 // ── 4 bis. Ambiance & tenues ──────────────────────────────────────────────────
 
-/** Repris du faire-part des fiançailles : à relire et adapter pour le mariage. */
+/** Illustrations de tenues (public/sj-invitation/tenue-*.webp). */
+export type Tenue =
+  | "cocktail-longue" | "cocktail-drapee" | "cocktail-courte" | "indienne-lehenga" | "indienne-sari"
+  | "malgache-lamba" | "creole-madras" | "creole-fleurie" | "detente"
+
+/**
+ * Pas de dress code : une ambiance par jour, pour orienter sans imposer (réponse aux questions des invités).
+ * Chaque jour ne s'affiche que si l'invité est convié à au moins un moment de ce jour (même date que DAYS).
+ */
 export const AMBIANCE = {
-  text: "Nous imaginons une ambiance élégante et festive, qui mêlera des influences :",
-  influences: ["gujaraties", "malgaches", "réunionnaises", "guadeloupéennes"],
-  dress: "Les tenues traditionnelles ou inspirées de tes origines sont les bienvenues, sans être obligatoires :",
-  examples: "costume, robe élégante, sari, kurta, lamba, tenue créole ou tenue de soirée.",
-  avoid: "Merci d'éviter les tenues trop décontractées.",
-  /** Précisions par moment : chacune ne s'affiche que si l'invité est convié à l'un des moments indiqués. */
-  notes: [
-    { text: "Nikkah : indienne si souhaitée.", sequenceIds: ["493c6164-7ff2-4c87-a037-b59c6bcfe008"] },
-    { text: "Pique-nique : tenue décontractée.", sequenceIds: ["52990fa4-fc1e-4b99-b51d-50b1efef38a9"] },
-    { text: "Soirée conviviale : tenue décontractée.", sequenceIds: ["5347d0f2-31b0-4e69-9a8f-f6f3d10c0969"] },
-    { text: "Célébration au domaine : prévois des chaussures confortables pour danser et une petite laine pour la nuit.", sequenceIds: ["c14a9820-2d9f-466f-9d19-1b732b2733c1"] },
-  ],
+  intro: "Pas de dress code ni de couleurs imposées : chacun s'habille comme il le souhaite.",
+  why: "Comme plusieurs d'entre vous nous ont posé la question, voici l'ambiance que nous imaginons pour chaque journée. De simples pistes pour t'inspirer, **rien d'obligatoire**.",
+  days: [
+    {
+      date: "2027-06-25", mood: "Solennelle et chic",
+      text: "Pour le « oui » officiel et le goûter d'honneur, une ambiance cocktail : robe, costume ou tenue habillée.",
+      tenues: ["cocktail-courte"],
+    },
+    {
+      date: "2027-06-26", mood: "Détente",
+      text: "Pique-nique et soirée jeux : une tenue décontractée, dans laquelle tu te sens à l'aise.",
+      tenues: ["detente"],
+    },
+    {
+      date: "2027-06-27", mood: "Indienne",
+      text: "Pour le Nikkah, une tenue indienne si tu le souhaites : sari, lehenga, kurta…",
+      tenues: ["indienne-lehenga", "indienne-sari"],
+    },
+    {
+      date: "2027-06-28", mood: "Élégante et festive",
+      text: "Nous imaginons une ambiance élégante et festive, qui mêlera des influences gujaraties, malgaches, réunionnaises et guadeloupéennes. Les tenues traditionnelles ou inspirées de tes origines sont les bienvenues, sans être obligatoires : costume, robe élégante, sari, kurta, lamba, tenue créole ou tenue de soirée.",
+      tenues: ["creole-madras", "cocktail-drapee", "indienne-sari", "malgache-lamba", "cocktail-longue", "creole-fleurie", "indienne-lehenga", "cocktail-courte"],
+    },
+  ] as { date: string; mood: string; text: string; note?: string; tenues: Tenue[] }[],
 }
 
 // ── 5. Le cortège (facultatif : mettre show à false pour masquer la section) ───

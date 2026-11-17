@@ -524,33 +524,38 @@ function PlacesSection({ days }: { days: Day[] }) {
 // ── 4 bis. Ambiance & tenues ──────────────────────────────────────────────────
 
 function AmbianceSection({ days }: { days: Day[] }) {
-  const ids = new Set(days.flatMap((d) => d.moments.map((m) => m.sequenceId)))
-  const notes = AMBIANCE.notes.filter((n) => n.sequenceIds.some((id) => ids.has(id)))
+  // Jours où l'invité est convié, avec leur libellé (« Vendredi 25 juin »).
+  const label = new Map(days.map((d) => [d.date, d.label]))
+  const shown = AMBIANCE.days.filter((a) => label.has(a.date))
+  const tenue = (name: string) => `/sj-invitation/tenue-${name}.webp`
   return (
     <Section id="ambiance" eyebrow="Ambiance & tenues" title="Comment s'habiller ?" width="max-w-8xl" picto="robe" decor={
       // Tourne-disque flottant en biais, en haut à gauche (comme le bouquet du programme).
       <Deco className="-left-4 -top-12 w-32 sm:-left-10 sm:-top-16 sm:w-48" from="left"><RecordPlayer className="w-full -rotate-12" /></Deco>
     }>
-      <div className="space-y-6 text-center">
-        <p className="text-xl leading-relaxed sm:text-2xl" style={heading}>
-          <T>{AMBIANCE.text}</T>{" "}
-          {AMBIANCE.influences.map((x, i) => (
-            <span key={x}>
-              <strong className="font-medium" style={{ color: MATTE_GOLD }}>{x}</strong>
-              {i < AMBIANCE.influences.length - 2 ? ", " : i === AMBIANCE.influences.length - 2 ? " et " : "."}
-            </span>
-          ))}
-        </p>
-        <Fleuron />
-        <p className="text-lg leading-relaxed" style={heading}>
-          <T>{AMBIANCE.dress}</T> <span className="italic" style={{ color: MATTE_GOLD }}><T>{AMBIANCE.examples}</T></span>
-        </p>
-        <p className="text-lg" style={heading}><T>{AMBIANCE.avoid}</T></p>
-        {notes.length > 0 && (
-          <ul className="mx-auto max-w-md space-y-2 border-t pt-6 text-sm" style={{ borderColor: "var(--p-line)" }}>
-            {notes.map((n) => <li key={n.text}><T>{n.text}</T></li>)}
-          </ul>
-        )}
+      <div className="mx-auto max-w-2xl space-y-3 text-center">
+        <p className="text-xl leading-relaxed sm:text-2xl" style={heading}><T>{AMBIANCE.intro}</T></p>
+        <p className="text-base leading-relaxed sm:text-lg" style={muted}><T>{AMBIANCE.why}</T></p>
+      </div>
+      <Fleuron className="my-10" />
+      <div className="grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
+        {shown.map((a, k) => {
+          const wide = a.tenues.length > 2
+          return (
+            <Reveal key={a.date} delay={k * 120} className={`flex flex-col items-center text-center ${wide ? "sm:col-span-2 lg:col-span-3" : ""}`}>
+              <p className="text-[11px] uppercase tracking-[0.3em]" style={{ color: MATTE_GOLD }}>{label.get(a.date)}</p>
+              <h3 className="mt-1 text-3xl sm:text-4xl" style={heading}>{a.mood}</h3>
+              <div className={wide ? "mt-6 grid w-full max-w-5xl grid-cols-4 gap-2 sm:gap-4 lg:grid-cols-8" : "mt-6 flex justify-center gap-2"}>
+                {a.tenues.map((t) => (
+                  <img key={t} src={tenue(t)} alt="" aria-hidden loading="lazy" decoding="async"
+                    className={wide ? "aspect-square w-full object-contain" : "size-36 object-contain sm:size-44"} />
+                ))}
+              </div>
+              <p className={`mt-5 text-base leading-relaxed sm:text-lg ${wide ? "max-w-3xl" : "max-w-sm"}`} style={heading}><T>{a.text}</T></p>
+              {a.note && <p className="mt-3 text-sm italic" style={{ color: MATTE_GOLD }}><T>{a.note}</T></p>}
+            </Reveal>
+          )
+        })}
       </div>
     </Section>
   )

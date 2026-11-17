@@ -301,7 +301,7 @@ export function InvitationEnLigneTab() {
             <FlaskConical className="size-3.5" aria-hidden />
             {demo ? "Retirer la simulation" : "Simuler des réponses"}
           </button>
-          <a href={INVITATION_ROUTES.details} target="_blank" rel="noreferrer"
+          <a href={INVITATION_ROUTES.landing} target="_blank" rel="noreferrer"
             className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-muted">
             Ouvrir l'invitation <ExternalLink className="size-3.5" aria-hidden />
           </a>

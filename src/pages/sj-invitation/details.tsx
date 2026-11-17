@@ -172,12 +172,12 @@ function PreviewBar({ view }: { view: GuestView }) {
 
 // ── En-tête et navigation ─────────────────────────────────────────────────────
 
-const HERO_PHOTO = "/sj-invitation/entete.webp"
+const HERO_PHOTO = "/sj-invitation/details-fond.webp"
 const HERO_SHADOW = "0 1px 12px rgba(0,0,0,.4)"
 
 function Hero({ member }: { member: GalleryMember }) {
   return (
-    // Photo des mariés en fond (public/sj-invitation/entete.webp, tirée de IMG_7794.JPG) sous un voile sombre :
+    // Photo des mariés en fond (public/sj-invitation/details-fond.webp, tirée de S&J397.jpg) sous un voile sombre :
     // textes en blanc, comme sur l'accueil.
     <header className="relative isolate flex min-h-svh flex-col items-center justify-center overflow-hidden px-6 py-12 text-center text-white">
       <img src={HERO_PHOTO} alt="" aria-hidden className="absolute inset-0 -z-10 size-full object-cover" />

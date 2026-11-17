@@ -25,8 +25,9 @@ export const INVITATION_ROUTES = {
  * public/sj-invitation/ (accueil-ordinateur.jpg et accueil-telephone.jpg) puis remplacer ces valeurs
  * par "/sj-invitation/accueil-ordinateur.jpg" et "/sj-invitation/accueil-telephone.jpg".
  */
-export const LANDING_PHOTO_DESKTOP = "/sj-invitation/S&J397.jpg"
-export const LANDING_PHOTO_MOBILE = "/sj-invitation/S&J397.jpg"
+// entete.webp : tirée de IMG_7794.JPG (photo d'en-tête de la page de détails jusqu'au 17/11).
+export const LANDING_PHOTO_DESKTOP = "/sj-invitation/entete.webp"
+export const LANDING_PHOTO_MOBILE = "/sj-invitation/entete.webp"
 
 /** Sous-titre de l'en-tête « Sarah & Jordan » sur l'invitation (la galerie garde celui des fiançailles). */
 export const INVITATION_SUBTITLE = "Mariage · juin 2027"

@@ -312,13 +312,14 @@ function YearLogins({ members }: { members: GalleryMember[] }) {
                     )}
                   </div>
                   <span className="font-mono text-sm tabular-nums">{m.birth_year}</span>
+                  {m.year_kind === "meeting" && <span className="text-xs text-muted-foreground">année de rencontre</span>}
                   {locked && (
                     <Button size="xs" variant="outline" onClick={() => save(m, { year_locked_until: null, year_failures: 0 }, "Connexion par année débloquée.")}>
                       Débloquer
                     </Button>
                   )}
                   <Button size="xs" variant="ghost" className="text-bordeaux"
-                    onClick={() => save(m, { birth_year: null, year_failures: 0, year_locked_until: null }, "Retiré de la liste : code par mail uniquement.")}>
+                    onClick={() => save(m, { birth_year: null, ...(m.year_kind === "meeting" ? { year_kind: "birth" as const } : {}), year_failures: 0, year_locked_until: null }, "Retiré de la liste : code par mail uniquement.")}>
                     Retirer
                   </Button>
                 </li>

@@ -151,12 +151,15 @@ Deno.serve(async (req) => {
 
   // 1. Compte existant : actif → code (ou année si liste blanche) ; désactivé → même réponse qu'une demande en attente.
   const { data: member } = await db.from(t("members"))
-    .select("id, status, role, birth_year, year_locked_until").eq("email", email).maybeSingle()
+    .select("id, status, role, birth_year, year_kind, year_locked_until").eq("email", email).maybeSingle()
   if (member) {
     if (member.status !== "active") return json({ status: "pending" })
     const locked = member.year_locked_until && new Date(member.year_locked_until) > new Date()
     await markSource(db, member.id, source)
-    return json({ status: "ready", yearLogin: member.role === "guest" && member.birth_year != null && !locked })
+    // Liste blanche : invités (année de naissance) ; dérogation administrateur avec l'année de rencontre (0181).
+    const yearKind = (member as { year_kind?: string }).year_kind === "meeting" ? "meeting" : "birth"
+    const allowed = member.role === "guest" || (member.role === "admin" && yearKind === "meeting")
+    return json({ status: "ready", yearLogin: allowed && member.birth_year != null && !locked, yearKind })
   }
 
   // 2. Administrateur déclaré : ouverture de son compte à la première connexion.
@@ -249,13 +252,13 @@ async function yearLogin(db: SupabaseClient, email: string, year: number, source
   }
   if (row.result === "locked") {
     await db.from(t("activity")).insert({ member_id: row.member_id, event: "year_login_locked", details: {} })
-    const { data: m } = await db.from(t("members")).select("first_name, last_name").eq("id", row.member_id).maybeSingle()
+    const { data: m } = await db.from(t("members")).select("first_name, last_name, role").eq("id", row.member_id).maybeSingle()
     // Repli sur le code par mail : le modèle d'e-mail doit parler de la bonne interface.
     await markSource(db, row.member_id, source)
     await sendMail(await adminEmails(db), `${SOURCE_LABEL[source].subject} : connexion par année bloquée`,
       mailLayout("Connexion par année bloquée",
-        `Deux années de naissance incorrectes ont été saisies pour ${escapeHtml(`${m?.first_name ?? ""} ${m?.last_name ?? ""}`.trim() || email)} ` +
-        `(${escapeHtml(email)}). La connexion par année est bloquée pendant 1 heure ; la personne a reçu un code par mail à la place.<br><br>` +
+        `Deux années incorrectes ont été saisies pour ${escapeHtml(`${m?.first_name ?? ""} ${m?.last_name ?? ""}`.trim() || email)} ` +
+        `(${escapeHtml(email)}). La connexion par année est bloquée pendant ${m?.role === "admin" ? "24 heures" : "1 heure"} ; la personne a reçu un code par mail à la place.<br><br>` +
         `Si ce n'est pas elle, vérifiez son compte : <a href="${sourceUrl(source)}/admin/acces">${sourceUrl(source)}/admin/acces</a>`))
     return json({ status: "locked" })
   }

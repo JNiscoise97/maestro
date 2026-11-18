@@ -39,9 +39,10 @@ export const INVITATION = {
 
 export const OUR_WORD = {
   paragraphs: [
-    "Il y a des moments qu'on ne veut vivre qu'entourés de ceux qu'on aime. Notre mariage en fait partie, et tu en fais partie.",
-    "Nos familles, nos amis et nos origines ont fait de nous ce que nous sommes. Pour notre mariage, nous voulons tout réunir : la tradition, l'émotion, les rires et une grande fête.",
-    "Viens comme tu es, avec ta bonne humeur et l'envie de danser. Nous avons hâte de te retrouver.",
+    "Il y a des moments qu'on imagine et qui deviennent encore plus beaux lorsqu'on pense aux personnes avec qui on va les partager.",
+    "Pour notre mariage, nous avons eu envie de réunir nos familles, nos amis, nos cultures et nos traditions, le temps de journées qui nous ressemblent.",
+    "Des moments solennels aux instants les plus simples, nous espérons surtout des retrouvailles, des conversations qui n'en finissent pas, des éclats de rire, quelques larmes de joie et beaucoup de danse.",
+    "Nous avons hâte de vivre tout cela avec toi et de créer ensemble des souvenirs qui nous accompagneront longtemps.",
   ],
   signature: "Sarah & Jordan",
 }

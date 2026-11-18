@@ -26,6 +26,7 @@ import { RsvpSuiviTab } from "@/pages/invites/RsvpSuiviTab"
 import { AtelierTab } from "@/pages/invites/AtelierTab"
 import { PapeterieTab } from "@/pages/invites/PapeterieTab"
 import { InvitationEnLigneTab } from "@/pages/invites/InvitationEnLigneTab"
+import { InvitationsArea } from "@/pages/invites/InvitationJournal"
 import { FoyersTab } from "@/pages/invites/FoyersTab"
 import { SequencesTab } from "@/pages/invites/SequencesTab"
 import { CortegeTab } from "@/pages/invites/CortegeTab"
@@ -476,7 +477,7 @@ export function InvitesPage() {
       {tab === "enfants" && <EnfantsPage />}
       {tab === "accessibilite" && <PersonnesAgeesPage />}
       {tab === "messages" && <MessageSuiviPage />}
-      {tab === "invitations" && <InvitationEnLigneTab />}
+      {tab === "invitations" && <InvitationsArea suivi={<InvitationEnLigneTab />} />}
       {tab === "foyers" && <FoyersTab />}
       {tab === "papeterie" && <PapeterieTab />}
       {tab === "sequences" && <SequencesTab />}

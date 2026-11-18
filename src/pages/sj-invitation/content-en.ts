@@ -30,9 +30,10 @@ export const INVITATION = {
 
 export const OUR_WORD = {
   paragraphs: [
-    "Some moments are only worth living surrounded by the people we love. Our wedding is one of them, and so are you.",
-    "Our families, our friends and our roots have made us who we are. For our wedding, we want to bring it all together: tradition, emotion, laughter and a big celebration.",
-    "Come as you are, with your good mood and ready to dance. We can't wait to see you.",
+    "Some moments we imagine become even more beautiful when we think of the people we will share them with.",
+    "For our wedding, we wanted to bring together our families, our friends, our cultures and our traditions, over days that truly reflect who we are.",
+    "From the solemn moments to the simplest ones, what we hope for most is reunions, conversations that never end, bursts of laughter, a few happy tears and lots of dancing.",
+    "We can't wait to experience all of this with you and to create memories together that will stay with us for a long time.",
   ],
   signature: "Sarah & Jordan",
 }

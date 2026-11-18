@@ -9,7 +9,7 @@ import { INVITATION_SUBTITLE } from "@/pages/sj-invitation/paths"
 type Step = "email" | "name" | "year" | "code" | "pending"
 
 type IdentifyResult =
-  | { status: "ready"; yearLogin?: boolean }
+  | { status: "ready"; yearLogin?: boolean; yearKind?: "birth" | "meeting" }
   | { status: "need_name" | "pending" | "locked" }
   | { status: "signed"; tokenHash: string }
   | { status: "wrong_year"; remaining: number }
@@ -22,7 +22,7 @@ const TEXTS = {
     errorAddress: "Une erreur est survenue. Vérifiez votre adresse et réessayez.",
     loginFailed: "La connexion a échoué. Réessayez dans un instant.",
     wrongYear: (n: number) => `Année incorrecte. Il vous reste ${n} essai${n > 1 ? "s" : ""}.`,
-    yearLocked: "Pour votre sécurité, la connexion par année est suspendue pendant 1 heure.",
+    yearLocked: "Pour votre sécurité, la connexion par année est suspendue. Un code vous a été envoyé par e-mail.",
     error: "Une erreur est survenue. Réessayez dans un instant.",
     badCode: "Code incorrect ou expiré. Vérifiez-le ou demandez-en un nouveau.",
     emailIntro: "Indiquez votre adresse e-mail : nous vous envoyons un code de connexion.",
@@ -36,9 +36,11 @@ const TEXTS = {
     continue: "Continuer",
     yearBefore: "Saisissez votre ",
     yearStrong: "année de naissance",
+    meetingStrong: "année de rencontre",
     yearAfter: " pour vous connecter.",
     yearPlaceholder: "AAAA",
     yearLabel: "Année de naissance",
+    meetingLabel: "Année de rencontre",
     checking: "Vérification…",
     signIn: "Se connecter",
     changeAddress: "Changer d'adresse",
@@ -57,7 +59,7 @@ const TEXTS = {
     errorAddress: "Something went wrong. Please check your address and try again.",
     loginFailed: "Sign-in failed. Please try again in a moment.",
     wrongYear: (n: number) => `Incorrect year. You have ${n} attempt${n > 1 ? "s" : ""} left.`,
-    yearLocked: "For your security, signing in with your birth year is suspended for 1 hour.",
+    yearLocked: "For your security, signing in with a year is suspended. A code has been sent to you by email.",
     error: "Something went wrong. Please try again in a moment.",
     badCode: "Incorrect or expired code. Please check it or ask for a new one.",
     emailIntro: "Enter your email address: we will send you a sign-in code.",
@@ -71,9 +73,11 @@ const TEXTS = {
     continue: "Continue",
     yearBefore: "Enter your ",
     yearStrong: "year of birth",
+    meetingStrong: "year you met",
     yearAfter: " to sign in.",
     yearPlaceholder: "YYYY",
     yearLabel: "Year of birth",
+    meetingLabel: "Year you met",
     checking: "Checking…",
     signIn: "Sign in",
     changeAddress: "Change address",
@@ -126,6 +130,8 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
   const [lastName, setLastName] = useState("")
   const [code, setCode] = useState("")
   const [year, setYear] = useState("")
+  // Année demandée : de naissance (invités) ou de rencontre (dérogation administrateur).
+  const [yearKind, setYearKind] = useState<"birth" | "meeting">("birth")
   // Message affiché au-dessus du code (ex. bascule sur le mail après 2 années incorrectes).
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -152,7 +158,7 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
       const res = await callGalleryFunction<IdentifyResult>("gallery-identify", {
         email, source, ...(withName ? { firstName, lastName } : {}),
       })
-      if (res.status === "ready" && res.yearLogin) { setYear(""); setStep("year") }
+      if (res.status === "ready" && res.yearLogin) { setYear(""); setYearKind(res.yearKind ?? "birth"); setStep("year") }
       else if (res.status === "ready") await sendCode()
       else if (res.status === "need_name") setStep("name")
       else setStep("pending")
@@ -239,10 +245,10 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
         {step === "year" && (
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void verifyYear() }}>
             <p className="text-sm" style={{ color: "var(--p-muted)" }}>
-              {t.yearBefore}<b style={{ color: "var(--p-fg)" }}>{t.yearStrong}</b>{t.yearAfter}
+              {t.yearBefore}<b style={{ color: "var(--p-fg)" }}>{yearKind === "meeting" ? t.meetingStrong : t.yearStrong}</b>{t.yearAfter}
             </p>
             <input inputMode="numeric" autoComplete="off" maxLength={4} required value={year}
-              onChange={(e) => setYear(e.target.value.replace(/\D/g, ""))} placeholder={t.yearPlaceholder} aria-label={t.yearLabel}
+              onChange={(e) => setYear(e.target.value.replace(/\D/g, ""))} placeholder={t.yearPlaceholder} aria-label={yearKind === "meeting" ? t.meetingLabel : t.yearLabel}
               className={`${input} text-center text-2xl tracking-[0.5em]`} style={{ borderColor: "var(--p-line)" }} />
             <button type="submit" disabled={busy || year.length !== 4} className={btnClass}
               style={btnStyle}>

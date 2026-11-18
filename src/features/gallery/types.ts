@@ -14,6 +14,8 @@ export type GalleryMember = {
   last_seen_at: string | null
   /** Liste blanche : année de naissance acceptée à la place du code par mail. */
   birth_year: number | null
+  /** Nature de birth_year : année de naissance (invités) ou de rencontre (dérogation administrateur, 0181). */
+  year_kind?: "birth" | "meeting"
   year_failures: number
   year_locked_until: string | null
   /** Accès limité : ne voit que la sélection d'accueil (50 photos max). */

@@ -45,6 +45,8 @@ export const PROGRAMME = {
   titleSome: "{n} to share",
   introSome: "Here are the moments we would be delighted to share with you.",
   limitedNote: "Moments marked “limited places” take place in a small group: please confirm your attendance as soon as possible.",
+  pending: "Your programme is being prepared: come back soon to discover the moments we will share.",
+  pendingReply: "You will be able to reply as soon as your programme is ready.",
   unknownNote: "We haven't found your personal invitation yet: only the moments open to everyone are shown. Feel free to get in touch.",
 }
 
@@ -325,6 +327,7 @@ export const UI = {
     under10: "under 10",
     restrictions: "Dietary requirements:",
     edit: "Change my reply",
+    unsureLater: "Not sure yet about some moments? You can come back and change your reply until",
   },
   thanks: { aria: "Thank you" },
   footer: { letter: "See the letter again" },

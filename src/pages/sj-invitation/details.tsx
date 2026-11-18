@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
-import { ChevronDown, Lock, LockOpen, MapPin, TriangleAlert } from "lucide-react"
+import { Check, ChevronDown, CircleHelp, Lock, LockOpen, MapPin, Pencil, TriangleAlert, X } from "lucide-react"
 
 import { useGalleryAuth } from "@/context/GalleryAuthContext"
 import { MATTE_GOLD } from "@/features/gallery/gilded"
@@ -30,8 +30,9 @@ import { PAPER_STYLE, TABLE_STYLE, iconForMoment, pictoForTravel, type PictoName
 type SectionId = "invitation" | "mot" | "programme" | "lieux" | "ambiance" | "cortege" | "venir" | "liste" | "faq" | "reponse"
 
 /** Rubriques de la barre de navigation (Cortège seulement s'il est affiché). */
-function navItems(c: Content): { id: SectionId; label: string }[] {
-  const ids: SectionId[] = ["mot", "invitation", "programme", "lieux", "ambiance", ...(c.CORTEGE.show ? ["cortege" as const] : []), "venir", "liste", "faq"]
+function navItems(c: Content, hidden: readonly SectionId[] = []): { id: SectionId; label: string }[] {
+  const ids = (["mot", "invitation", "programme", "lieux", "ambiance", ...(c.CORTEGE.show ? ["cortege" as const] : []), "venir", "liste", "faq"] as SectionId[])
+    .filter((id) => !hidden.includes(id))
   return ids.map((id) => ({ id, label: c.UI.nav[id as Exclude<SectionId, "reponse">] }))
 }
 
@@ -59,22 +60,24 @@ function scrollToId(id: string) {
 export function DetailsScreen({ member }: { member: GalleryMember }) {
   const { CORTEGE } = useContent()
   const view = useGuestView(member)
+  // Programme pas encore préparé (aucune séquence cochée) : ni lieux ni ambiance, pas de formulaire.
+  const pending = view.mode === "pending"
   return (
     <div className="min-h-svh overflow-x-clip" style={{ ...TABLE_STYLE, color: "#2e2a25" }}>
       <Hero member={member} />
       {member.role === "admin" && <PreviewBar view={view} />}
-      <Nav />
+      <Nav hidden={pending ? PENDING_HIDDEN : undefined} />
       <main>
         <OurWordSection />
         <InvitationSection />
         <ProgrammeSection view={view} />
-        <PlacesSection days={view.days} />
-        <AmbianceSection days={view.days} />
+        {!pending && <PlacesSection days={view.days} />}
+        {!pending && <AmbianceSection days={view.days} />}
         {CORTEGE.show && <CortegeSection />}
         <TravelSection days={view.days} />
         <GiftsSection />
         <FaqSection />
-        <RsvpSection member={member} days={view.days} guestId={view.guestId} />
+        {pending ? <RsvpPending /> : <RsvpSection member={member} days={view.days} guestId={view.guestId} />}
         <ThanksSection />
       </main>
       <Footer />
@@ -86,8 +89,11 @@ export function DetailsScreen({ member }: { member: GalleryMember }) {
 
 type GuestView = {
   loading: boolean
-  /** all : tous les moments · some : une partie · unknown : invité non retrouvé (moments ouverts à tous). */
-  mode: "all" | "some" | "unknown"
+  /**
+   * all : tous les moments · some : une partie · unknown : invité non retrouvé (moments ouverts à tous) ·
+   * pending : invité retrouvé mais aucune séquence cochée (Invités › Séquences) → programme « en préparation ».
+   */
+  mode: "all" | "some" | "unknown" | "pending"
   days: Day[]
   /** Invité de la liste du mariage auquel rattacher la réponse. */
   guestId: string | null
@@ -140,7 +146,9 @@ function useGuestView(member: GalleryMember): GuestView {
   if (!target) return unknown
   if (loaded?.id !== target.id) return { ...base, loading: true, mode: "some", days: [] }
   const programme = loaded.programme
-  if (programme?.status !== "found" || programme.sequenceIds.size === 0) return unknown
+  if (programme?.status !== "found") return unknown
+  // Invité bien retrouvé mais sans séquence : on ne devine pas son programme (pas de repli sur les moments ouverts).
+  if (programme.sequenceIds.size === 0) return { ...base, loading: false, mode: "pending", days: [] }
   const days = visibleDays(programme.sequenceIds, false, DAYS)
   const count = days.reduce((n, d) => n + d.moments.length, 0)
   const total = DAYS.reduce((n, d) => n + d.moments.length, 0)
@@ -205,16 +213,18 @@ function Hero({ member }: { member: GalleryMember }) {
   )
 }
 
-function Nav() {
+const PENDING_HIDDEN: readonly SectionId[] = ["lieux", "ambiance"]
+
+function Nav({ hidden }: { hidden?: readonly SectionId[] }) {
   const content = useContent()
   const { UI } = content
-  const NAV = navItems(content)
+  const NAV = navItems(content, hidden)
   const [active, setActive] = useState<SectionId | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
   // Rubrique en cours : la dernière dont le haut est passé sous la barre.
   useEffect(() => {
-    const ids: SectionId[] = [...navItems(content).map((n) => n.id), "reponse"]
+    const ids: SectionId[] = [...navItems(content, hidden).map((n) => n.id), "reponse"]
     let frame = 0
     const update = () => {
       frame = 0
@@ -236,7 +246,7 @@ function Nav() {
       window.removeEventListener("resize", onScroll)
       cancelAnimationFrame(frame)
     }
-  }, [content])
+  }, [content, hidden])
 
   // Sur téléphone, la barre défile horizontalement : on garde le lien actif visible.
   useEffect(() => {
@@ -406,6 +416,8 @@ function ProgrammeSection({ view }: { view: GuestView }) {
     }>
       {loading ? (
         <p className="text-center text-sm" style={muted} role="status">{UI.sections.programme.loading}</p>
+      ) : mode === "pending" ? (
+        <p className="mx-auto max-w-xl text-center text-lg leading-relaxed" style={heading}><T>{PROGRAMME.pending}</T></p>
       ) : (
         <>
           <p className="mx-auto max-w-xl text-center text-sm leading-relaxed" style={muted}>
@@ -872,10 +884,13 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
     <Section id="reponse" eyebrow={UI.sections.reponse.eyebrow} title={UI.sections.reponse.title} narrow picto="enveloppe" decor={
       <Deco className="-right-6 -top-10 w-32 sm:-right-12 sm:-top-14 sm:w-48"><FlowerCluster flip kind="coin-hortensia" className="w-full" /></Deco>
     }>
-      <div className="-mt-4 mb-10 space-y-3 text-center text-sm leading-relaxed" style={muted}>
-        <p><T>{RSVP.intro}</T></p>
-        <p>{UI.rsvp.before} <strong style={{ color: "#2e2a25" }}>{RSVP.deadline}</strong>.</p>
-      </div>
+      {/* Introduction du formulaire : masquée une fois la réponse envoyée (encadré de la réponse à la place). */}
+      {(!previous || editing) && (
+        <div className="-mt-4 mb-10 space-y-3 text-center text-sm leading-relaxed" style={muted}>
+          <p><T>{RSVP.intro}</T></p>
+          <p>{UI.rsvp.before} <strong style={{ color: "#2e2a25" }}>{RSVP.deadline}</strong>.</p>
+        </div>
+      )}
 
       <div ref={topRef} />
       {previous && !editing ? (
@@ -1098,6 +1113,8 @@ function PreviousAnswer({ response: r, moments, onEdit }: { response: RsvpRespon
   const presence = fromAttendance(r.attendance)
   const party = r.party ?? []
   const title = UI.rsvp.done[presence]
+  const showMoments = presence !== "no" && party.length > 0 && moments.length > 0
+  const hasUnsure = showMoments && party.some((p) => moments.some((m) => (p.moments[m.sequenceId] ?? "unsure") === "unsure"))
   return (
     <div className="border p-6 text-center sm:p-8" style={{ borderColor: MATTE_GOLD }} role="status">
       <p className="text-3xl" style={heading}>{title}</p>
@@ -1106,24 +1123,56 @@ function PreviousAnswer({ response: r, moments, onEdit }: { response: RsvpRespon
         {RSVP.attendance[presence].toLowerCase()}
         {presence !== "no" && party.length > 0 && ` · ${UI.rsvp.people(party.length)}`}.
       </p>
-      {presence !== "no" && party.length > 0 && moments.length > 0 && (
-        <ul className="mx-auto mt-5 max-w-md space-y-3 text-left text-sm">
+      {showMoments && (
+        // Une carte par personne : chaque moment sur sa ligne, la réponse à droite (icône + texte).
+        <ul className="mx-auto mt-6 max-w-md space-y-4 text-left">
           {party.map((p, i) => (
-            <li key={i}>
-              <span style={heading} className="text-lg">{p.firstName} {p.lastName}</span>
-              {p.under10 && <span className="ml-2 text-xs" style={muted}>{UI.rsvp.under10}</span>}
-              {p.diet && <span className="block text-xs italic" style={muted}>{UI.rsvp.restrictions} {p.diet}</span>}
-              <span className="block text-xs leading-relaxed" style={muted}>
-                {moments.map((m) => `${m.title} : ${RSVP.answers[p.moments[m.sequenceId] ?? "unsure"].toLowerCase()}`).join(" · ")}
-              </span>
+            <li key={i} className="border bg-white/60 px-4 py-3 sm:px-5" style={{ borderColor: "rgba(0,0,0,.1)", borderRadius: "var(--p-radius)" }}>
+              <p className="text-xl" style={heading}>
+                {p.firstName} {p.lastName}
+                {p.under10 && <span className="ml-2 align-middle text-xs" style={muted}>{UI.rsvp.under10}</span>}
+              </p>
+              {p.diet && <p className="text-xs italic" style={muted}>{UI.rsvp.restrictions} {p.diet}</p>}
+              <ul className="mt-2 divide-y text-sm" style={{ borderColor: "rgba(0,0,0,.06)" }}>
+                {moments.map((m) => {
+                  const a = p.moments[m.sequenceId] ?? "unsure"
+                  const Icon = a === "yes" ? Check : a === "no" ? X : CircleHelp
+                  return (
+                    <li key={m.sequenceId} className="flex items-center justify-between gap-3 py-2" style={{ borderColor: "rgba(0,0,0,.06)" }}>
+                      <span>{m.title}</span>
+                      <span className="flex shrink-0 items-center gap-1.5 text-xs"
+                        style={a === "yes" ? { color: MATTE_GOLD, fontWeight: 600 } : a === "no" ? muted : { color: "#9a6b2f", fontStyle: "italic" }}>
+                        <Icon className="size-4" aria-hidden />{RSVP.answers[a]}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
             </li>
           ))}
         </ul>
       )}
-      <button type="button" className="mt-6 text-xs underline" style={muted} onClick={onEdit}>
-        {UI.rsvp.edit}
+      {hasUnsure && (
+        <p className="mx-auto mt-5 max-w-md text-sm leading-relaxed" style={muted}>
+          {UI.rsvp.unsureLater} <strong style={{ color: "#2e2a25" }}>{RSVP.deadline}</strong>.
+        </p>
+      )}
+      {/* Bouton bien visible (même style que les boutons du formulaire, fond or) : on peut modifier jusqu'à la date limite. */}
+      <button type="button" className={`${button} mt-8 inline-flex items-center gap-2`}
+        style={{ ...buttonStyle, background: MATTE_GOLD, color: "#fff" }} onClick={onEdit}>
+        <Pencil className="size-4" aria-hidden />{UI.rsvp.edit}
       </button>
     </div>
+  )
+}
+
+/** Réponse impossible tant que le programme de l'invité n'est pas préparé. */
+function RsvpPending() {
+  const { PROGRAMME, UI } = useContent()
+  return (
+    <Section id="reponse" eyebrow={UI.sections.reponse.eyebrow} title={UI.sections.reponse.title} narrow picto="enveloppe">
+      <p className="-mt-4 text-center text-sm leading-relaxed" style={muted}><T>{PROGRAMME.pendingReply}</T></p>
+    </Section>
   )
 }
 

@@ -84,6 +84,9 @@ export const PROGRAMME = {
   /** Affiché quand au moins un des moments de l'invité est à places limitées. */
   limitedNote: "Les moments marqués « places limitées » se déroulent en comité restreint : merci de nous confirmer ta présence au plus tôt.",
   /** Compte non rattaché à la liste des invités : seuls les moments sans places limitées s'affichent. */
+  /** Invité retrouvé mais aucune séquence cochée : programme pas encore préparé (ni lieux, ni formulaire de réponse). */
+  pending: "Ton programme est en cours de préparation : reviens bientôt pour découvrir les moments que nous partagerons.",
+  pendingReply: "Tu pourras nous répondre dès que ton programme sera prêt.",
   unknownNote: "Nous n'avons pas encore retrouvé ton invitation personnalisée : seuls les moments ouverts à tous s'affichent. N'hésite pas à nous écrire.",
 }
 
@@ -406,6 +409,8 @@ export const UI = {
     under10: "moins de 10 ans",
     restrictions: "Restrictions :",
     edit: "Modifier ma réponse",
+    /** Sous la réponse enregistrée, s'il reste des « je ne sais pas encore ». */
+    unsureLater: "Tu hésites encore pour certains moments ? Tu peux revenir modifier ta réponse jusqu'au",
   },
   thanks: { aria: "Merci" },
   footer: { letter: "Revoir la lettre" },

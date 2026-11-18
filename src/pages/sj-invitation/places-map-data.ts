@@ -14,7 +14,7 @@ export const MAP_PINS: Record<string, { x: number; y: number; label: string; sid
     { x: 483.9, y: 258.0, label: "Villa des garçons", side: "bottom" },
     { x: 123.7, y: 333.5, label: "Villa des filles", side: "bottom" },
   ],
-  eglise: [{ x: 201.8, y: 317.4, label: "Saint-Cléophas", side: "top" }],
+  eglise: [{ x: 201.8, y: 317.4, label: "Église Saint-Cléophas", side: "top" }],
   ostara: [{ x: 487.3, y: 47.7, label: "Domaine Ostara", side: "left" }],
 }
 

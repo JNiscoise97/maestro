@@ -22,7 +22,7 @@ export const INVITATION = {
   groomParents: ["Mr Georges NISÇOISE", "Mrs Corine NISÇOISE"],
   announce: "are delighted to announce the marriage of their children",
   date: "which will take place on Monday 28 June 2027 in Montpellier.",
-  context: "The celebrations will unfold over several occasions, civil, religious and festive, from Friday 25 to Monday 28 June 2027. As not every venue can welcome all of the guests, each guest is invited to some of these moments.",
+  context: "The celebrations will unfold over several occasions (civil, religious and festive) from Friday 25 to Monday 28 June 2027. As not every venue can welcome all of the guests, each guest is invited to some of these moments.",
   invite: "They kindly invite you to share with them the moments presented below.",
 }
 

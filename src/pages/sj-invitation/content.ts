@@ -29,7 +29,7 @@ export const INVITATION = {
   /** Sous les prénoms : le jour du mariage (le même que sur le carton de l'enveloppe). */
   date: "qui sera célébré le lundi 28 juin 2027 à Montpellier.",
   /** Explique pourquoi les festivités durent quatre jours et pourquoi chacun n'est pas convié à tout. */
-  context: "Les festivités se dérouleront en plusieurs temps, civils, religieux et conviviaux, du vendredi 25 au lundi 28 juin 2027. Les lieux ne pouvant pas tous accueillir l'ensemble des invités, chacun est convié à une partie de ces moments.",
+  context: "Les festivités se dérouleront en plusieurs temps (civils, religieux et conviviaux) du vendredi 25 au lundi 28 juin 2027. Les lieux ne pouvant pas tous accueillir l'ensemble des invités, chacun est convié à une partie de ces moments.",
   /** Dernière phrase de l'invitation. */
   invite: "Ils vous prient de partager avec eux ceux présentés ci-dessous.",
 }

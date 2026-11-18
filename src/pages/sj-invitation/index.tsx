@@ -76,7 +76,7 @@ function InvitationRouter() {
   // Fond blanc sur tous les écrans, quel que soit le thème ou le mode choisi sur la galerie.
   return (
     <div className="min-h-svh" style={{ ...themeStyle(theme, "light"), ...WHITE }}>
-      {/* Aperçu ordinateur / téléphone : bouton en haut à droite (provisoirement pour tout le monde). */}
+      {/* Aperçu ordinateur / téléphone : bouton en haut à droite (administrateurs seulement). */}
       <DevicePreview>{content}</DevicePreview>
     </div>
   )

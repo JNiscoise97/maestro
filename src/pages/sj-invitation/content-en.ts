@@ -23,7 +23,6 @@ export const INVITATION = {
   announce: "are delighted to announce the marriage of their children",
   date: "which will take place on Monday 28 June 2027 in Montpellier.",
   context: "The celebrations will unfold over several occasions (civil, religious and festive) from Friday 25 to Monday 28 June 2027. As not every venue can welcome all of the guests, each guest is invited to some of these moments.",
-  invite: "They kindly invite you to share with them the moments presented below.",
 }
 
 // ── 2. A word from us ────────────────────────────────────────────────────────
@@ -262,7 +261,7 @@ export const UI = {
   },
   hero: {
     intro: (first: string) => (first ? `${first}, here is everything you need to know about our wedding.` : "Here is everything you need to know about our wedding."),
-    reply: "Reply to the invitation",
+    scroll: "See more",
   },
   preview: { label: "Admin preview", all: "Whole programme" },
   sections: {

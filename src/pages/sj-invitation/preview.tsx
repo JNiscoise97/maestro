@@ -14,7 +14,7 @@ function readDevice(): Device {
 }
 
 /**
- * Aperçu ordinateur / téléphone de l'invitation (provisoirement visible par tout le monde).
+ * Aperçu ordinateur / téléphone de l'invitation (administrateurs seulement).
  * Bouton en haut à droite. En mode téléphone, la page est rechargée dans une iframe de 390 px :
  * les règles responsives (sm:, lg:…) se basent alors sur la largeur du téléphone, comme sur un vrai mobile.
  * En revenant sur « Ordinateur », la page principale reprend l'écran affiché dans le téléphone.
@@ -31,12 +31,10 @@ export function DevicePreview({ children }: { children: React.ReactNode }) {
   // Page affichée dans le cadre téléphone : détectée par l'iframe elle-même (pas par l'adresse, perdue
   // à la navigation), sinon le stockage de session partagé ouvrirait un cadre dans le cadre.
   const insidePreview = isInIframe()
-  // Provisoire : bouton visible par tout le monde (connecté ou non). Pour le réserver aux
-  // administrateurs, remettre la condition `!isAdmin` dans le test ci-dessous.
+  // Bouton réservé aux administrateurs : les invités voient la page telle quelle.
   const isAdmin = member?.role === "admin" && member.status === "active"
-  void isAdmin
-  // Dans l'iframe ou dans l'administration : la page telle quelle.
-  if (insidePreview || location.pathname.includes("/admin")) return <>{children}</>
+  // Dans l'iframe, dans l'administration ou pour un invité : la page telle quelle.
+  if (!isAdmin || insidePreview || location.pathname.includes("/admin")) return <>{children}</>
 
   function choose(next: Device) {
     if (next === "mobile") setFrameSrc(location.pathname)

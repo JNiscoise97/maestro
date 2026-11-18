@@ -3,7 +3,7 @@
  *
  * Tout le texte de la page est ici : il suffit de remplacer les valeurs.
  * Un texte qui commence par « À compléter » s'affiche en italique grisé, pour repérer ce qui manque.
- * Ordre de la page : invitation → mot → programme → lieux → ambiance & tenues → cortège → venir & se loger → liste → FAQ → réponse.
+ * Ordre de la page : mot → invitation → programme → lieux → ambiance & tenues → cortège → venir & se loger → liste → FAQ → réponse.
  */
 
 export const TODO = "À compléter"
@@ -30,8 +30,6 @@ export const INVITATION = {
   date: "qui sera célébré le lundi 28 juin 2027 à Montpellier.",
   /** Explique pourquoi les festivités durent quatre jours et pourquoi chacun n'est pas convié à tout. */
   context: "Les festivités se dérouleront en plusieurs temps (civils, religieux et conviviaux) du vendredi 25 au lundi 28 juin 2027. Les lieux ne pouvant pas tous accueillir l'ensemble des invités, chacun est convié à une partie de ces moments.",
-  /** Dernière phrase de l'invitation. */
-  invite: "Ils vous prient de partager avec eux ceux présentés ci-dessous.",
 }
 
 // ── 2. Un mot de nous ─────────────────────────────────────────────────────────
@@ -343,7 +341,7 @@ export const UI = {
   },
   hero: {
     intro: (first: string) => (first ? `${first}, voici tout ce qu'il faut savoir sur notre mariage.` : "Voici tout ce qu'il faut savoir sur notre mariage."),
-    reply: "Répondre à l'invitation",
+    scroll: "Découvrir la suite",
   },
   preview: { label: "Aperçu administrateur", all: "Tout le programme" },
   sections: {

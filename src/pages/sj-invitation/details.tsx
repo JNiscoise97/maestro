@@ -31,7 +31,7 @@ type SectionId = "invitation" | "mot" | "programme" | "lieux" | "ambiance" | "co
 
 /** Rubriques de la barre de navigation (Cortège seulement s'il est affiché). */
 function navItems(c: Content): { id: SectionId; label: string }[] {
-  const ids: SectionId[] = ["invitation", "mot", "programme", "lieux", "ambiance", ...(c.CORTEGE.show ? ["cortege" as const] : []), "venir", "liste", "faq"]
+  const ids: SectionId[] = ["mot", "invitation", "programme", "lieux", "ambiance", ...(c.CORTEGE.show ? ["cortege" as const] : []), "venir", "liste", "faq"]
   return ids.map((id) => ({ id, label: c.UI.nav[id as Exclude<SectionId, "reponse">] }))
 }
 
@@ -65,8 +65,8 @@ export function DetailsScreen({ member }: { member: GalleryMember }) {
       {member.role === "admin" && <PreviewBar view={view} />}
       <Nav />
       <main>
-        <InvitationSection />
         <OurWordSection />
+        <InvitationSection />
         <ProgrammeSection view={view} />
         <PlacesSection days={view.days} />
         <AmbianceSection days={view.days} />
@@ -188,13 +188,18 @@ function Hero({ member }: { member: GalleryMember }) {
       <div className="[&_h1_span]:text-white!" style={{ "--p-gold": "#fff", textShadow: HERO_SHADOW } as React.CSSProperties}>
         <Masthead subtitle={UI.subtitle} gilded />
       </div>
-      <p className="mt-2 max-w-md text-sm leading-relaxed text-white/90" style={{ textShadow: HERO_SHADOW }}>
+      {/* Phrase d'accueil mise en avant : grande italique (police des titres), entre deux filets. */}
+      <div aria-hidden className="mx-auto mt-8 h-px w-16 bg-white/70" />
+      <p className="mt-6 max-w-2xl text-2xl italic leading-snug text-white sm:text-3xl"
+        style={{ fontFamily: "var(--p-heading)", textShadow: HERO_SHADOW }}>
         {UI.hero.intro(greeting)}
       </p>
-      <button type="button" onClick={() => scrollToId("reponse")}
-        className="mt-8 inline-block border border-white px-8 py-3 text-xs uppercase tracking-[0.24em] text-white transition-colors hover:bg-white hover:text-neutral-900"
-        style={{ borderRadius: "var(--p-radius)", textShadow: HERO_SHADOW }}>
-        {UI.hero.reply}
+      <div aria-hidden className="mx-auto mt-6 h-px w-16 bg-white/70" />
+      {/* Flèche animée : invite à faire défiler la page (un clic descend à la première section). */}
+      <button type="button" onClick={() => scrollToId("mot")} aria-label={UI.hero.scroll}
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 rounded-full p-2 text-white/90 transition-colors hover:text-white"
+        style={{ filter: "drop-shadow(0 1px 6px rgba(0,0,0,.5))" }}>
+        <ChevronDown className="size-9 motion-safe:animate-bounce" strokeWidth={1.5} />
       </button>
     </header>
   )
@@ -334,7 +339,6 @@ function InvitationSection() {
         <p className="text-lg sm:text-xl"><T>{INVITATION.date}</T></p>
         <Fleuron className="my-8" />
         <p className="mx-auto max-w-xl text-lg leading-relaxed sm:text-xl"><T>{INVITATION.context}</T></p>
-        <p className="mt-6 text-lg sm:text-xl"><T>{INVITATION.invite}</T></p>
       </div>
     </Section>
   )

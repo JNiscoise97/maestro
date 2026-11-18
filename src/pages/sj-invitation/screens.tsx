@@ -7,6 +7,7 @@ import { useGalleryAuth } from "@/context/GalleryAuthContext"
 import type { GalleryMember } from "@/features/gallery/types"
 import { GOLD_TEXT, MATTE_GOLD } from "@/features/gallery/gilded"
 import { Masthead } from "@/pages/photos/GalleryChrome"
+import { useGreetingName } from "./guest-programme"
 import { useContent } from "./i18n"
 import { LangSwitch } from "./lang-switch"
 import { INVITATION_ROUTES, LANDING_PHOTO_DESKTOP, LANDING_PHOTO_MOBILE } from "./paths"
@@ -14,10 +15,6 @@ import { INVITATION_ROUTES, LANDING_PHOTO_DESKTOP, LANDING_PHOTO_MOBILE } from "
 // Bouton or mat : contour fin et texte dorés, rempli d'or au survol.
 const primary = "inline-block border px-8 py-3 text-xs uppercase tracking-[0.24em] transition-colors hover:bg-[#a8844f]! hover:text-white! disabled:opacity-40"
 const primaryStyle = { borderColor: MATTE_GOLD, color: MATTE_GOLD, background: "transparent", borderRadius: "var(--p-radius)" }
-
-function fullName(m: GalleryMember): string {
-  return `${m.first_name ?? ""} ${m.last_name ?? ""}`.trim()
-}
 
 /** Cadre commun : fond blanc (porté par le conteneur), contenu centré, pied (admin, déconnexion) si connecté. */
 function Frame({ children, footer = true }: { children: React.ReactNode; footer?: boolean }) {
@@ -109,13 +106,14 @@ function EnvelopeHeader({ member, hidden = false, headerRef }: {
   headerRef?: React.Ref<HTMLDivElement>
 }) {
   const { UI } = useContent()
+  const name = useGreetingName(member)
   return (
     <div ref={headerRef} aria-hidden={hidden || undefined}
       className="flex flex-col items-center transition-opacity duration-500 motion-reduce:transition-none" style={{ opacity: hidden ? 0 : 1 }}>
       {/* Même en-tête que la connexion : sous-titre et « Sarah & Jordan » en or mat. */}
       <Masthead compact subtitle={UI.subtitle} gilded />
       <p className="mb-8 mt-2 text-[10px] uppercase tracking-[0.35em]" style={{ color: "var(--p-muted)" }}>
-        {UI.envelope.letterFor(member.first_name ?? "")}
+        {UI.envelope.letterFor(name)}
       </p>
     </div>
   )
@@ -125,7 +123,8 @@ function EnvelopeHeader({ member, hidden = false, headerRef }: {
 
 export function OpenedEnvelopeScreen(props: { member: GalleryMember }) {
   const { UI } = useContent()
-  const name = fullName(props.member)
+  // Même nom que sur l'enveloppe : nom sur l'invitation, sinon surnom, sinon prénom.
+  const name = useGreetingName(props.member)
   const navigate = useNavigate()
   // Refermer : la lettre redescend dans la poche, puis retour à l'enveloppe fermée.
   const [closing, setClosing] = useState(false)

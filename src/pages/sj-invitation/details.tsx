@@ -9,7 +9,7 @@ import { Masthead } from "@/pages/photos/GalleryChrome"
 import { rsvpService, type MomentAnswer, type PartyMember, type RsvpResponse } from "@/services/rsvp.service"
 import { isTodo, type Day, type Moment } from "./content"
 import {
-  findGuest, loadGuestIdsWithSequences, loadProgramme, loadWeddingGuests, visibleDays, weddingTable,
+  findGuest, loadGuestIdsWithSequences, useGreetingName, loadProgramme, loadWeddingGuests, visibleDays, weddingTable,
   type Programme, type WeddingGuest,
 } from "./guest-programme"
 import { frenchTitle, joinList, useContent, type Content } from "./i18n"
@@ -175,6 +175,7 @@ const HERO_SHADOW = "0 1px 12px rgba(0,0,0,.4)"
 
 function Hero({ member }: { member: GalleryMember }) {
   const { UI } = useContent()
+  const greeting = useGreetingName(member)
   return (
     // Photo des mariés en fond (public/sj-invitation/details-fond.webp, tirée de S&J397.jpg) sous un voile sombre :
     // textes en blanc, comme sur l'accueil.
@@ -188,7 +189,7 @@ function Hero({ member }: { member: GalleryMember }) {
         <Masthead subtitle={UI.subtitle} gilded />
       </div>
       <p className="mt-2 max-w-md text-sm leading-relaxed text-white/90" style={{ textShadow: HERO_SHADOW }}>
-        {UI.hero.intro(member.first_name ?? "")}
+        {UI.hero.intro(greeting)}
       </p>
       <button type="button" onClick={() => scrollToId("reponse")}
         className="mt-8 inline-block border border-white px-8 py-3 text-xs uppercase tracking-[0.24em] text-white transition-colors hover:bg-white hover:text-neutral-900"

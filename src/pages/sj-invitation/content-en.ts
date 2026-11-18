@@ -285,7 +285,7 @@ export const UI = {
   places: { directions: "Directions", mapAria: "Map of the venues around Montpellier" },
   ambiance: { record: "Let's set the mood" },
   travel: { stay: "Where to stay", book: "Book" },
-  polaroids: { first: "Our first photo, 2020!", mexico: "Mexico, 2023!", reunion: "Réunion Island, 2023!", us: "Cheers to us!" },
+  polaroids: { first: "Our first photo, 2020!", mexico: "Mexico, 2023", reunion: "Réunion Island, 2023", us: "Cheers to us!" },
   rsvp: {
     before: "Please reply before",
     stepsAria: "Form steps",

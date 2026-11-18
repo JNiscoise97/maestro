@@ -366,7 +366,7 @@ export const UI = {
   places: { directions: "Itinéraire", mapAria: "Plan des lieux autour de Montpellier" },
   ambiance: { record: "Mettons l'ambiance" },
   travel: { stay: "Où dormir", book: "Réserver" },
-  polaroids: { first: "1ère photo de nous, 2020 !", mexico: "Mexique, 2023 !", reunion: "La Réunion, 2023 !", us: "À nous !" },
+  polaroids: { first: "1ère photo de nous, 2020 !", mexico: "Mexique, 2023", reunion: "La Réunion, 2023", us: "À nous !" },
   rsvp: {
     before: "Merci de nous répondre avant le",
     stepsAria: "Étapes du formulaire",

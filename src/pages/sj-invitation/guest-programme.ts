@@ -1,15 +1,13 @@
 import { supabase, USE_SUPABASE } from "@/supabase/client"
 import type { GalleryMember } from "@/features/gallery/types"
-import type { PartyMember, RsvpResponse } from "@/services/rsvp.service"
 import { DAYS, type Day } from "./content"
 
 /**
- * Programme personnalisé : chaque invité ne voit que les moments auxquels son foyer est convié.
+ * Programme personnalisé : chaque invité ne voit que les moments auxquels il est convié.
  *
  * Source : l'appli mariage (préfixe _20270628_), quel que soit le déploiement qui sert la page.
- *   · guests            → l'invité connecté (par guest_id, sinon par prénom + nom) et son foyer (household_id) ;
+ *   · guests            → l'invité connecté (par guest_id, sinon par prénom + nom) ;
  *   · guest_sequences   → les séquences cochées pour chaque invité (Invités › Séquences).
- * Le foyer reçoit l'union des séquences de ses membres : une invitation par foyer.
  */
 
 export const WEDDING_PREFIX = "_20270628_"
@@ -32,28 +30,6 @@ export type Programme =
 
 const normalize = (s: string | null | undefined) =>
   (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z]/g, "")
-
-/** Membres du foyer de l'invité, lui excepté (vide sans foyer). */
-export function householdOf(guest: WeddingGuest, guests: WeddingGuest[]): WeddingGuest[] {
-  return guest.household_id ? guests.filter((g) => g.household_id === guest.household_id && g.id !== guest.id) : []
-}
-
-export type Covering = { response: RsvpResponse; member: PartyMember | null }
-
-/**
- * Réponse qui vaut pour l'invité : la plus récente qui le concerne, la sienne ou celle d'un proche qui l'a inclus
- * (par identifiant, sinon par prénom + nom pour les réponses sans identifiant). Une réponse envoyée par l'invité
- * lui-même remplace donc, pour lui seul, celle qu'un proche avait envoyée avant. responses : la plus récente d'abord.
- */
-export function coveringResponse(responses: RsvpResponse[], guest: WeddingGuest): Covering | null {
-  const name = normalize(`${guest.first_name}${guest.last_name}`)
-  for (const r of responses) {
-    if (r.guestId === guest.id) return { response: r, member: r.party?.[0] ?? null }
-    const m = r.party?.slice(1).find((p) => (p.guestId ? p.guestId === guest.id : normalize(`${p.firstName}${p.lastName}`) === name))
-    if (m) return { response: r, member: m }
-  }
-  return null
-}
 
 /** Liste des invités du mariage (quelques centaines de lignes), chargée une fois par visite. */
 let guestsCache: Promise<WeddingGuest[]> | null = null
@@ -89,11 +65,9 @@ export function findGuest(guests: WeddingGuest[], member: Pick<GalleryMember, "g
   return matches.length === 1 ? matches[0] : null
 }
 
-/** Séquences du foyer de l'invité. */
-export async function loadProgramme(guest: WeddingGuest, guests: WeddingGuest[]): Promise<Programme> {
-  const ids = guest.household_id ? guests.filter((g) => g.household_id === guest.household_id).map((g) => g.id) : [guest.id]
-  if (!ids.includes(guest.id)) ids.push(guest.id)
-  const { data, error } = await db.from(weddingTable("guest_sequences")).select("sequence_id").in("guest_id", ids)
+/** Séquences de l'invité (le foyer n'est pas pris en compte sur l'invitation). */
+export async function loadProgramme(guest: WeddingGuest): Promise<Programme> {
+  const { data, error } = await db.from(weddingTable("guest_sequences")).select("sequence_id").eq("guest_id", guest.id)
   if (error) throw error
   return { status: "found", guest, sequenceIds: new Set(((data ?? []) as { sequence_id: string }[]).map((r) => r.sequence_id)) }
 }

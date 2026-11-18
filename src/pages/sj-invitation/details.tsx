@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { ChevronDown, Lock, LockOpen, MapPin, TriangleAlert } from "lucide-react"
 
@@ -9,8 +9,8 @@ import { Masthead } from "@/pages/photos/GalleryChrome"
 import { rsvpService, type MomentAnswer, type PartyMember, type RsvpResponse } from "@/services/rsvp.service"
 import { isTodo, type Day, type Moment } from "./content"
 import {
-  coveringResponse, findGuest, householdOf, loadGuestIdsWithSequences, loadProgramme, loadWeddingGuests, visibleDays, weddingTable,
-  type Covering, type Programme, type WeddingGuest,
+  findGuest, loadGuestIdsWithSequences, loadProgramme, loadWeddingGuests, visibleDays, weddingTable,
+  type Programme, type WeddingGuest,
 } from "./guest-programme"
 import { frenchTitle, joinList, useContent, type Content } from "./i18n"
 import { LangSwitch } from "./lang-switch"
@@ -125,7 +125,7 @@ function useGuestView(member: GalleryMember): GuestView {
   useEffect(() => {
     if (!guests || !target) return
     let alive = true
-    loadProgramme(target, guests)
+    loadProgramme(target)
       .then((programme) => { if (alive) setLoaded({ id: target.id, programme }) })
       .catch((e) => { console.error("[invitation] programme", e); if (alive) setLoaded({ id: target.id, programme: null }) })
     return () => { alive = false }
@@ -549,7 +549,7 @@ function AmbianceSection({ days }: { days: Day[] }) {
   return (
     <Section id="ambiance" eyebrow={UI.sections.ambiance.eyebrow} title={UI.sections.ambiance.title} width="max-w-8xl" picto="robe" decor={
       // Tourne-disque flottant en biais, en haut à gauche (comme le bouquet du programme).
-      <Deco className="-left-4 -top-12 w-32 sm:-left-10 sm:-top-16 sm:w-48" from="left"><RecordPlayer className="w-full -rotate-12" caption={UI.ambiance.record} /></Deco>
+      <Deco className="-left-4 -top-12 w-32 sm:-left-10 sm:-top-16 sm:w-48" from="left"><RecordPlayer className="w-full -rotate-12" caption={UI.ambiance.record} src={UI.ambiance.song} playLabel={UI.ambiance.play} pauseLabel={UI.ambiance.pause} /></Deco>
     }>
       <div className="mx-auto max-w-2xl space-y-3 text-center">
         <p className="text-xl leading-relaxed sm:text-2xl" style={heading}><T>{AMBIANCE.intro}</T></p>
@@ -692,29 +692,22 @@ const RSVP_TABLE = weddingTable("rsvp_responses")
 
 type Presence = "yes" | "no" | "unsure"
 type Answers = Record<string, MomentAnswer | null>
-/** guestId : membre du foyer proposé (nom repris de la liste, non modifiable) ; absent : personne ajoutée librement. */
-type Person = { key: string; guestId?: string | null; firstName: string; lastName: string; under10: boolean; moments: Answers; hasDiet: boolean; diet: string }
+type Person = { key: string; firstName: string; lastName: string; under10: boolean; moments: Answers; hasDiet: boolean; diet: string }
 type StepId = "presence" | "moments" | "party" | "word"
 
 const ANSWER_ORDER: MomentAnswer[] = ["yes", "no", "unsure"]
 const toAttendance = { yes: "yes", no: "no", unsure: "probably" } as const
 const fromAttendance = (a: string): Presence => (a === "no" || a === "probably-not" ? "no" : a === "probably" ? "unsure" : "yes")
 const newKey = () => Math.random().toString(36).slice(2)
-/** Prénom puis NOM DE FAMILLE en capitales (comme sur le faire-part). */
-const guestName = (g: WeddingGuest) => ({ firstName: g.first_name?.trim() ?? "", lastName: g.last_name?.trim().toLocaleUpperCase("fr-FR") ?? "" })
 
 /**
  * Formulaire de réponse, étape par étape :
  *   1. Ta présence (nom, oui / non / je ne sais pas encore) ;
  *   2. Tes moments : oui / non / je ne sais pas encore pour chacun (si l'invité est convié à plusieurs) ;
- *   3. Qui vient avec toi : les membres du foyer qui n'ont pas encore répondu sont proposés (un clic les ajoute,
- *      reliés à leur fiche) ; d'autres personnes peuvent être ajoutées librement (prénom, nom, moins de 10 ans,
- *      présence par moment), avec le compteur de personnes ;
+ *   3. Qui vient avec toi : personnes ajoutées une à une (prénom, nom, moins de 10 ans, présence par moment),
+ *      avec le compteur de personnes ;
  *   4. Un petit mot (restrictions alimentaires, message), puis envoi.
  * Une réponse « non » passe directement à l'étape 4.
- *
- * Foyer : la réponse la plus récente qui concerne une personne vaut pour elle. Si un proche a répondu pour
- * l'invité, celui-ci voit cette réponse et peut envoyer la sienne, qui la remplace pour lui seul.
  */
 function RsvpSection({ member, days: programmeDays, guestId }: { member: GalleryMember; days: Day[]; guestId: string | null }) {
   const { RSVP, UI } = useContent()
@@ -723,11 +716,10 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
   const askMoments = moments.length > 1
 
   const [previous, setPrevious] = useState<RsvpResponse | null>(null)
-  // Réponse envoyée par un proche du foyer pour cet invité (sans réponse plus récente de sa part).
-  const [coveredBy, setCoveredBy] = useState<Covering | null>(null)
-  // Membres du foyer (lui excepté), réponses du foyer (la plus récente d'abord) et invités, pour les noms.
-  const [household, setHousehold] = useState<{ members: WeddingGuest[]; responses: RsvpResponse[]; guests: WeddingGuest[] }>({ members: [], responses: [], guests: [] })
   const [editing, setEditing] = useState(true)
+  // Haut du formulaire (ou de la réponse enregistrée) : on y revient après un changement d'étape ou l'envoi.
+  const topRef = useRef<HTMLDivElement>(null)
+  const scrollPending = useRef(false)
   const [step, setStep] = useState(0)
   // Prénom puis NOM DE FAMILLE en capitales (comme sur le faire-part).
   const accountFirst = member.first_name?.trim() ?? ""
@@ -752,57 +744,39 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
   const isLast = step >= steps.length - 1
   const count = 1 + others.length
 
-  // Réponse qui vaut pour cet invité (la sienne, ou celle d'un proche du foyer qui l'a inclus) : on l'affiche
-  // et on pré-remplit le formulaire pour la modifier.
+  // Réponse déjà envoyée par cet invité : on l'affiche et on pré-remplit le formulaire pour la modifier.
   useEffect(() => {
     if (!guestId) return
     let alive = true
-    void (async () => {
-      const guests = await loadWeddingGuests().catch(() => [] as WeddingGuest[])
-      const me = guests.find((g) => g.id === guestId)
-      const members = me ? householdOf(me, guests) : []
-      const responses = await rsvpService.listForGuests([guestId, ...members.map((m) => m.id)], RSVP_TABLE)
-      if (!alive) return
-      setHousehold({ members, responses, guests })
-      const own = responses.find((r) => r.guestId === guestId)
-      const covering = me ? coveringResponse(responses, me) : own ? { response: own, member: null } : null
-      if (!covering) return
+    void rsvpService.latestForGuest(guestId, RSVP_TABLE).then((r) => {
+      if (!alive || !r) return
+      setPrevious(r)
       setEditing(false)
-      if (covering.response.guestId === guestId) {
-        setPrevious(covering.response)
-        fill(covering.response, responses, guests)
-      } else {
-        setCoveredBy(covering)
-        fillFromProche(covering)
-      }
-    })()
+      fill(r)
+    })
     return () => { alive = false }
     // Recharger seulement quand l'invité change (fill ne fait que remplir le formulaire).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guestId])
 
-  /**
-   * Personnes d'une réponse qui en dépendent encore : un membre du foyer qui a répondu depuis (lui-même ou via
-   * un autre proche) n'en fait plus partie, pour ne pas écraser sa réponse en modifiant celle-ci.
-   */
-  function stillCovered(r: RsvpResponse, responses = household.responses, guests = household.guests): RsvpResponse {
-    if (!r.party) return r
-    const [self, ...rest] = r.party
-    const kept = rest.filter((p) => {
-      const g = p.guestId ? guests.find((x) => x.id === p.guestId) : undefined
-      return !g || coveringResponse(responses, g)?.response.id === r.id
-    })
-    return { ...r, party: [self, ...kept] }
-  }
+  // Après le rendu de la nouvelle étape (page déjà raccourcie ou allongée), on remonte au haut du formulaire
+  // s'il est sorti de l'écran : calculé sur la mise en page finale, la position tombe juste.
+  useLayoutEffect(() => {
+    if (!scrollPending.current || !topRef.current) return
+    scrollPending.current = false
+    const top = topRef.current.getBoundingClientRect().top
+    if (top >= NAV_HEIGHT && top < window.innerHeight * 0.4) return
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    window.scrollTo({ top: top + window.scrollY - NAV_HEIGHT - 24, behavior: reduce ? "auto" : "smooth" })
+  }, [step, editing])
 
-  function fill(response: RsvpResponse, responses = household.responses, guests = household.guests) {
-    const r = stillCovered(response, responses, guests)
+  function fill(r: RsvpResponse) {
     const [self, ...rest] = r.party ?? []
     setFirstName(self?.firstName ?? accountFirst)
     setLastName(self?.lastName ?? accountLast)
     setPresence(fromAttendance(r.attendance))
     setMine(self?.moments ?? {})
-    setOthers(rest.map((p) => ({ ...p, key: newKey(), guestId: p.guestId ?? null, hasDiet: !!p.diet?.trim(), diet: p.diet ?? "" })))
+    setOthers(rest.map((p) => ({ ...p, key: newKey(), hasDiet: !!p.diet?.trim(), diet: p.diet ?? "" })))
     // Anciennes réponses : une seule restriction pour tout le monde, reprise pour la personne qui répond.
     const myDiet = self ? (self.diet ?? "") : (r.dietaryConstraints ?? "")
     setHasDiet(!!myDiet.trim())
@@ -810,35 +784,6 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
     setMessage(r.message ?? "")
     setStep(0)
   }
-
-  /** Formulaire pré-rempli avec la partie de la réponse d'un proche qui concerne l'invité ; il répond pour lui seul. */
-  function fillFromProche({ response: r, member: m }: Covering) {
-    setFirstName(accountFirst || (m?.firstName ?? ""))
-    setLastName(accountLast || (m?.lastName ?? ""))
-    setPresence(fromAttendance(r.attendance))
-    setMine(m?.moments ?? {})
-    setOthers([])
-    setHasDiet(!!m?.diet?.trim())
-    setDietary(m?.diet ?? "")
-    setMessage("")
-    setStep(0)
-  }
-
-  /** Nom de la personne qui a envoyé une réponse (prénom de sa fiche, sinon le nom saisi). */
-  const responderName = (r: RsvpResponse) =>
-    household.guests.find((g) => g.id === r.guestId)?.first_name?.trim() || r.party?.[0]?.firstName || r.name
-
-  // Membres du foyer pas encore dans le formulaire : proposés s'ils n'ont pas répondu (ou si c'est l'invité
-  // lui-même qui les avait inclus), grisés sinon.
-  const suggestions = household.members
-    .filter((g) => !others.some((p) => p.guestId === g.id))
-    .map((g) => {
-      const c = coveringResponse(household.responses, g)
-      return { guest: g, answered: c && c.response.guestId !== guestId ? c.response : null }
-    })
-
-  const addMember = (g: WeddingGuest) =>
-    setOthers((list) => [...list, { key: newKey(), guestId: g.id, ...guestName(g), under10: false, moments: {}, hasDiet: false, diet: "" }])
 
   /** Réponses d'une personne pour tous les moments (un seul moment : la présence globale). */
   const answersOf = (a: Answers): Record<string, MomentAnswer> =>
@@ -868,8 +813,8 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
       if (problem) { setError(problem); return }
     }
     setError(null)
+    scrollPending.current = true
     setStep((s) => Math.max(0, Math.min(steps.length - 1, s + delta)))
-    scrollToId("reponse")
   }
 
   async function submit(e: React.FormEvent) {
@@ -884,7 +829,7 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
       { firstName: firstName.trim(), lastName: lastName.trim(), under10: false, moments: answersOf(mine), diet: hasDiet && dietary.trim() ? dietary.trim() : null, guestId },
       ...others.map((p) => ({
         firstName: p.firstName.trim(), lastName: p.lastName.trim(), under10: p.under10, moments: answersOf(p.moments),
-        diet: p.hasDiet && p.diet.trim() ? p.diet.trim() : null, guestId: p.guestId ?? null,
+        diet: p.hasDiet && p.diet.trim() ? p.diet.trim() : null,
       })),
     ] : []
     // Récapitulatif des restrictions (colonne existante, lue par l'onglet Réponses) : « Prénom Nom : … ».
@@ -907,10 +852,8 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
         message: message.trim() || null,
       }, RSVP_TABLE)
       setPrevious(saved)
-      setCoveredBy(null)
-      setHousehold((h) => ({ ...h, responses: [saved, ...h.responses] }))
+      scrollPending.current = true
       setEditing(false)
-      scrollToId("reponse")
     } catch {
       setError(E.send)
     } finally {
@@ -929,12 +872,9 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
         <p>{UI.rsvp.before} <strong style={{ color: "#2e2a25" }}>{RSVP.deadline}</strong>.</p>
       </div>
 
+      <div ref={topRef} />
       {previous && !editing ? (
-        <PreviousAnswer response={stillCovered(previous)} moments={moments} onEdit={() => { fill(previous); setEditing(true) }} />
-      ) : coveredBy && !editing ? (
-        <PreviousAnswer response={{ ...coveredBy.response, party: coveredBy.member ? [coveredBy.member] : coveredBy.response.party }} moments={moments}
-          title={UI.rsvp.answeredFor(responderName(coveredBy.response))} note={UI.rsvp.answeredForNote} editLabel={UI.rsvp.answerMyself}
-          onEdit={() => { fillFromProche(coveredBy); setEditing(true) }} />
+        <PreviousAnswer response={previous} moments={moments} onEdit={() => { fill(previous); setEditing(true) }} />
       ) : (
         <form onSubmit={submit} noValidate className="text-left">
           {/* Étapes */}
@@ -1010,17 +950,12 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
                         <button type="button" className="text-xs underline" style={muted}
                           onClick={() => setOthers((list) => list.filter((x) => x.key !== p.key))}>{UI.rsvp.remove}</button>
                       </div>
-                      {p.guestId ? (
-                        // Membre du foyer : nom repris de la liste.
-                        <p className="text-lg" style={heading}>{p.firstName} {p.lastName}</p>
-                      ) : (
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <input value={p.firstName} onChange={(e) => updateOther(p.key, { firstName: e.target.value })} placeholder={UI.rsvp.firstName}
-                            aria-label={UI.rsvp.firstNameOf(i + 2)} className={field} style={fieldStyle} />
-                          <input value={p.lastName} onChange={(e) => updateOther(p.key, { lastName: e.target.value })} placeholder={UI.rsvp.lastName}
-                            aria-label={UI.rsvp.lastNameOf(i + 2)} className={field} style={fieldStyle} />
-                        </div>
-                      )}
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <input value={p.firstName} onChange={(e) => updateOther(p.key, { firstName: e.target.value })} placeholder={UI.rsvp.firstName}
+                          aria-label={UI.rsvp.firstNameOf(i + 2)} className={field} style={fieldStyle} />
+                        <input value={p.lastName} onChange={(e) => updateOther(p.key, { lastName: e.target.value })} placeholder={UI.rsvp.lastName}
+                          aria-label={UI.rsvp.lastNameOf(i + 2)} className={field} style={fieldStyle} />
+                      </div>
                       <label className="mt-4 flex cursor-pointer items-center gap-2.5 text-sm">
                         <input type="checkbox" checked={p.under10} onChange={(e) => updateOther(p.key, { under10: e.target.checked })}
                           className="size-4" style={{ accentColor: MATTE_GOLD }} />
@@ -1038,30 +973,6 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
                       </div>
                     </div>
                   ))}
-                  {suggestions.length > 0 && (
-                    <div className="text-center">
-                      <p className="mb-2.5 text-xs uppercase tracking-[0.16em]" style={muted}>{UI.rsvp.household}</p>
-                      <div className="flex flex-wrap justify-center gap-2">
-                        {suggestions.map(({ guest: g, answered }) => {
-                          const n = guestName(g)
-                          return answered ? (
-                            <span key={g.id} className="border border-dashed px-3 py-1.5 text-sm" style={{ borderColor: "#d8d2c8", color: "var(--p-muted)", borderRadius: "var(--p-radius)" }}>
-                              {n.firstName} {n.lastName}
-                              <span className="ml-1.5 text-xs italic">
-                                · {answered.guestId === g.id ? UI.rsvp.alreadyAnswered : UI.rsvp.answeredBy(responderName(answered))}
-                              </span>
-                            </span>
-                          ) : (
-                            <button key={g.id} type="button" onClick={() => addMember(g)}
-                              className="border px-3 py-1.5 text-sm transition-colors hover:bg-[#a8844f]/10"
-                              style={{ borderColor: MATTE_GOLD, color: MATTE_GOLD, borderRadius: "var(--p-radius)" }}>
-                              + {n.firstName} {n.lastName}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
                   <div className="text-center">
                     <button type="button" className={button} style={buttonStyle}
                       onClick={() => setOthers((list) => [...list, { key: newKey(), firstName: "", lastName: lastName.trim(), under10: false, moments: {}, hasDiet: false, diet: "" }])}>
@@ -1093,9 +1004,8 @@ function RsvpSection({ member, days: programmeDays, guestId }: { member: Gallery
             <button type="submit" disabled={loading} className={button} style={buttonStyle}>
               {isLast ? (loading ? UI.rsvp.sending : UI.rsvp.send) : UI.rsvp.next}
             </button>
-            {(previous || coveredBy) && (
-              <button type="button" className="text-xs underline" style={muted}
-                onClick={() => { if (previous) fill(previous); else if (coveredBy) fillFromProche(coveredBy); setEditing(false) }}>
+            {previous && (
+              <button type="button" className="text-xs underline" style={muted} onClick={() => { fill(previous); scrollPending.current = true; setEditing(false) }}>
                 {UI.rsvp.cancel}
               </button>
             )}
@@ -1178,15 +1088,11 @@ function MomentAnswers({ moments, value, onChange, onChangeAll, compact = false 
 }
 
 /** Réponse déjà envoyée : résumé par personne et par moment. */
-function PreviousAnswer({ response: r, moments, onEdit, title: customTitle, note, editLabel }: {
-  response: RsvpResponse; moments: (Moment & { day: string })[]; onEdit: () => void
-  /** Réponse envoyée par un proche : titre, explication et bouton propres. */
-  title?: string; note?: string; editLabel?: string
-}) {
+function PreviousAnswer({ response: r, moments, onEdit }: { response: RsvpResponse; moments: (Moment & { day: string })[]; onEdit: () => void }) {
   const { RSVP, UI } = useContent()
   const presence = fromAttendance(r.attendance)
   const party = r.party ?? []
-  const title = customTitle ?? UI.rsvp.done[presence]
+  const title = UI.rsvp.done[presence]
   return (
     <div className="border p-6 text-center sm:p-8" style={{ borderColor: MATTE_GOLD }} role="status">
       <p className="text-3xl" style={heading}>{title}</p>
@@ -1209,9 +1115,8 @@ function PreviousAnswer({ response: r, moments, onEdit, title: customTitle, note
           ))}
         </ul>
       )}
-      {note && <p className="mx-auto mt-5 max-w-md text-xs italic leading-relaxed" style={muted}>{note}</p>}
       <button type="button" className="mt-6 text-xs underline" style={muted} onClick={onEdit}>
-        {editLabel ?? UI.rsvp.edit}
+        {UI.rsvp.edit}
       </button>
     </div>
   )

@@ -92,10 +92,39 @@ export function FlowerCluster({ className = "", flip = false, kind = "bouquet-ro
 
 // ── Tourne-disque ─────────────────────────────────────────────────────────────
 
-/** Valise tourne-disque ouverte ; le disque tourne doucement (sauf « réduire les animations »). */
-export function RecordPlayer({ className = "", caption = "Mettons l'ambiance" }: { className?: string; caption?: string }) {
-  return (
-    <svg viewBox="0 0 240 230" aria-hidden className={`pointer-events-none ${className}`} style={{ filter: "drop-shadow(0 12px 14px rgba(70,52,25,.25))" }}>
+/**
+ * Valise tourne-disque ouverte. Sans morceau : décor, le disque tourne doucement (sauf « réduire les animations »).
+ * Avec src : bouton lecture / pause ; le disque ne tourne et le bras ne se pose que pendant la lecture (en boucle).
+ * Fichier introuvable ou illisible : le tourne-disque redevient un simple décor.
+ */
+export function RecordPlayer({ className = "", caption = "Mettons l'ambiance", src, playLabel = "Lancer la musique", pauseLabel = "Mettre la musique en pause" }: {
+  className?: string; caption?: string; src?: string; playLabel?: string; pauseLabel?: string
+}) {
+  const audio = useRef<HTMLAudioElement | null>(null)
+  const [playing, setPlaying] = useState(false)
+  const [broken, setBroken] = useState(false)
+  const interactive = !!src && !broken
+
+  // Quitter la page (ou changer de langue) coupe la musique.
+  useEffect(() => () => { audio.current?.pause(); audio.current = null }, [src])
+
+  function toggle() {
+    if (!src) return
+    if (!audio.current) {
+      const a = new Audio(src)
+      a.loop = true
+      a.onpause = () => setPlaying(false)
+      a.onplay = () => setPlaying(true)
+      a.onerror = () => { setBroken(true); setPlaying(false) }
+      audio.current = a
+    }
+    const a = audio.current
+    if (a.paused) void a.play().catch(() => setBroken(true))
+    else a.pause()
+  }
+
+  const svg = (
+    <svg viewBox="0 0 240 230" aria-hidden className={interactive ? "block w-full" : `pointer-events-none ${className}`} style={{ filter: "drop-shadow(0 12px 14px rgba(70,52,25,.25))" }}>
       {/* Couvercle ouvert */}
       <path d="M30 18h180l-6 70H36Z" fill="#f8f4ec" stroke="#cfc4b0" strokeWidth="1.5" />
       <path d="M40 26h160l-5 54H45Z" fill="none" stroke={MATTE_GOLD} strokeWidth=".8" opacity=".6" />
@@ -107,7 +136,7 @@ export function RecordPlayer({ className = "", caption = "Mettons l'ambiance" }:
       <rect x="22" y="92" width="196" height="122" rx="10" fill="#fbf8f2" stroke="#cfc4b0" strokeWidth="1.5" />
       <rect x="30" y="100" width="180" height="106" rx="6" fill="#f1ebe0" />
       {/* Disque */}
-      <g className="origin-[105px_153px] motion-safe:animate-[spin_6s_linear_infinite]">
+      <g className="origin-[105px_153px] motion-safe:animate-[spin_6s_linear_infinite]" style={src ? { animationPlayState: playing ? "running" : "paused" } : undefined}>
         <circle cx="105" cy="153" r="46" fill="#1d1b19" />
         {[40, 34, 28, 22].map((r) => <circle key={r} cx="105" cy="153" r={r} fill="none" stroke="#3a3632" strokeWidth=".8" />)}
         <circle cx="105" cy="153" r="14" fill="#f4efe6" />
@@ -115,16 +144,26 @@ export function RecordPlayer({ className = "", caption = "Mettons l'ambiance" }:
         <circle cx="105" cy="153" r="2" fill="#1d1b19" />
         <path d="M80 130a34 34 0 0 1 22-11" stroke="#6b6560" strokeWidth="1.5" fill="none" opacity=".6" />
       </g>
-      {/* Bras */}
+      {/* Bras : posé sur le disque pendant la lecture. */}
+      <g style={{ transformOrigin: "180px 118px", transform: src && playing ? "rotate(20deg)" : "none", transition: "transform .7s ease" }}>
+        <path d="M180 118l4 46-18 14" stroke={MATTE_GOLD} strokeWidth="3" fill="none" strokeLinecap="round" />
+        <rect x="158" y="174" width="12" height="7" rx="2" fill="#e8dcc4" stroke={MATTE_GOLD} transform="rotate(-38 164 177)" />
+      </g>
       <circle cx="180" cy="118" r="8" fill="#e8dcc4" stroke={MATTE_GOLD} />
-      <path d="M180 118l4 46-18 14" stroke={MATTE_GOLD} strokeWidth="3" fill="none" strokeLinecap="round" />
-      <rect x="158" y="174" width="12" height="7" rx="2" fill="#e8dcc4" stroke={MATTE_GOLD} transform="rotate(-38 164 177)" />
       {/* Boutons */}
       <circle cx="190" cy="192" r="5" fill="#c7a160" />
       <circle cx="176" cy="196" r="3.5" fill="#c7a160" />
       {/* Fermoir */}
       <rect x="110" y="206" width="20" height="10" rx="2" fill="#c7a160" />
     </svg>
+  )
+
+  if (!interactive) return svg
+  return (
+    <button type="button" onClick={toggle} aria-pressed={playing} aria-label={playing ? pauseLabel : playLabel} title={playing ? pauseLabel : playLabel}
+      className={`pointer-events-auto cursor-pointer rounded-xl transition-transform hover:scale-[1.03] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#a8844f] ${className}`}>
+      {svg}
+    </button>
   )
 }
 

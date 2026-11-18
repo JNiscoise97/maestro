@@ -364,7 +364,8 @@ export const UI = {
     limited: "Places limitées",
   },
   places: { directions: "Itinéraire", mapAria: "Plan des lieux autour de Montpellier" },
-  ambiance: { record: "Mettons l'ambiance" },
+  /** song : morceau joué en cliquant sur le tourne-disque (fichier dans public/sj-invitation/). */
+  ambiance: { record: "Mettons l'ambiance", song: "/sj-invitation/ambiance.aac", play: "Lancer la musique", pause: "Mettre la musique en pause" },
   travel: { stay: "Où dormir", book: "Réserver" },
   polaroids: { first: "1ère photo de nous, 2020 !", mexico: "Mexique, 2023", reunion: "La Réunion, 2023", us: "À nous !" },
   rsvp: {
@@ -407,14 +408,6 @@ export const UI = {
     under10: "moins de 10 ans",
     restrictions: "Restrictions :",
     edit: "Modifier ma réponse",
-    /** Membres du foyer proposés à l'étape « Qui vient avec toi ? ». */
-    household: "De ton foyer :",
-    alreadyAnswered: "a déjà répondu",
-    answeredBy: (by: string) => `réponse de ${by}`,
-    /** Réponse envoyée par un proche pour l'invité connecté. */
-    answeredFor: (by: string) => `${by} a répondu pour toi`,
-    answeredForNote: "Tu peux la modifier : ta réponse remplacera alors celle-ci, pour toi seulement.",
-    answerMyself: "Répondre moi-même",
   },
   thanks: { aria: "Merci" },
   footer: { letter: "Revoir la lettre" },

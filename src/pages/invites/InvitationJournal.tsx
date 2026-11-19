@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Check, CircleHelp, LogIn, MailCheck, RotateCcw, Search, X } from "lucide-react"
+import { Check, ChevronRight, CircleHelp, LogIn, MailCheck, RotateCcw, Search, X } from "lucide-react"
 
 
 import { Input } from "@/components/ui/input"
@@ -251,19 +251,27 @@ function Bulletin({ response: r, guests }: { response: RsvpResponse; guests: Gue
       {!declined && party.length > 0 && (
         <ul className="space-y-2">
           {party.map((p, i) => (
-            <li key={i} className="rounded border bg-card p-2.5">
-              <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="text-sm font-medium">{`${p.firstName} ${p.lastName}`.trim() || "Sans nom"}</span>
-                {i === 0 && <Tag>répond</Tag>}
-                {inList(p) ? <Tag>dans la liste</Tag> : <Tag warn>hors liste</Tag>}
-                {p.under10 && <Tag>moins de 10 ans</Tag>}
-              </p>
-              {p.diet && <p className="mt-0.5 italic text-muted-foreground">Restrictions : {p.diet}</p>}
-              {moments.length > 0 && (
-                <ul className="mt-1.5 divide-y">
-                  {moments.map((m) => <MomentLine key={m.id} title={m.title} day={m.day} answer={p.moments[m.id]} />)}
-                </ul>
-              )}
+            // Personne repliée par défaut : nom, étiquettes et résumé des réponses ; dépliée : le détail par moment.
+            <li key={i} className="rounded border bg-card">
+              <details className="group">
+                <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 p-2.5 [&::-webkit-details-marker]:hidden">
+                  <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden />
+                  <span className="text-sm font-medium">{`${p.firstName} ${p.lastName}`.trim() || "Sans nom"}</span>
+                  {i === 0 && <Tag>répond</Tag>}
+                  {inList(p) ? <Tag>dans la liste</Tag> : <Tag warn>hors liste</Tag>}
+                  {p.under10 && <Tag>moins de 10 ans</Tag>}
+                  {p.diet && <Tag>restrictions</Tag>}
+                  {moments.length > 0 && <span className="ml-auto text-muted-foreground">{answerSummary(p, moments.map((m) => m.id))}</span>}
+                </summary>
+                <div className="px-2.5 pb-2.5">
+                  {p.diet && <p className="italic text-muted-foreground">Restrictions : {p.diet}</p>}
+                  {moments.length > 0 && (
+                    <ul className="mt-1 divide-y">
+                      {moments.map((m) => <MomentLine key={m.id} title={m.title} day={m.day} answer={p.moments[m.id]} />)}
+                    </ul>
+                  )}
+                </div>
+              </details>
             </li>
           ))}
         </ul>
@@ -274,6 +282,13 @@ function Bulletin({ response: r, guests }: { response: RsvpResponse; guests: Gue
       )}
     </div>
   )
+}
+
+/** « 3 oui · 1 non · 1 ne sait pas » (réponses absentes comptées comme « ne sait pas »). */
+function answerSummary(p: PartyMember, ids: string[]) {
+  const n = { yes: 0, no: 0, unsure: 0 }
+  for (const id of ids) n[p.moments[id] ?? "unsure"]++
+  return [n.yes && `${n.yes} oui`, n.no && `${n.no} non`, n.unsure && `${n.unsure} ne sait pas`].filter(Boolean).join(" · ")
 }
 
 function MomentLine({ title, day, answer }: { title: string; day: string; answer: MomentAnswer | undefined }) {

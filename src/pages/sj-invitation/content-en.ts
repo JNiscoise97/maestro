@@ -222,6 +222,7 @@ export const RSVP = {
 export const THANKS = {
   title: "Thank you!",
   text: "Having you there will make our wedding even more beautiful. We can't wait to share these moments with you.",
+  titleDeclined: "Such a shame!",
   textDeclined: "Having you there would have made our wedding even more beautiful. We would so have loved to share these moments with you.",
   closing: "With all our love,",
   signature: "Sarah & Jordan",
@@ -322,7 +323,7 @@ export const UI = {
       personDiet: (name: string) => `Please specify ${name}'s dietary requirements, or untick the box.`,
       send: "Your reply could not be sent. Please try again.",
     },
-    done: { yes: "Thank you, see you very soon!", no: "Thank you for letting us know.", unsure: "Thank you, keep us posted!" },
+    done: { yes: "Thank you, see you very soon!", no: "Thank you for letting us know. We will miss you and will be thinking of you!", unsure: "Thank you, keep us posted!" },
     savedOn: (date: string) => `Reply saved on ${date}:`,
     people: (n: number) => `${n} ${n > 1 ? "people" : "person"}`,
     under10: "under 10",

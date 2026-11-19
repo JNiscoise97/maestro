@@ -780,7 +780,7 @@ function RsvpSection({ member, days: programmeDays, guestId, onDeclined }: {
 
   const [previous, setPrevious] = useState<RsvpResponse | null>(null)
   // Dernière réponse « non » : signalée à la page (mot de remerciement adapté).
-  useEffect(() => { onDeclined(previous?.attendance === "no") }, [previous, onDeclined])
+  useEffect(() => { onDeclined(!!previous && fromAttendance(previous.attendance) === "no") }, [previous, onDeclined])
   const [editing, setEditing] = useState(true)
   // Haut du formulaire (ou de la réponse enregistrée) : on y revient après un changement d'étape ou l'envoi.
   const topRef = useRef<HTMLDivElement>(null)
@@ -1274,7 +1274,7 @@ function ThanksSection({ declined }: { declined: boolean }) {
         </Reveal>
         <Reveal delay={350} className="relative z-20 -mt-14 ml-auto w-[78%] sm:-mr-8">
           <div className="px-6 py-6 text-center sm:px-8" style={{ ...PAPER_STYLE, transform: "rotate(-1.5deg)" }}>
-            <p className="text-4xl sm:text-5xl" style={script}>{THANKS.title}</p>
+            <p className="text-4xl sm:text-5xl" style={script}>{declined ? THANKS.titleDeclined : THANKS.title}</p>
             <p className="mt-3 text-base leading-relaxed sm:text-lg" style={heading}>{declined ? THANKS.textDeclined : THANKS.text}</p>
             <p className="mt-3 text-sm italic" style={{ ...heading, ...muted }}>{THANKS.closing}</p>
             <p className="mt-1 text-3xl sm:text-4xl" style={script}>{THANKS.signature}</p>

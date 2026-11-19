@@ -302,6 +302,7 @@ export const THANKS = {
   title: "Merci !",
   text: "Ta présence rendra notre mariage encore plus beau. Nous avons tellement hâte de vivre ces moments avec toi.",
   /** Invité ayant répondu non. */
+  titleDeclined: "Quel dommage !",
   textDeclined: "Ta présence aurait rendu notre mariage encore plus beau. Nous aurions tellement aimé vivre ces moments avec toi.",
   closing: "Avec tout notre amour,",
   signature: "Sarah & Jordan",
@@ -405,7 +406,7 @@ export const UI = {
       personDiet: (name: string) => `Merci de préciser les restrictions alimentaires de ${name}, ou de décocher la case.`,
       send: "L'envoi n'a pas abouti. Merci de réessayer.",
     },
-    done: { yes: "Merci, à très bientôt !", no: "Merci de nous avoir répondu.", unsure: "Merci, tiens-nous au courant !" },
+    done: { yes: "Merci, à très bientôt !", no: "Merci de nous avoir prévenus. Tu vas nous manquer, nous penserons bien à toi !", unsure: "Merci, tiens-nous au courant !" },
     savedOn: (date: string) => `Réponse enregistrée le ${date} :`,
     people: (n: number) => `${n} personne${n > 1 ? "s" : ""}`,
     under10: "moins de 10 ans",

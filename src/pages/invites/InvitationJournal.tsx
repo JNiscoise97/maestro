@@ -32,7 +32,7 @@ type Visit = {
 }
 
 type Kind = "login" | "visit" | "rsvp"
-type Entry = { id: string; at: string; kind: Kind; who: string; detail?: string; update?: boolean; response?: RsvpResponse }
+type Entry = { id: string; at: string; kind: Kind; who: string; detail?: string; update?: boolean; response?: RsvpResponse; admin?: boolean }
 
 const KIND_LABELS: Record<Kind, string> = { login: "Connexion", visit: "Retour sur l'invitation", rsvp: "Réponse" }
 const ATTENDANCE: Record<string, string> = { yes: "Oui", probably: "Ne sait pas encore", "probably-not": "Probablement pas", no: "Non" }
@@ -89,7 +89,7 @@ function Journal() {
     }
     for (const a of activity) {
       if (a.event !== "login" && a.event !== "visit") continue
-      list.push({ id: `a-${a.id}`, at: a.created_at, kind: a.event, who: nameOf(a) })
+      list.push({ id: `a-${a.id}`, at: a.created_at, kind: a.event, who: nameOf(a), admin: a.role === "admin" })
     }
     return list.sort((a, b) => b.at.localeCompare(a.at))
     // nameOf ne dépend que de guestName.
@@ -199,6 +199,7 @@ function JournalRow({ entry: e, guests }: { entry: Entry; guests: Guest[] }) {
       <div className="min-w-0 flex-1">
         <p>
           <span className="font-medium">{e.who}</span>{" "}
+          {e.admin && <span className="mr-1"><Tag>Admin</Tag></span>}
           <span className="text-muted-foreground">
             · {e.kind === "rsvp" ? (e.update ? "Réponse modifiée" : "Réponse") : KIND_LABELS[e.kind]}
           </span>

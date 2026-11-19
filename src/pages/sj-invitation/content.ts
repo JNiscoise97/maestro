@@ -301,6 +301,8 @@ export const RSVP = {
 export const THANKS = {
   title: "Merci !",
   text: "Ta présence rendra notre mariage encore plus beau. Nous avons tellement hâte de vivre ces moments avec toi.",
+  /** Invité ayant répondu non. */
+  textDeclined: "Ta présence aurait rendu notre mariage encore plus beau. Nous aurions tellement aimé vivre ces moments avec toi.",
   closing: "Avec tout notre amour,",
   signature: "Sarah & Jordan",
 }

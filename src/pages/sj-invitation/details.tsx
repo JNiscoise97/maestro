@@ -62,6 +62,8 @@ export function DetailsScreen({ member }: { member: GalleryMember }) {
   const view = useGuestView(member)
   // Programme pas encore préparé (aucune séquence cochée) : ni lieux ni ambiance, pas de formulaire.
   const pending = view.mode === "pending"
+  // Réponse enregistrée « non » : le mot de remerciement passe au conditionnel.
+  const [declined, setDeclined] = useState(false)
   return (
     <div className="min-h-svh overflow-x-clip print:[print-color-adjust:exact]" style={{ ...TABLE_STYLE, color: "#2e2a25" }}>
       <Hero member={member} />
@@ -79,9 +81,9 @@ export function DetailsScreen({ member }: { member: GalleryMember }) {
         <FaqSection />
         {/* Formulaire de réponse : pas dans le PDF. */}
         <div className="print:hidden">
-          {pending ? <RsvpPending /> : <RsvpSection member={member} days={view.days} guestId={view.guestId} />}
+          {pending ? <RsvpPending /> : <RsvpSection member={member} days={view.days} guestId={view.guestId} onDeclined={setDeclined} />}
         </div>
-        <ThanksSection />
+        <ThanksSection declined={declined && !pending} />
       </main>
       <Footer />
     </div>
@@ -768,13 +770,17 @@ const newKey = () => Math.random().toString(36).slice(2)
  *   4. Un petit mot (restrictions alimentaires, message), puis envoi.
  * Une réponse « non » passe directement à l'étape 4.
  */
-function RsvpSection({ member, days: programmeDays, guestId }: { member: GalleryMember; days: Day[]; guestId: string | null }) {
+function RsvpSection({ member, days: programmeDays, guestId, onDeclined }: {
+  member: GalleryMember; days: Day[]; guestId: string | null; onDeclined: (declined: boolean) => void
+}) {
   const { RSVP, UI } = useContent()
   const E = UI.rsvp.errors
   const moments = programmeDays.flatMap((d) => d.moments.map((m) => ({ ...m, day: d.label, date: d.date })))
   const askMoments = moments.length > 1
 
   const [previous, setPrevious] = useState<RsvpResponse | null>(null)
+  // Dernière réponse « non » : signalée à la page (mot de remerciement adapté).
+  useEffect(() => { onDeclined(previous?.attendance === "no") }, [previous, onDeclined])
   const [editing, setEditing] = useState(true)
   // Haut du formulaire (ou de la réponse enregistrée) : on y revient après un changement d'étape ou l'envoi.
   const topRef = useRef<HTMLDivElement>(null)
@@ -1256,7 +1262,7 @@ function Choice({ selected, onClick, children }: { selected: boolean; onClick: (
 
 const script = { fontFamily: "'Nickainley', var(--p-heading)", color: MATTE_GOLD }
 
-function ThanksSection() {
+function ThanksSection({ declined }: { declined: boolean }) {
   const { THANKS, UI } = useContent()
   return (
     <section aria-label={UI.thanks.aria} className="px-4 pb-6 pt-14 sm:pt-20">
@@ -1269,7 +1275,7 @@ function ThanksSection() {
         <Reveal delay={350} className="relative z-20 -mt-14 ml-auto w-[78%] sm:-mr-8">
           <div className="px-6 py-6 text-center sm:px-8" style={{ ...PAPER_STYLE, transform: "rotate(-1.5deg)" }}>
             <p className="text-4xl sm:text-5xl" style={script}>{THANKS.title}</p>
-            <p className="mt-3 text-base leading-relaxed sm:text-lg" style={heading}>{THANKS.text}</p>
+            <p className="mt-3 text-base leading-relaxed sm:text-lg" style={heading}>{declined ? THANKS.textDeclined : THANKS.text}</p>
             <p className="mt-3 text-sm italic" style={{ ...heading, ...muted }}>{THANKS.closing}</p>
             <p className="mt-1 text-3xl sm:text-4xl" style={script}>{THANKS.signature}</p>
           </div>

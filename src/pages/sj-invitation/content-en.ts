@@ -222,6 +222,7 @@ export const RSVP = {
 export const THANKS = {
   title: "Thank you!",
   text: "Having you there will make our wedding even more beautiful. We can't wait to share these moments with you.",
+  textDeclined: "Having you there would have made our wedding even more beautiful. We would so have loved to share these moments with you.",
   closing: "With all our love,",
   signature: "Sarah & Jordan",
 }

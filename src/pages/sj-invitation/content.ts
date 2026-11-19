@@ -413,7 +413,7 @@ export const UI = {
     unsureLater: "Tu hésites encore pour certains moments ? Tu peux revenir modifier ta réponse jusqu'au",
   },
   thanks: { aria: "Merci" },
-  footer: { letter: "Revoir la lettre" },
+  footer: { letter: "Revoir la lettre", rings: "Alliances" },
   /** Nombre de moments en lettres (« Trois moments »). */
   momentsInWords: (n: number) => `${["Aucun", "Un", "Deux", "Trois", "Quatre", "Cinq", "Six", "Sept", "Huit", "Neuf", "Dix"][n] ?? n} moment${n > 1 ? "s" : ""}`,
   /** Format des dates (réponse enregistrée le…). */

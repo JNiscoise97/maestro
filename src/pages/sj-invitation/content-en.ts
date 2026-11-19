@@ -330,7 +330,7 @@ export const UI = {
     unsureLater: "Not sure yet about some moments? You can come back and change your reply until",
   },
   thanks: { aria: "Thank you" },
-  footer: { letter: "See the letter again" },
+  footer: { letter: "See the letter again", rings: "Rings" },
   momentsInWords: (n: number) => `${["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"][n] ?? n} moment${n > 1 ? "s" : ""}`,
   locale: "en-GB",
   mapLabels: { mairie: ["City Hall"], eglise: ["Saint-Cléophas Church"], villas: ["Boys' villa", "Girls' villa"] } as Record<string, string[]>,

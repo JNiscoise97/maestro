@@ -63,6 +63,17 @@ export function Fleuron({ className = "" }: { className?: string }) {
   )
 }
 
+// ── Alliances ─────────────────────────────────────────────────────────────────
+// PNG détouré de pngimg.com (licence CC BY-NC 4.0 : usage non commercial, crédit en pied de page).
+
+/** Alliances dorées détourées (public/sj-invitation/alliances.webp). */
+export function Rings({ className = "", style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <img src="/sj-invitation/alliances.webp" alt="" aria-hidden loading="lazy" decoding="async" className={`pointer-events-none select-none ${className}`}
+      style={{ ...style, filter: "drop-shadow(0 6px 6px rgba(70,52,25,.22))" }} />
+  )
+}
+
 // ── Fleurs blanches ──────────────────────────────────────────────
 // Fleurs : compositions découpées dans le collage fourni par les mariés (fond transparent), une image
 // WebP par composition dans public/sj-invitation/fleurs-*.webp.

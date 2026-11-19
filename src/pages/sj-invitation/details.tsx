@@ -17,7 +17,7 @@ import { LangSwitch } from "./lang-switch"
 import { INVITATION_ROUTES } from "./paths"
 import { PinNumber, PlacesMap } from "./places-map"
 import { hasPin } from "./places-map-data"
-import { Carte, Fleuron, FlowerCluster, Picto, Polaroid, REVEAL_ALL, RecordPlayer, Reveal, Ribbon } from "./decor"
+import { Carte, Fleuron, FlowerCluster, Picto, Polaroid, REVEAL_ALL, RecordPlayer, Reveal, Ribbon, Rings } from "./decor"
 import { PAPER_STYLE, TABLE_STYLE, iconForMoment, pictoForTravel, type PictoName } from "./decor-styles"
 
 /**
@@ -373,7 +373,11 @@ function InvitationSection() {
   const { INVITATION, UI } = useContent()
   return (
     <Section id="invitation" eyebrow={UI.sections.invitation.eyebrow} title={UI.sections.invitation.title} carte decor={
-      <Deco className="-right-8 -top-10 w-36 sm:-right-24 sm:-top-14 sm:w-52"><FlowerCluster kind="couronne" className="w-full" /></Deco>
+      <>
+        <Deco className="-right-8 -top-10 w-36 sm:-right-24 sm:-top-14 sm:w-52"><FlowerCluster kind="couronne" className="w-full" /></Deco>
+        {/* Alliances posées en bas à gauche de la carte. */}
+        <Deco className="-bottom-8 -left-4 w-24 sm:-bottom-10 sm:-left-16 sm:w-32" from="left"><Rings className="w-full -rotate-12" /></Deco>
+      </>
     }>
       <div className="text-center" style={heading}>
         <div className="grid gap-x-12 gap-y-8 text-base sm:grid-cols-2 sm:text-xl">
@@ -1289,6 +1293,10 @@ function Footer() {
         <button type="button" className="underline" onClick={() => void signOut()}>{UI.common.signOut}</button>
       </div>
       <LangSwitch className="mt-4 justify-center" />
+      <p className="mt-6 text-[10px]" style={muted}>
+        {UI.footer.rings} : <a href="https://pngimg.com" target="_blank" rel="noreferrer" className="underline">pngimg.com</a>,{" "}
+        <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noreferrer" className="underline">CC BY-NC 4.0</a>
+      </p>
     </footer>
   )
 }

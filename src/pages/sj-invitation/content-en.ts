@@ -265,7 +265,7 @@ export const UI = {
     intro: (first: string) => (first ? `${first}, here is everything you need to know about our wedding.` : "Here is everything you need to know about our wedding."),
     scroll: "See more",
   },
-  preview: { label: "Admin preview", all: "Whole programme" },
+  preview: { label: "Admin preview", all: "Whole programme", pdf: "Download as PDF", pdfBusy: "Preparing…" },
   sections: {
     invitation: { eyebrow: "Announcement", title: "The invitation" },
     mot: { eyebrow: "From the heart", title: "A word from us" },

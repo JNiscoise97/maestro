@@ -60,7 +60,7 @@ export function DevicePreview({ children }: { children: React.ReactNode }) {
         </div>
       ) : children}
 
-      <div className="fixed right-4 top-4 z-50 flex overflow-hidden rounded-full border border-neutral-300 bg-white/90 text-neutral-700 shadow-md backdrop-blur"
+      <div className="fixed right-4 top-4 z-50 flex overflow-hidden print:hidden rounded-full border border-neutral-300 bg-white/90 text-neutral-700 shadow-md backdrop-blur"
         role="group" aria-label="Aperçu de l'invitation">
         <DeviceButton active={device === "desktop"} onClick={() => choose("desktop")} label="Ordinateur"><Monitor className="size-4" /></DeviceButton>
         <DeviceButton active={device === "mobile"} onClick={() => choose("mobile")} label="Téléphone"><Smartphone className="size-4" /></DeviceButton>

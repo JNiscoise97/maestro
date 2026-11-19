@@ -14,6 +14,9 @@ import { PAPER_STYLE, type PictoName } from "./decor-styles"
 // ── Apparition au défilement ──────────────────────────────────────────────────
 
 /** Fait apparaître son contenu (fondu + léger glissement) quand il entre à l'écran. Rien si « réduire les animations ». */
+/** Événement : tout faire apparaître d'un coup (avant l'impression en PDF). */
+export const REVEAL_ALL = "sj-reveal-all"
+
 export function Reveal({ children, className = "", delay = 0, from = "up", style }: {
   children: React.ReactNode; className?: string; delay?: number; from?: "up" | "left" | "right" | "zoom"; style?: React.CSSProperties
 }) {
@@ -22,15 +25,17 @@ export function Reveal({ children, className = "", delay = 0, from = "up", style
   useEffect(() => {
     const el = ref.current
     if (!el || shown) return
+    const all = () => setShown(true)
+    window.addEventListener(REVEAL_ALL, all)
     const io = new IntersectionObserver(([e]) => {
       if (e.isIntersecting) { setShown(true); io.disconnect() }
     }, { rootMargin: "0px 0px -8% 0px" })
     io.observe(el)
-    return () => io.disconnect()
+    return () => { io.disconnect(); window.removeEventListener(REVEAL_ALL, all) }
   }, [shown])
   const hidden = { up: "translateY(28px)", left: "translateX(-36px)", right: "translateX(36px)", zoom: "scale(.85)" }[from]
   return (
-    <div ref={ref} className={`motion-reduce:transform-none! motion-reduce:opacity-100! motion-reduce:transition-none! ${className}`}
+    <div ref={ref} className={`motion-reduce:transform-none! motion-reduce:opacity-100! motion-reduce:transition-none! print:opacity-100! print:transition-none! ${className}`}
       style={{
         ...style,
         opacity: shown ? 1 : 0,

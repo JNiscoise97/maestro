@@ -242,10 +242,14 @@ export async function downloadPhoto(photoId: string, quality: "normal" | "hd"): 
 
 export function logEvent(event: "login" | "logout" | "visit" | "photo_open" | "search", photoId?: string, details: Record<string, unknown> = {}) {
   if (!galleryClient) return
-  void db().rpc(gt("log"), {
+  // .then() indispensable : une requête Supabase ne part que lorsqu'on lit son résultat
+  // (avec un simple `void db().rpc(...)`, rien n'était jamais envoyé ni journalisé).
+  db().rpc(gt("log"), {
     p_event: event,
     p_photo: photoId ?? null,
     p_details: event === "login" || event === "visit" ? { ...details, device: deviceId() } : details,
+  }).then(({ error }: { error: { message: string } | null }) => {
+    if (error) console.warn("[galerie] journal non enregistré :", event, error.message)
   })
 }
 

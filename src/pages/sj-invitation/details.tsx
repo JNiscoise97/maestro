@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
-import { Check, ChevronDown, CircleHelp, Lock, LockOpen, MapPin, Pencil, TriangleAlert, X } from "lucide-react"
+import { Check, ChevronDown, CircleHelp, Download, Lock, LockOpen, MapPin, Pencil, TriangleAlert, X } from "lucide-react"
 
 import { useGalleryAuth } from "@/context/GalleryAuthContext"
 import { MATTE_GOLD } from "@/features/gallery/gilded"
@@ -17,7 +17,7 @@ import { LangSwitch } from "./lang-switch"
 import { INVITATION_ROUTES } from "./paths"
 import { PinNumber, PlacesMap } from "./places-map"
 import { hasPin } from "./places-map-data"
-import { Carte, Fleuron, FlowerCluster, Picto, Polaroid, RecordPlayer, Reveal, Ribbon } from "./decor"
+import { Carte, Fleuron, FlowerCluster, Picto, Polaroid, REVEAL_ALL, RecordPlayer, Reveal, Ribbon } from "./decor"
 import { PAPER_STYLE, TABLE_STYLE, iconForMoment, pictoForTravel, type PictoName } from "./decor-styles"
 
 /**
@@ -63,7 +63,7 @@ export function DetailsScreen({ member }: { member: GalleryMember }) {
   // Programme pas encore préparé (aucune séquence cochée) : ni lieux ni ambiance, pas de formulaire.
   const pending = view.mode === "pending"
   return (
-    <div className="min-h-svh overflow-x-clip" style={{ ...TABLE_STYLE, color: "#2e2a25" }}>
+    <div className="min-h-svh overflow-x-clip print:[print-color-adjust:exact]" style={{ ...TABLE_STYLE, color: "#2e2a25" }}>
       <Hero member={member} />
       {member.role === "admin" && <PreviewBar view={view} />}
       <Nav hidden={pending ? PENDING_HIDDEN : undefined} />
@@ -77,7 +77,10 @@ export function DetailsScreen({ member }: { member: GalleryMember }) {
         <TravelSection days={view.days} />
         <GiftsSection />
         <FaqSection />
-        {pending ? <RsvpPending /> : <RsvpSection member={member} days={view.days} guestId={view.guestId} />}
+        {/* Formulaire de réponse : pas dans le PDF. */}
+        <div className="print:hidden">
+          {pending ? <RsvpPending /> : <RsvpSection member={member} days={view.days} guestId={view.guestId} />}
+        </div>
         <ThanksSection />
       </main>
       <Footer />
@@ -162,18 +165,53 @@ function PreviewBar({ view }: { view: GuestView }) {
     .filter((g) => view.previewable.has(g.id))
     .map((g) => ({ id: g.id, name: `${g.first_name ?? ""} ${g.last_name ?? ""}`.trim() }))
     .sort((a, b) => a.name.localeCompare(b.name, "fr"))
+  const [busy, setBusy] = useState(false)
+  const guestName = options.find((o) => o.id === view.previewId)?.name
+  const pdf = async () => {
+    setBusy(true)
+    try { await printInvitation(guestName ? `Invitation Sarah & Jordan - ${guestName}` : "Invitation Sarah & Jordan") } finally { setBusy(false) }
+  }
   return (
-    <div className="border-t px-6 py-3 text-xs" style={{ borderColor: "var(--p-line)", background: "#faf8f4" }}>
-      <label className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-3 gap-y-1">
-        <span className="uppercase tracking-[0.16em]" style={muted}>{UI.preview.label}</span>
-        <select value={view.previewId} onChange={(e) => view.setPreviewId(e.target.value)}
-          className="max-w-full border bg-white px-2 py-1.5 text-sm" style={{ borderColor: "#d8d2c8", borderRadius: "var(--p-radius)" }}>
-          <option value="">{UI.preview.all}</option>
-          {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-        </select>
-      </label>
+    <div className="border-t px-6 py-3 text-xs print:hidden" style={{ borderColor: "var(--p-line)", background: "#faf8f4" }}>
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-4 gap-y-2">
+        <label className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+          <span className="uppercase tracking-[0.16em]" style={muted}>{UI.preview.label}</span>
+          <select value={view.previewId} onChange={(e) => view.setPreviewId(e.target.value)}
+            className="max-w-full border bg-white px-2 py-1.5 text-sm" style={{ borderColor: "#d8d2c8", borderRadius: "var(--p-radius)" }}>
+            <option value="">{UI.preview.all}</option>
+            {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>
+        </label>
+        {/* PDF de la page telle qu'affichée (programme de l'aperçu choisi) : impression du navigateur → « Enregistrer au format PDF ». */}
+        <button type="button" onClick={() => void pdf()} disabled={busy}
+          className="inline-flex items-center gap-1.5 border bg-white px-3 py-1.5 text-sm transition-colors hover:bg-[#f3eee6] disabled:opacity-50"
+          style={{ borderColor: MATTE_GOLD, color: MATTE_GOLD, borderRadius: "var(--p-radius)" }}>
+          <Download className="size-4" aria-hidden />{busy ? UI.preview.pdfBusy : UI.preview.pdf}
+        </button>
+      </div>
     </div>
   )
+}
+
+/**
+ * Impression de la page (le navigateur propose « Enregistrer au format PDF ») : images différées chargées
+ * d'abord (sinon absentes du PDF), titre du document = nom de fichier proposé.
+ */
+async function printInvitation(fileName: string) {
+  const images = [...document.images]
+  for (const img of images) if (img.loading === "lazy") img.loading = "eager"
+  await Promise.all(images.map((img) => img.complete ? null : new Promise<void>((done) => {
+    img.addEventListener("load", () => done(), { once: true })
+    img.addEventListener("error", () => done(), { once: true })
+    setTimeout(done, 8000)
+  })))
+  // Éléments animés pas encore apparus (bas de page) : affichés tout de suite, puis une image le temps du rendu.
+  window.dispatchEvent(new Event(REVEAL_ALL))
+  await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))
+  const title = document.title
+  document.title = fileName
+  window.addEventListener("afterprint", () => { document.title = title }, { once: true })
+  window.print()
 }
 
 // ── En-tête et navigation ─────────────────────────────────────────────────────
@@ -189,7 +227,7 @@ function Hero({ member }: { member: GalleryMember }) {
     // textes en blanc, comme sur l'accueil.
     <header className="relative isolate flex min-h-svh flex-col items-center justify-center overflow-hidden px-6 py-12 text-center text-white">
       <img src={HERO_PHOTO} alt="" aria-hidden className="absolute inset-0 -z-10 size-full object-cover" />
-      <LangSwitch tone="light" className="absolute right-4 top-4" />
+      <LangSwitch tone="light" className="absolute right-4 top-4 print:hidden" />
       <div aria-hidden className="absolute inset-0 -z-10"
         style={{ background: "linear-gradient(180deg, rgba(20,16,12,.55) 0%, rgba(20,16,12,.45) 50%, rgba(20,16,12,.65) 100%)" }} />
       {/* Même nom qu'avant (capitales espacées, « & » entre deux filets), passé en blanc sur la photo. */}
@@ -205,7 +243,7 @@ function Hero({ member }: { member: GalleryMember }) {
       <div aria-hidden className="mx-auto mt-6 h-px w-16 bg-white/70" />
       {/* Flèche animée : invite à faire défiler la page (un clic descend à la première section). */}
       <button type="button" onClick={() => scrollToId("mot")} aria-label={UI.hero.scroll}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 rounded-full p-2 text-white/90 transition-colors hover:text-white"
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 rounded-full p-2 text-white/90 transition-colors hover:text-white print:hidden"
         style={{ filter: "drop-shadow(0 1px 6px rgba(0,0,0,.5))" }}>
         <ChevronDown className="size-9 motion-safe:animate-bounce" strokeWidth={1.5} />
       </button>
@@ -258,7 +296,7 @@ function Nav({ hidden }: { hidden?: readonly SectionId[] }) {
   }, [active])
 
   return (
-    <nav aria-label={UI.nav.aria} className="sticky top-0 z-30 border-y backdrop-blur"
+    <nav aria-label={UI.nav.aria} className="sticky top-0 z-30 border-y backdrop-blur print:hidden"
       style={{ height: NAV_HEIGHT, background: "rgba(255,255,255,.92)", borderColor: "var(--p-line)" }}>
       <div className="mx-auto flex h-full max-w-5xl items-center gap-3 pl-2 pr-3 sm:px-6">
         <div ref={listRef} className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

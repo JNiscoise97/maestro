@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { Check, ChevronDown, CircleHelp, Download, Lock, LockOpen, MapPin, Pencil, TriangleAlert, X } from "lucide-react"
 
@@ -27,14 +27,35 @@ import { PAPER_STYLE, TABLE_STYLE, iconForMoment, pictoForTravel, type PictoName
  * auxquels il est convié (./guest-programme.ts) ; un administrateur peut prévisualiser la page d'un invité.
  */
 
+/**
+ * Onglets de la page (un seul affiché à la fois, pour éviter un long défilement). L'adresse suit l'onglet (#programme…).
+ *   invitation (par défaut) · mot · programme · pratique (lieux + venir & se loger) ·
+ *   ambiance (ambiance & tenues + cortège) · questions (FAQ + liste de mariage) ·
+ *   reponse (formulaire + mot de remerciement)
+ */
+/** Rubriques (ancres #id des sections). */
 type SectionId = "invitation" | "mot" | "programme" | "lieux" | "ambiance" | "cortege" | "venir" | "liste" | "faq" | "reponse"
 
-/** Rubriques de la barre de navigation (Cortège seulement s'il est affiché). */
-function navItems(c: Content, hidden: readonly SectionId[] = []): { id: SectionId; label: string }[] {
-  const ids = (["mot", "invitation", "programme", "lieux", "ambiance", ...(c.CORTEGE.show ? ["cortege" as const] : []), "venir", "liste", "faq"] as SectionId[])
-    .filter((id) => !hidden.includes(id))
-  return ids.map((id) => ({ id, label: c.UI.nav[id as Exclude<SectionId, "reponse">] }))
+type TabId = "invitation" | "mot" | "programme" | "pratique" | "ambiance" | "questions" | "reponse"
+/** Onglets de la barre (Répondre à part : bouton or à droite). */
+const TABS: Exclude<TabId, "reponse">[] = ["invitation", "mot", "programme", "pratique", "ambiance", "questions"]
+const ALL_TABS: TabId[] = [...TABS, "reponse"]
+
+/** Onglet qui contient une rubrique ou un élément (#lieux, #faq, #lieu-eglise…) ; null : inconnu. */
+function tabOf(target: string): TabId | null {
+  if ((ALL_TABS as string[]).includes(target)) return target as TabId
+  if (target === "lieux" || target === "venir" || target.startsWith("lieu-")) return "pratique"
+  if (target === "cortege") return "ambiance"
+  if (target === "faq" || target === "liste") return "questions"
+  return null
 }
+
+/** Ouvre l'onglet d'une rubrique ou d'un élément puis y fait défiler (liens internes de la page). */
+const GoContext = createContext<(target: string) => void>(() => {})
+const useGo = () => useContext(GoContext)
+
+/** Haut du contenu des onglets (cible du défilement quand on change d'onglet). */
+const TAB_TOP = "contenu"
 
 const NAV_HEIGHT = 56
 const button = "inline-block border px-8 py-3 text-xs uppercase tracking-[0.24em] transition-colors hover:bg-[#a8844f]! hover:text-white! disabled:opacity-40"
@@ -64,29 +85,77 @@ export function DetailsScreen({ member }: { member: GalleryMember }) {
   const pending = view.mode === "pending"
   // Réponse enregistrée « non » : le mot de remerciement passe au conditionnel.
   const [declined, setDeclined] = useState(false)
+
+  // Onglet affiché : celui de l'adresse (#programme, #lieux…), sinon l'invitation.
+  const [tab, setTab] = useState<TabId>(() => tabOf(window.location.hash.slice(1)) ?? "invitation")
+  // Élément vers lequel défiler une fois l'onglet affiché.
+  const [scrollTo, setScrollTo] = useState<{ id: string } | null>(() => {
+    const id = window.location.hash.slice(1)
+    return id && id !== "invitation" ? { id: (ALL_TABS as string[]).includes(id) ? TAB_TOP : id } : null
+  })
+  const go = useCallback((target: string) => {
+    const next = tabOf(target)
+    if (next) {
+      setTab(next)
+      try { history.replaceState(history.state, "", `#${next}`) } catch { /* adresse inchangée */ }
+    }
+    setScrollTo({ id: next && next === target ? TAB_TOP : target })
+  }, [])
+  useEffect(() => {
+    if (!scrollTo) return
+    // Une image après le rendu de l'onglet (sa hauteur est connue), sans attendre les images.
+    const frame = requestAnimationFrame(() => scrollToId(scrollTo.id))
+    return () => cancelAnimationFrame(frame)
+  }, [scrollTo, tab])
+
+  // PDF (administrateur) : tous les onglets pendant l'impression.
+  const [printAll, setPrintAll] = useState(false)
+  useEffect(() => {
+    const on = () => setPrintAll(true)
+    const off = () => setPrintAll(false)
+    window.addEventListener(REVEAL_ALL, on)
+    window.addEventListener("afterprint", off)
+    return () => { window.removeEventListener(REVEAL_ALL, on); window.removeEventListener("afterprint", off) }
+  }, [])
+
+  // Programme pas encore préparé : pas d'onglet Ambiance (sauf cortège) ; un onglet masqué ramène à l'invitation.
+  const hiddenTabs: TabId[] = pending && !CORTEGE.show ? ["ambiance"] : []
+  const current = hiddenTabs.includes(tab) ? "invitation" : tab
+  const show = (t: TabId) => printAll || current === t
+
   return (
+    <GoContext.Provider value={go}>
     <div className="min-h-svh overflow-x-clip print:[print-color-adjust:exact]" style={{ ...TABLE_STYLE, color: "#2e2a25" }}>
       <Hero member={member} />
       {member.role === "admin" && <PreviewBar view={view} />}
-      <Nav hidden={pending ? PENDING_HIDDEN : undefined} />
+      <Nav active={current} hidden={hiddenTabs} />
       <main>
-        <OurWordSection />
-        <InvitationSection />
-        <ProgrammeSection view={view} />
-        {!pending && <PlacesSection days={view.days} />}
-        {!pending && <AmbianceSection days={view.days} />}
-        {CORTEGE.show && <CortegeSection />}
-        <TravelSection days={view.days} />
-        <GiftsSection />
-        <FaqSection />
-        {/* Formulaire de réponse : pas dans le PDF. */}
-        <div className="print:hidden">
+        <div id={TAB_TOP} />
+        {show("invitation") && <InvitationSection />}
+        {show("mot") && <OurWordSection />}
+        {show("programme") && <ProgrammeSection view={view} />}
+        {show("pratique") && <>
+          {!pending && <PlacesSection days={view.days} />}
+          <TravelSection days={view.days} />
+        </>}
+        {show("ambiance") && <>
+          {!pending && <AmbianceSection days={view.days} />}
+          {CORTEGE.show && <CortegeSection />}
+        </>}
+        {show("questions") && <>
+          <FaqSection />
+          <GiftsSection />
+        </>}
+        {/* Onglet Répondre : formulaire (gardé monté, masqué hors de l'onglet, pour connaître une réponse « non »
+            et ne pas perdre une saisie en cours) puis mot de remerciement. Formulaire absent du PDF. */}
+        <div className={current === "reponse" ? "print:hidden" : "hidden"}>
           {pending ? <RsvpPending /> : <RsvpSection member={member} days={view.days} guestId={view.guestId} onDeclined={setDeclined} />}
         </div>
-        <ThanksSection declined={declined && !pending} />
+        {show("reponse") && <ThanksSection declined={declined && !pending} />}
       </main>
       <Footer />
     </div>
+    </GoContext.Provider>
   )
 }
 
@@ -200,6 +269,9 @@ function PreviewBar({ view }: { view: GuestView }) {
  * d'abord (sinon absentes du PDF), titre du document = nom de fichier proposé.
  */
 async function printInvitation(fileName: string) {
+  // Tous les onglets et tous les éléments animés affichés d'abord, puis une image le temps du rendu.
+  window.dispatchEvent(new Event(REVEAL_ALL))
+  await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))
   const images = [...document.images]
   for (const img of images) if (img.loading === "lazy") img.loading = "eager"
   await Promise.all(images.map((img) => img.complete ? null : new Promise<void>((done) => {
@@ -207,9 +279,6 @@ async function printInvitation(fileName: string) {
     img.addEventListener("error", () => done(), { once: true })
     setTimeout(done, 8000)
   })))
-  // Éléments animés pas encore apparus (bas de page) : affichés tout de suite, puis une image le temps du rendu.
-  window.dispatchEvent(new Event(REVEAL_ALL))
-  await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))
   const title = document.title
   document.title = fileName
   window.addEventListener("afterprint", () => { document.title = title }, { once: true })
@@ -243,8 +312,8 @@ function Hero({ member }: { member: GalleryMember }) {
         {UI.hero.intro(greeting)}
       </p>
       <div aria-hidden className="mx-auto mt-6 h-px w-16 bg-white/70" />
-      {/* Flèche animée : invite à faire défiler la page (un clic descend à la première section). */}
-      <button type="button" onClick={() => scrollToId("mot")} aria-label={UI.hero.scroll}
+      {/* Flèche animée : invite à faire défiler la page (un clic descend à l'onglet affiché). */}
+      <button type="button" onClick={() => scrollToId(TAB_TOP)} aria-label={UI.hero.scroll}
         className="absolute bottom-8 left-1/2 -translate-x-1/2 rounded-full p-2 text-white/90 transition-colors hover:text-white print:hidden"
         style={{ filter: "drop-shadow(0 1px 6px rgba(0,0,0,.5))" }}>
         <ChevronDown className="size-9 motion-safe:animate-bounce" strokeWidth={1.5} />
@@ -253,40 +322,11 @@ function Hero({ member }: { member: GalleryMember }) {
   )
 }
 
-const PENDING_HIDDEN: readonly SectionId[] = ["lieux", "ambiance"]
-
-function Nav({ hidden }: { hidden?: readonly SectionId[] }) {
-  const content = useContent()
-  const { UI } = content
-  const NAV = navItems(content, hidden)
-  const [active, setActive] = useState<SectionId | null>(null)
+function Nav({ active, hidden }: { active: TabId; hidden: TabId[] }) {
+  const { UI } = useContent()
+  const go = useGo()
+  const NAV = TABS.filter((t) => !hidden.includes(t)).map((id) => ({ id, label: UI.nav[id] }))
   const listRef = useRef<HTMLDivElement>(null)
-
-  // Rubrique en cours : la dernière dont le haut est passé sous la barre.
-  useEffect(() => {
-    const ids: SectionId[] = [...navItems(content, hidden).map((n) => n.id), "reponse"]
-    let frame = 0
-    const update = () => {
-      frame = 0
-      let current: SectionId | null = null
-      for (const id of ids) {
-        const el = document.getElementById(id)
-        if (el && el.getBoundingClientRect().top <= NAV_HEIGHT + 80) current = id
-      }
-      // Tout en bas de la page : la dernière rubrique, même si elle est courte.
-      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) current = ids[ids.length - 1]
-      setActive(current)
-    }
-    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update) }
-    update()
-    window.addEventListener("scroll", onScroll, { passive: true })
-    window.addEventListener("resize", onScroll)
-    return () => {
-      window.removeEventListener("scroll", onScroll)
-      window.removeEventListener("resize", onScroll)
-      cancelAnimationFrame(frame)
-    }
-  }, [content, hidden])
 
   // Sur téléphone, la barre défile horizontalement : on garde le lien actif visible.
   useEffect(() => {
@@ -304,18 +344,18 @@ function Nav({ hidden }: { hidden?: readonly SectionId[] }) {
         <div ref={listRef} className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {NAV.map((n) => (
             <a key={n.id} href={`#${n.id}`} data-id={n.id}
-              onClick={(e) => { e.preventDefault(); scrollToId(n.id) }}
-              aria-current={active === n.id ? "true" : undefined}
+              onClick={(e) => { e.preventDefault(); go(n.id) }}
+              aria-current={active === n.id ? "page" : undefined}
               className="shrink-0 whitespace-nowrap border-b px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] transition-colors"
               style={{ borderColor: active === n.id ? MATTE_GOLD : "transparent", color: active === n.id ? MATTE_GOLD : "var(--p-muted)" }}>
               {n.label}
             </a>
           ))}
         </div>
-        <a href="#reponse" onClick={(e) => { e.preventDefault(); scrollToId("reponse") }}
+        <a href="#reponse" onClick={(e) => { e.preventDefault(); go("reponse") }}
           className="shrink-0 px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-white transition-opacity hover:opacity-90"
-          style={{ background: MATTE_GOLD, borderRadius: "var(--p-radius)" }}
-          aria-current={active === "reponse" ? "true" : undefined}>
+          style={{ background: MATTE_GOLD, borderRadius: "var(--p-radius)", boxShadow: active === "reponse" ? `0 0 0 2px #fff, 0 0 0 3px ${MATTE_GOLD}` : undefined }}
+          aria-current={active === "reponse" ? "page" : undefined}>
           {UI.nav.reply}
         </a>
         <LangSwitch className="hidden shrink-0 sm:flex" />
@@ -446,6 +486,7 @@ function OurWordSection() {
 
 function ProgrammeSection({ view }: { view: GuestView }) {
   const { PLACES, PROGRAMME, UI } = useContent()
+  const go = useGo()
   const placeName = (id: string) => PLACES.find((p) => p.id === id)?.name ?? ""
   const { days, mode, loading } = view
   // Numéro de chaque moment (I, II…), dans l'ordre du programme de l'invité.
@@ -499,7 +540,7 @@ function ProgrammeSection({ view }: { view: GuestView }) {
                         )}
                         <p className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs">
                           {placeName(m.placeId) && (
-                            <a href={`#lieu-${m.placeId}`} onClick={(e) => { e.preventDefault(); scrollToId(`lieu-${m.placeId}`) }}
+                            <a href={`#lieu-${m.placeId}`} onClick={(e) => { e.preventDefault(); go(`lieu-${m.placeId}`) }}
                               className="inline-flex items-center gap-1 underline-offset-4 hover:underline" style={{ color: MATTE_GOLD }}>
                               <MapPin className="size-3.5" aria-hidden /><T>{placeName(m.placeId)}</T>
                             </a>

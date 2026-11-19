@@ -22,7 +22,7 @@ export const INVITATION = {
   groomParents: ["Mr Georges NISÇOISE", "Mrs Corine NISÇOISE"],
   announce: "are delighted to announce the marriage of their children",
   date: "which will take place on Monday 28 June 2027 in Montpellier.",
-  context: "The celebrations will unfold over several occasions (civil, religious and festive) from Friday 25 to Monday 28 June 2027. As not every venue can welcome all of the guests, each guest is invited to some of these moments.",
+  context: "The celebrations will unfold over several occasions (civil, religious and festive) from Friday 25 to Monday 28 June 2027. As not every venue can welcome all of the guests, you are invited to some of these moments.",
 }
 
 // ── 2. A word from us ────────────────────────────────────────────────────────
@@ -174,7 +174,7 @@ export const GIFTS = {
 // ── 8. FAQ ────────────────────────────────────────────────────────────────────
 
 export const FAQ: { q: string; a: string }[] = [
-  { q: "When should I reply to the invitation?", a: "Before 15 February 2027, using the “Will you join us?” form at the bottom of this page. You can change your reply until then." },
+  { q: "When should I reply to the invitation?", a: "Before 15 February 2027, in the “Reply” tab of this page. You can change your reply until then." },
   { q: "Can I bring an extra guest?", a: "Your invitation is personal and lists the people invited. If you would like to bring someone, please talk to us before replying." },
   { q: "Are children welcome?", a: "Yes, the children named on your invitation are welcome. Add them one by one in the reply form (a box marks children under 10)." },
   { q: "Can I come to only some of the moments?", a: "Of course. The reply form asks for your attendance moment by moment, for each person." },
@@ -260,8 +260,8 @@ export const UI = {
   },
   nav: {
     aria: "Invitation sections",
-    invitation: "Invitation", mot: "A word", programme: "Programme", lieux: "Venues", ambiance: "Outfits",
-    cortege: "Wedding party", venir: "Travel & stay", liste: "Gifts", faq: "Questions", reply: "Reply",
+    invitation: "The invitation", mot: "A word from us", programme: "The programme", pratique: "Practical info",
+    ambiance: "Dress code", questions: "Questions", reply: "Reply",
   },
   hero: {
     intro: (first: string) => (first ? `${first}, here is everything you need to know about our wedding.` : "Here is everything you need to know about our wedding."),

@@ -29,7 +29,7 @@ export const INVITATION = {
   /** Sous les prénoms : le jour du mariage (le même que sur le carton de l'enveloppe). */
   date: "qui sera célébré le lundi 28 juin 2027 à Montpellier.",
   /** Explique pourquoi les festivités durent quatre jours et pourquoi chacun n'est pas convié à tout. */
-  context: "Les festivités se dérouleront en plusieurs temps (civils, religieux et conviviaux) du vendredi 25 au lundi 28 juin 2027. Les lieux ne pouvant pas tous accueillir l'ensemble des invités, chacun est convié à une partie de ces moments.",
+  context: "Les festivités se dérouleront en plusieurs temps (civils, religieux et conviviaux) du vendredi 25 au lundi 28 juin 2027. Les lieux ne pouvant pas tous accueillir l'ensemble des invités, tu es convié à une partie de ces moments.",
 }
 
 // ── 2. Un mot de nous ─────────────────────────────────────────────────────────
@@ -246,7 +246,7 @@ export const GIFTS = {
 // Lue par tous les invités : ne pas y citer de moment réservé à certains.
 
 export const FAQ: { q: string; a: string }[] = [
-  { q: "Quand dois-je répondre à l'invitation ?", a: "Avant le 15 février 2027, grâce au formulaire « Seras-tu des nôtres ? » en bas de cette page. Tu pourras modifier ta réponse jusqu'à cette date." },
+  { q: "Quand dois-je répondre à l'invitation ?", a: "Avant le 15 février 2027, dans l'onglet « Répondre » de cette page. Tu pourras modifier ta réponse jusqu'à cette date." },
   { q: "Puis-je venir accompagné(e) d'un invité supplémentaire ?", a: "Ton invitation est nominative et indique les personnes conviées. Si tu souhaites venir accompagné(e), parle-nous-en avant de répondre." },
   { q: "Les enfants sont-ils les bienvenus ?", a: "Oui, les enfants mentionnés sur ton invitation sont les bienvenus. Ajoute-les un à un dans le formulaire de réponse (une case indique les moins de 10 ans)." },
   { q: "Puis-je venir seulement à certains moments ?", a: "Bien sûr. Le formulaire de réponse te demande ta présence moment par moment, pour chaque personne." },
@@ -342,8 +342,9 @@ export const UI = {
   },
   nav: {
     aria: "Rubriques de l'invitation",
-    invitation: "Invitation", mot: "Un mot", programme: "Programme", lieux: "Lieux", ambiance: "Tenues",
-    cortege: "Cortège", venir: "Venir & dormir", liste: "Liste", faq: "Questions", reply: "Répondre",
+    /** Onglets : pratique = lieux + venir & se loger ; ambiance = tenues (+ cortège) ; questions = FAQ + liste. */
+    invitation: "L'invitation", mot: "Un mot de nous", programme: "Le programme", pratique: "Infos pratiques",
+    ambiance: "Ambiance", questions: "Questions", reply: "Répondre",
   },
   hero: {
     intro: (first: string) => (first ? `${first}, voici tout ce qu'il faut savoir sur notre mariage.` : "Voici tout ce qu'il faut savoir sur notre mariage."),

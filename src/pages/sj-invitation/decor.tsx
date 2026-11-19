@@ -13,15 +13,19 @@ import { PAPER_STYLE, type PictoName } from "./decor-styles"
 
 // ── Apparition au défilement ──────────────────────────────────────────────────
 
-/** Fait apparaître son contenu (fondu + léger glissement) quand il entre à l'écran. Rien si « réduire les animations ». */
 /** Événement : tout faire apparaître d'un coup (avant l'impression en PDF). */
 export const REVEAL_ALL = "sj-reveal-all"
+// Après REVEAL_ALL, les éléments montés ensuite (onglets affichés pour l'impression) apparaissent d'emblée.
+let revealedAll = false
+if (typeof window !== "undefined") window.addEventListener(REVEAL_ALL, () => { revealedAll = true })
+
+/** Fait apparaître son contenu (fondu + léger glissement) quand il entre à l'écran. Rien si « réduire les animations ». */
 
 export function Reveal({ children, className = "", delay = 0, from = "up", style }: {
   children: React.ReactNode; className?: string; delay?: number; from?: "up" | "left" | "right" | "zoom"; style?: React.CSSProperties
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [shown, setShown] = useState(() => typeof IntersectionObserver === "undefined")
+  const [shown, setShown] = useState(() => revealedAll || typeof IntersectionObserver === "undefined")
   useEffect(() => {
     const el = ref.current
     if (!el || shown) return

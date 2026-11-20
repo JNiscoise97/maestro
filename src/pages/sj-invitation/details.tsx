@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
-import { Check, ChevronDown, CircleHelp, Download, Lock, LockOpen, MapPin, Pencil, TriangleAlert, X } from "lucide-react"
+import { Check, ChevronDown, CircleHelp, Download, Lock, LockOpen, MapPin, Pause, Pencil, Play, TriangleAlert, X } from "lucide-react"
 
 import { useGalleryAuth } from "@/context/GalleryAuthContext"
 import { MATTE_GOLD } from "@/features/gallery/gilded"
@@ -34,7 +34,7 @@ import { PAPER_STYLE, TABLE_STYLE, iconForMoment, pictoForTravel, type PictoName
  *   reponse (formulaire + mot de remerciement)
  */
 /** Rubriques (ancres #id des sections). */
-type SectionId = "invitation" | "mot" | "programme" | "lieux" | "ambiance" | "cortege" | "venir" | "liste" | "faq" | "reponse"
+type SectionId = "invitation" | "mot" | "programme" | "lieux" | "musique" | "ambiance" | "cortege" | "venir" | "liste" | "faq" | "reponse"
 
 type TabId = "invitation" | "mot" | "programme" | "pratique" | "ambiance" | "questions" | "reponse"
 /** Onglets de la barre (Répondre à part : bouton or à droite). */
@@ -45,7 +45,7 @@ const ALL_TABS: TabId[] = [...TABS, "reponse"]
 function tabOf(target: string): TabId | null {
   if ((ALL_TABS as string[]).includes(target)) return target as TabId
   if (target === "lieux" || target === "venir" || target.startsWith("lieu-")) return "pratique"
-  if (target === "cortege") return "ambiance"
+  if (target === "cortege" || target === "musique") return "ambiance"
   if (target === "faq" || target === "liste") return "questions"
   return null
 }
@@ -142,6 +142,7 @@ export function DetailsScreen({ member }: { member: GalleryMember }) {
           <TravelSection days={view.days} />
         </>}
         {show("ambiance") && <>
+          <MusicSection />
           {!pending && <AmbianceSection days={view.days} />}
           {CORTEGE.show && <CortegeSection />}
         </>}
@@ -655,6 +656,59 @@ function PlacesSection({ days }: { days: Day[] }) {
 
 // ── 4 bis. Ambiance & tenues ──────────────────────────────────────────────────
 
+/**
+ * Notre ambiance (onglet Ambiance, avant « Comment s'habiller ? ») : tourne-disque bien droit et bouton
+ * Écouter / Mettre en pause (public/sj-invitation/ambiance.aac, en boucle). Un clic sur le tourne-disque
+ * fait de même. Quitter l'onglet ou la page coupe la musique.
+ */
+function MusicSection() {
+  const { UI } = useContent()
+  const M = UI.music
+  const audio = useRef<HTMLAudioElement | null>(null)
+  const [playing, setPlaying] = useState(false)
+  const [broken, setBroken] = useState(false)
+  useEffect(() => () => { audio.current?.pause(); audio.current = null }, [])
+
+  function toggle() {
+    if (broken) return
+    if (!audio.current) {
+      const a = new Audio(UI.ambiance.song)
+      a.loop = true
+      a.onplay = () => setPlaying(true)
+      a.onpause = () => setPlaying(false)
+      a.onerror = () => { setBroken(true); setPlaying(false) }
+      audio.current = a
+    }
+    const a = audio.current
+    if (a.paused) void a.play().catch(() => setBroken(true))
+    else a.pause()
+  }
+
+  const label = playing ? M.pause : M.play
+  return (
+    <Section id="musique" eyebrow={M.eyebrow} title={M.title} narrow>
+      <div className="flex flex-col items-center gap-8 sm:flex-row sm:justify-center sm:gap-12">
+        <button type="button" onClick={toggle} disabled={broken} aria-label={label} aria-pressed={playing}
+          className="w-44 shrink-0 cursor-pointer transition-transform hover:scale-[1.03] disabled:cursor-default disabled:hover:scale-100 sm:w-56">
+          <RecordPlayer className="w-full" caption={UI.ambiance.record} playing={playing} />
+        </button>
+        <div className="max-w-xs text-center sm:text-left">
+          <p className="text-lg leading-relaxed sm:text-xl" style={heading}><T>{M.text}</T></p>
+          {broken ? (
+            <p className="mt-6 text-sm italic" style={muted}>{M.broken}</p>
+          ) : (
+            <button type="button" onClick={toggle} aria-pressed={playing}
+              className={`${button} mt-6 inline-flex items-center gap-2 print:hidden`}
+              style={{ ...buttonStyle, background: MATTE_GOLD, color: "#fff" }}>
+              {playing ? <Pause className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}{label}
+            </button>
+          )}
+        </div>
+      </div>
+    </Section>
+  )
+}
+
 function AmbianceSection({ days }: { days: Day[] }) {
   const { AMBIANCE, UI } = useContent()
   // Jours où l'invité est convié ; le texte ne cite que ses moments (« Pour le pique-nique, … »).
@@ -669,11 +723,7 @@ function AmbianceSection({ days }: { days: Day[] }) {
   })
   const tenue = (name: string) => `/sj-invitation/tenue-${name}.webp`
   return (
-    <Section id="ambiance" eyebrow={UI.sections.ambiance.eyebrow} title={UI.sections.ambiance.title} width="max-w-8xl" picto="robe" decor={
-      // Tourne-disque flottant en biais, en haut à gauche (comme le bouquet du programme).
-      <Deco className="-left-4 -top-12 w-40 sm:-left-10 sm:-top-16 sm:w-52" from="left"><RecordPlayer className="w-full -rotate-12" caption={UI.ambiance.record} src={UI.ambiance.song} playLabel={UI.ambiance.play} pauseLabel={UI.ambiance.pause}
-          playHint={UI.ambiance.playHint} pauseHint={UI.ambiance.pauseHint} /></Deco>
-    }>
+    <Section id="ambiance" eyebrow={UI.sections.ambiance.eyebrow} title={UI.sections.ambiance.title} width="max-w-8xl" picto="robe">
       <div className="mx-auto max-w-2xl space-y-3 text-center">
         <p className="text-xl leading-relaxed sm:text-2xl" style={heading}><T>{AMBIANCE.intro}</T></p>
         <p className="text-base leading-relaxed sm:text-lg" style={muted}><T>{AMBIANCE.why}</T></p>

@@ -118,13 +118,15 @@ export function FlowerCluster({ className = "", flip = false, kind = "bouquet-ro
  * Fichier introuvable ou illisible : le tourne-disque redevient un simple décor.
  */
 export function RecordPlayer({ className = "", caption = "Mettons l'ambiance", src, playLabel = "Lancer la musique", pauseLabel = "Mettre la musique en pause",
-  playHint, pauseHint }: {
+  playing: controlled }: {
   className?: string; caption?: string; src?: string; playLabel?: string; pauseLabel?: string
-  /** Consigne sur le couvercle (une ligne par élément) quand la musique est arrêtée / en cours ; sinon caption. */
-  playHint?: string[]; pauseHint?: string[]
+  /** Lecture pilotée par le parent (sans src) : le disque tourne et le bras se pose quand true. */
+  playing?: boolean
 }) {
   const audio = useRef<HTMLAudioElement | null>(null)
-  const [playing, setPlaying] = useState(false)
+  const [ownPlaying, setPlaying] = useState(false)
+  const playing = controlled ?? ownPlaying
+  const animated = !!src || controlled !== undefined
   const [broken, setBroken] = useState(false)
   const interactive = !!src && !broken
 
@@ -151,16 +153,7 @@ export function RecordPlayer({ className = "", caption = "Mettons l'ambiance", s
       {/* Couvercle ouvert */}
       <path d="M30 18h180l-6 70H36Z" fill="#f8f4ec" stroke="#cfc4b0" strokeWidth="1.5" />
       <path d="M40 26h160l-5 54H45Z" fill="none" stroke={MATTE_GOLD} strokeWidth=".8" opacity=".6" />
-      {interactive && playHint && pauseHint ? (
-        // Consigne explicite : « ▶ Clique ici / pour écouter / l'ambiance » (ou pour arrêter pendant la lecture).
-        <text textAnchor="middle" fontFamily="'Cormorant Garamond', serif" fill={MATTE_GOLD}>
-          {(playing ? pauseHint : playHint).map((line, i) => (
-            <tspan key={i} x="120" y={44 + i * 17} fontSize={i === 0 ? 19 : 16} fontWeight={i === 0 ? 700 : 500} fontStyle={i === 0 ? "normal" : "italic"}>{line}</tspan>
-          ))}
-        </text>
-      ) : (
-        <text x="120" y="60" textAnchor="middle" fontFamily="'Cormorant Garamond', serif" fontStyle="italic" fontSize="17" fill={MATTE_GOLD}>{caption}</text>
-      )}
+      <text x="120" y="60" textAnchor="middle" fontFamily="'Cormorant Garamond', serif" fontStyle="italic" fontSize="17" fill={MATTE_GOLD}>{caption}</text>
       {/* Charnières */}
       <rect x="60" y="86" width="14" height="6" rx="1" fill="#c7a160" />
       <rect x="166" y="86" width="14" height="6" rx="1" fill="#c7a160" />
@@ -168,7 +161,7 @@ export function RecordPlayer({ className = "", caption = "Mettons l'ambiance", s
       <rect x="22" y="92" width="196" height="122" rx="10" fill="#fbf8f2" stroke="#cfc4b0" strokeWidth="1.5" />
       <rect x="30" y="100" width="180" height="106" rx="6" fill="#f1ebe0" />
       {/* Disque */}
-      <g className="origin-[105px_153px] motion-safe:animate-[spin_6s_linear_infinite]" style={src ? { animationPlayState: playing ? "running" : "paused" } : undefined}>
+      <g className="origin-[105px_153px] motion-safe:animate-[spin_6s_linear_infinite]" style={animated ? { animationPlayState: playing ? "running" : "paused" } : undefined}>
         <circle cx="105" cy="153" r="46" fill="#1d1b19" />
         {[40, 34, 28, 22].map((r) => <circle key={r} cx="105" cy="153" r={r} fill="none" stroke="#3a3632" strokeWidth=".8" />)}
         <circle cx="105" cy="153" r="14" fill="#f4efe6" />
@@ -177,7 +170,7 @@ export function RecordPlayer({ className = "", caption = "Mettons l'ambiance", s
         <path d="M80 130a34 34 0 0 1 22-11" stroke="#6b6560" strokeWidth="1.5" fill="none" opacity=".6" />
       </g>
       {/* Bras : posé sur le disque pendant la lecture. */}
-      <g style={{ transformOrigin: "180px 118px", transform: src && playing ? "rotate(20deg)" : "none", transition: "transform .7s ease" }}>
+      <g style={{ transformOrigin: "180px 118px", transform: animated && playing ? "rotate(20deg)" : "none", transition: "transform .7s ease" }}>
         <path d="M180 118l4 46-18 14" stroke={MATTE_GOLD} strokeWidth="3" fill="none" strokeLinecap="round" />
         <rect x="158" y="174" width="12" height="7" rx="2" fill="#e8dcc4" stroke={MATTE_GOLD} transform="rotate(-38 164 177)" />
       </g>

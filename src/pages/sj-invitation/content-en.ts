@@ -287,8 +287,11 @@ export const UI = {
   },
   places: { directions: "Directions", mapAria: "Map of the venues around Montpellier" },
   ambiance: { record: "Let's set the mood", song: "/sj-invitation/ambiance.aac", play: "Play the music", pause: "Pause the music",
-    playHint: ["▶ Click here", "to hear", "our music"],
-    pauseHint: ["❚❚ Click here", "to stop", "the music"],
+  },
+  music: {
+    eyebrow: "In music", title: "Our vibe",
+    text: "A little foretaste of the atmosphere that will carry us through these days.",
+    play: "Listen", pause: "Pause", broken: "The music could not be loaded.",
   },
   travel: { stay: "Where to stay", book: "Book" },
   polaroids: { first: "Our first photo, 2020!", mexico: "Mexico, 2023", reunion: "Réunion Island, 2023", us: "Cheers to us!" },

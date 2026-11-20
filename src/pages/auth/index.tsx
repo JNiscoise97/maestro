@@ -45,7 +45,7 @@ export function LoginPage() {
     setAuthError(null)
     const found = await login(values.code)
     if (!found) {
-      setAuthError("Code d'accès invalide. Vérifiez auprès de Sarah ou Jordan.")
+      setAuthError("Code d'accès invalide. Vérifiez auprès de Jordan ou Sarah.")
     }
     // En cas de succès, le changement de `person` dans IdentityContext fait
     // re-rendre ce composant et tombe dans la branche `if (person)` ci-dessus.

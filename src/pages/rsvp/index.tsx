@@ -117,7 +117,7 @@ export function RsvpPage() {
               Nous avons hâte de vous retrouver à Montpellier.
             </p>
             <p className="text-[19px] italic text-[#1A1D1B] dark:text-[#E8E4DA] mt-7" style={{ fontFamily: SERIF }}>
-              Sarah &amp; Jordan
+              Jordan &amp; Sarah
             </p>
           </div>
         ) : (

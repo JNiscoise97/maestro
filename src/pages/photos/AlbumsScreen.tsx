@@ -25,7 +25,7 @@ export function CategoriesScreen({ photos, albums, onOpen }: {
   const cards = [
     ...albums.map((a) => {
       const list = photos.filter((p) => p.album_id === a.id)
-      // Couverture choisie par Sarah et Jordan si elle est visible, sinon la première photo.
+      // Couverture choisie par Jordan et Sarah si elle est visible, sinon la première photo.
       const cover = list.find((p) => p.id === a.cover_photo_id) ?? list[0]
       return { key: a.id, to: `/photos/albums/${a.id}`, title: a.name, count: list.length, cover, favorite: false, hidden: a.hidden }
     }),

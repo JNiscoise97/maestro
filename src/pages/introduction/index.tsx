@@ -48,7 +48,7 @@ return (
               {paragraph}
             </p>
           ))}
-          <p className="font-heading text-base font-semibold text-foreground">Sarah &amp; Jordan</p>
+          <p className="font-heading text-base font-semibold text-foreground">Jordan &amp; Sarah</p>
 
           {!isImpersonating && !person?.introductionSeen && (
             <div className="flex flex-wrap gap-2 pt-2">

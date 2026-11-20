@@ -203,7 +203,7 @@ function AccessForm({ onAccess }: { onAccess: (name: string, group: FilmGroup) =
             {/* En-tête */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <p style={{ fontFamily: "Nickainley, serif", fontSize: "3.6rem", lineHeight: 1, color: "var(--bordeaux)", margin: 0 }}>
-                Sarah & Jordan
+                Jordan & Sarah
               </p>
               <Divider />
               <p style={{ fontSize: 11, letterSpacing: "0.24em", textTransform: "uppercase", color: "color-mix(in oklch, var(--brun) 45%, transparent 55%)", margin: 0 }}>
@@ -332,7 +332,7 @@ function WatchScreen({ group, videos, viewerName, isPreview }: {
               {/* Signature */}
               <div style={{ marginTop: 28, display: "flex", justifyContent: "flex-end" }}>
                 <p style={{ fontFamily: "Nickainley, serif", fontSize: "1.8rem", color: "var(--bordeaux)", margin: 0, lineHeight: 1.1 }}>
-                  Sarah & Jordan
+                  Jordan & Sarah
                 </p>
               </div>
             </div>
@@ -345,7 +345,7 @@ function WatchScreen({ group, videos, viewerName, isPreview }: {
           {/* Heading section */}
           <div className="nr nr-up" style={{ textAlign: "center", marginBottom: 36 }}>
             <p style={{ fontSize: 10, letterSpacing: "0.24em", textTransform: "uppercase", color: "var(--bordeaux)", margin: "0 0 8px" }}>
-              Sarah & Jordan
+              Jordan & Sarah
             </p>
             <div style={{ width: 48, height: 1.5, backgroundColor: "var(--bordeaux)", margin: "0 auto 8px", opacity: 0.5 }} />
             <p style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "color-mix(in oklch, var(--brun) 40%, transparent 60%)", margin: 0 }}>
@@ -400,7 +400,7 @@ function WatchScreen({ group, videos, viewerName, isPreview }: {
           borderTop: "3px solid color-mix(in oklch, var(--dore) 60%, transparent 40%)",
         }}>
           <p style={{ fontFamily: "Nickainley, serif", fontSize: "2.2rem", color: "var(--ivoire)", margin: "0 0 10px", lineHeight: 1 }}>
-            Sarah & Jordan
+            Jordan & Sarah
           </p>
           <Divider color="color-mix(in oklch, var(--ivoire) 30%, transparent 70%)" />
           <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "color-mix(in oklch, var(--ivoire) 38%, transparent 62%)", margin: "10px 0 0" }}>

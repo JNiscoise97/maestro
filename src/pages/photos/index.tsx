@@ -60,7 +60,7 @@ function GalleryGate() {
   )
   else if (member.status !== "active") content = (
     <Notice title="Accès suspendu">
-      Votre compte a été désactivé. Contactez Sarah ou Jordan si besoin.{" "}
+      Votre compte a été désactivé. Contactez Jordan ou Sarah si besoin.{" "}
       <button type="button" className="underline" onClick={() => void signOut()}>Se déconnecter</button>
     </Notice>
   )

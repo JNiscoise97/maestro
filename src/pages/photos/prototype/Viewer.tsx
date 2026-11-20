@@ -91,7 +91,7 @@ export function ProtoViewer({ photos, index, onIndex, onClose, favorites, onTogg
       >
         {isReported ? (
           <p className="max-w-xs text-center text-sm opacity-80">
-            Merci, cette photo est masquée pour tout le monde le temps que Sarah et Jordan l'examinent.
+            Merci, cette photo est masquée pour tout le monde le temps que Jordan et Sarah l'examinent.
           </p>
         ) : (
           <img

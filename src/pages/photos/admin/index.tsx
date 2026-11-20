@@ -61,7 +61,7 @@ export function GalleryAdminEmbedded() {
   return <GalleryAdminShell nav={nav} embedded />
 }
 
-/** Espace d'administration réservé à Sarah et Jordan (CDCF ADM-01). */
+/** Espace d'administration réservé à Jordan et Sarah (CDCF ADM-01). */
 function GalleryAdminShell({ nav, embedded = false }: { nav: AdminNav; embedded?: boolean }) {
   const { data: requests = [] } = useAccessRequests()
   const { data: reports = [] } = useReports()

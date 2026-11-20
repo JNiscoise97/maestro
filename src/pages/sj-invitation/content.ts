@@ -42,7 +42,7 @@ export const OUR_WORD = {
     "Des moments solennels aux instants les plus simples, nous espérons surtout des retrouvailles, des conversations qui n'en finissent pas, des éclats de rire, quelques larmes de joie et beaucoup de danse.",
     "Nous avons hâte de vivre tout cela avec toi et de créer ensemble des souvenirs qui nous accompagneront longtemps.",
   ],
-  signature: "Sarah & Jordan",
+  signature: "Jordan & Sarah",
 }
 
 // ── 3. Programme ──────────────────────────────────────────────────────────────
@@ -305,7 +305,7 @@ export const THANKS = {
   titleDeclined: "Quel dommage !",
   textDeclined: "Ta présence aurait rendu notre mariage encore plus beau. Nous aurions tellement aimé vivre ces moments avec toi.",
   closing: "Avec tout notre amour,",
-  signature: "Sarah & Jordan",
+  signature: "Jordan & Sarah",
 }
 
 // ── Textes d'interface (boutons, formulaire, enveloppe, messages) ─────────────
@@ -323,7 +323,7 @@ export const UI = {
     accountMissing: "Compte introuvable",
     accountMissingText: "Ton accès n'est pas (ou plus) actif.",
     suspended: "Accès suspendu",
-    suspendedText: "Ton compte a été désactivé. Contacte Sarah ou Jordan si besoin.",
+    suspendedText: "Ton compte a été désactivé. Contacte Jordan ou Sarah si besoin.",
     and: "et",
     langLabel: "Langue",
   },

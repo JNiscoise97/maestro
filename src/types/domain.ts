@@ -1,7 +1,7 @@
 export type AppRole = "admin" | "referent" | "invite"
 
 /**
- * Réservée à Sarah & Jordan : ce n'est pas une table d'identité générique.
+ * Réservée à Jordan & Sarah : ce n'est pas une table d'identité générique.
  * Les référents sont des `Guest` affectés à un domaine (voir
  * `domaine_responsables`) — on fait la jointure plutôt que de dupliquer leurs
  * infos ici.
@@ -327,7 +327,7 @@ export interface Guest {
   /** Statut de présence aux fiançailles, dénormalisé depuis _20260725_guests. */
   sourceAttendance?: "present" | "declined" | "no-show" | null
   isActive?: boolean
-  /** A déjà vu la page Introduction (mot de Sarah & Jordan) lors d'une connexion précédente. */
+  /** A déjà vu la page Introduction (mot de Jordan & Sarah) lors d'une connexion précédente. */
   introductionSeen?: boolean
   /** Proposé comme candidat responsable de domaine dans Paramètres — voir 0043_guests_assignable.sql. */
   assignable: boolean

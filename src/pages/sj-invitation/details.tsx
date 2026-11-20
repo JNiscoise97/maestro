@@ -243,7 +243,7 @@ function PreviewBar({ view }: { view: GuestView }) {
   const guestName = options.find((o) => o.id === view.previewId)?.name
   const pdf = async () => {
     setBusy(true)
-    try { await printInvitation(guestName ? `Invitation Sarah & Jordan - ${guestName}` : "Invitation Sarah & Jordan") } finally { setBusy(false) }
+    try { await printInvitation(guestName ? `Invitation Jordan & Sarah - ${guestName}` : "Invitation Jordan & Sarah") } finally { setBusy(false) }
   }
   return (
     <div className="border-t px-6 py-3 text-xs print:hidden" style={{ borderColor: "var(--p-line)", background: "#faf8f4" }}>
@@ -426,12 +426,13 @@ function InvitationSection() {
     }>
       <div className="text-center" style={heading}>
         <div className="grid gap-x-12 gap-y-8 text-base sm:grid-cols-2 sm:text-xl">
-          <ul className="space-y-1">{INVITATION.brideParents.map((p) => <li key={p} className="whitespace-nowrap"><T>{p}</T></li>)}</ul>
+          {/* Parents de Jordan puis ceux de Sarah (même ordre que « Jordan & Sarah »). */}
           <ul className="space-y-1">{INVITATION.groomParents.map((p) => <li key={p} className="whitespace-nowrap"><T>{p}</T></li>)}</ul>
+          <ul className="space-y-1">{INVITATION.brideParents.map((p) => <li key={p} className="whitespace-nowrap"><T>{p}</T></li>)}</ul>
         </div>
         <p className="mt-8 text-lg italic sm:text-xl">{INVITATION.announce}</p>
         <p className="my-6 text-4xl font-light uppercase tracking-[0.18em] sm:text-5xl" style={{ color: MATTE_GOLD }}>
-          Sarah <span className="text-[0.6em] normal-case italic tracking-normal">&amp;</span> Jordan
+          Jordan <span className="text-[0.6em] normal-case italic tracking-normal">&amp;</span> Sarah
         </p>
         <p className="text-lg sm:text-xl"><T>{INVITATION.date}</T></p>
         <Fleuron className="my-8" />

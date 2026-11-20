@@ -10,7 +10,7 @@ import { ProtoViewer } from "./Viewer"
 
 /**
  * Prototype de la galerie privée — direction validée le 18/10/2026 :
- * style cinématographique (bordeaux, vert, touches d'or), « Sarah & Jordan » en Nickainley,
+ * style cinématographique (bordeaux, vert, touches d'or), « Jordan & Sarah » en Nickainley,
  * accueil en diaporama horizontal, galerie complète organisée par catégories + favoris.
  * Photos fictives, parcours simulés, aucun contrôle d'accès.
  */
@@ -145,7 +145,7 @@ function Masthead({ compact = false }: { compact?: boolean }) {
       </p>
       <h1 className={`mt-2 leading-none ${compact ? "text-5xl" : "text-6xl @2xl:text-8xl"}`}
         style={{ fontFamily: "var(--p-names-font)", color: "var(--p-names-color)" }}>
-        Sarah &amp; Jordan
+        Jordan &amp; Sarah
       </h1>
     </header>
   )
@@ -229,7 +229,7 @@ function ProtoLogin({ initial, onDone, mode, onToggleMode }: {
         )}
         {step === "pending" && (
           <div className="space-y-3 text-sm">
-            <p>Votre demande a bien été transmise à Sarah et Jordan.</p>
+            <p>Votre demande a bien été transmise à Jordan et Sarah.</p>
             <p style={{ color: "var(--p-muted)" }}>Vous recevrez un e-mail dès qu'elle sera acceptée.</p>
           </div>
         )}

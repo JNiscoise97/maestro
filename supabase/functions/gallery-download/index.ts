@@ -66,7 +66,7 @@ export function galleryUrl(): string {
  */
 export async function sendMail(to: string[], subject: string, html: string): Promise<void> {
   const key = Deno.env.get("RESEND_API_KEY")
-  const from = Deno.env.get("MAIL_FROM") ?? "Sarah & Jordan <connexion@20260725.geniius.io>"
+  const from = Deno.env.get("MAIL_FROM") ?? "Jordan & Sarah <connexion@20260725.geniius.io>"
   if (!key || to.length === 0) return
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",

@@ -18,7 +18,7 @@ Prototype comparatif : `/photos/prototype`.
 npx supabase login
 npx supabase link --project-ref <ref-du-projet>
 npx supabase secrets set RESEND_API_KEY=re_... \
-  MAIL_FROM="Sarah & Jordan <connexion@20260725.geniius.io>" \
+  MAIL_FROM="Jordan & Sarah <connexion@20260725.geniius.io>" \
   GALLERY_PUBLIC_URL=https://<domaine-du-site> \
   GALLERY_WEBHOOK_SECRET=<longue-chaine-aleatoire>
 npx supabase functions deploy gallery-identify --no-verify-jwt

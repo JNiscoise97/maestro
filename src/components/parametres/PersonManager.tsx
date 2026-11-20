@@ -25,7 +25,7 @@ interface PersonFormState {
   accessCode: string
 }
 
-// Réservé à Sarah & Jordan (voir types/domain.ts : Person.role = "fiance") —
+// Réservé à Jordan & Sarah (voir types/domain.ts : Person.role = "fiance") —
 // toujours les deux mêmes, jamais de création depuis l'UI (voir lib/constants.ts
 // et les nombreuses références à leurs ids ailleurs dans l'app).
 // Les référents sont gérés comme des invités depuis DomaineManager.

@@ -58,9 +58,9 @@ export function LandingScreen() {
       <p className="text-xs uppercase tracking-[0.4em] sm:text-sm" style={{ textShadow: SHADOW }}>{UI.subtitle}</p>
       <h1 className="mt-6 flex flex-col items-center gap-x-[0.35em] text-6xl font-medium uppercase leading-none sm:flex-row sm:text-7xl lg:text-8xl"
         style={{ fontFamily: "var(--p-names-font, var(--p-heading))", letterSpacing: "0.08em", textShadow: SHADOW }}>
-        <span>Sarah</span>
-        <span className="my-2 text-[0.5em] sm:my-0">&amp;</span>
         <span>Jordan</span>
+        <span className="my-2 text-[0.5em] sm:my-0">&amp;</span>
+        <span>Sarah</span>
       </h1>
       <Link to={target}
         className="mt-12 inline-block border border-white px-8 py-3 text-xs uppercase tracking-[0.25em] text-white transition-colors hover:bg-white hover:text-neutral-900"
@@ -110,7 +110,7 @@ function EnvelopeHeader({ member, hidden = false, headerRef }: {
   return (
     <div ref={headerRef} aria-hidden={hidden || undefined}
       className="flex flex-col items-center transition-opacity duration-500 motion-reduce:transition-none" style={{ opacity: hidden ? 0 : 1 }}>
-      {/* Même en-tête que la connexion : sous-titre et « Sarah & Jordan » en or mat. */}
+      {/* Même en-tête que la connexion : sous-titre et « Jordan & Sarah » en or mat. */}
       <Masthead compact subtitle={UI.subtitle} gilded />
       <p className="mb-8 mt-2 text-[10px] uppercase tracking-[0.35em]" style={{ color: "var(--p-muted)" }}>
         {UI.envelope.letterFor(name)}
@@ -170,9 +170,9 @@ export function OpenedEnvelopeScreen(props: { member: GalleryMember }) {
         {/* Signature : mots espacés par un écart fixe (l'espacement des lettres ne s'applique qu'aux noms). */}
         <p className="mt-5 flex items-baseline justify-center gap-[0.6em] text-xl font-light uppercase"
           style={{ fontFamily: "var(--p-names-font, var(--p-heading))", ...GOLD_TEXT }}>
-          <span className="tracking-[0.22em]" style={{ marginRight: "-0.22em" }}>Sarah</span>
-          <span className="italic normal-case">&amp;</span>
           <span className="tracking-[0.22em]" style={{ marginRight: "-0.22em" }}>Jordan</span>
+          <span className="italic normal-case">&amp;</span>
+          <span className="tracking-[0.22em]" style={{ marginRight: "-0.22em" }}>Sarah</span>
         </p>
       </OpenEnvelope>
       <div className="mt-10 flex items-stretch justify-center gap-3">

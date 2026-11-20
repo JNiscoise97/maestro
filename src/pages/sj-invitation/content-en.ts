@@ -34,7 +34,7 @@ export const OUR_WORD = {
     "From the solemn moments to the simplest ones, what we hope for most is reunions, conversations that never end, bursts of laughter, a few happy tears and lots of dancing.",
     "We can't wait to experience all of this with you and to create memories together that will stay with us for a long time.",
   ],
-  signature: "Sarah & Jordan",
+  signature: "Jordan & Sarah",
 }
 
 // ── 3. Programme ──────────────────────────────────────────────────────────────
@@ -225,7 +225,7 @@ export const THANKS = {
   titleDeclined: "Such a shame!",
   textDeclined: "Having you there would have made our wedding even more beautiful. We would so have loved to share these moments with you.",
   closing: "With all our love,",
-  signature: "Sarah & Jordan",
+  signature: "Jordan & Sarah",
 }
 
 // ── Interface text ────────────────────────────────────────────────────────────
@@ -242,7 +242,7 @@ export const UI = {
     accountMissing: "Account not found",
     accountMissingText: "Your access is not (or no longer) active.",
     suspended: "Access suspended",
-    suspendedText: "Your account has been deactivated. Please contact Sarah or Jordan if needed.",
+    suspendedText: "Your account has been deactivated. Please contact Jordan or Sarah if needed.",
     and: "and",
     langLabel: "Language",
   },

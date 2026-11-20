@@ -207,7 +207,7 @@ function ReferentHomePage() {
               </span>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Sarah &amp; Jordan vous ont confié ces missions. Confirmez celles que vous êtes prêt·e à prendre en charge.
+              Jordan &amp; Sarah vous ont confié ces missions. Confirmez celles que vous êtes prêt·e à prendre en charge.
             </p>
           </div>
           <div className="space-y-3">

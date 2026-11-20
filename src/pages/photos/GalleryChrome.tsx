@@ -12,7 +12,7 @@ export const GALLERY_SUBTITLE = "Fiançailles · 25 juillet 2026"
 export function Masthead({ compact = false, subtitle = GALLERY_SUBTITLE, gilded = false }: {
   compact?: boolean
   subtitle?: string
-  /** Style de l'invitation : « Sarah & Jordan » en or mat, capitales fines, « & » italique entre deux filets. */
+  /** Style de l'invitation : « Jordan & Sarah » en or mat, capitales fines, « & » italique entre deux filets. */
   gilded?: boolean
 }) {
   return (
@@ -29,16 +29,16 @@ export function Masthead({ compact = false, subtitle = GALLERY_SUBTITLE, gilded 
           // Invitation (piste « or mat uni ») : capitales fines très espacées, prénoms empilés,
           // « & » en italique entre deux filets fins (même esperluette que l'accueil).
           <span className="flex flex-col items-center font-light uppercase" style={GOLD_TEXT}>
-            <span style={{ letterSpacing: "0.22em", paddingLeft: "0.22em" }}>Sarah</span>
+            <span style={{ letterSpacing: "0.22em", paddingLeft: "0.22em" }}>Jordan</span>
             <span aria-hidden className="my-3 flex items-center gap-3.5 normal-case">
               <span className="h-px w-10 bg-current opacity-55" />
               <span className="text-[0.45em] italic tracking-normal">&amp;</span>
               <span className="h-px w-10 bg-current opacity-55" />
             </span>
             <span className="sr-only">&amp;</span>
-            <span style={{ letterSpacing: "0.22em", paddingLeft: "0.22em" }}>Jordan</span>
+            <span style={{ letterSpacing: "0.22em", paddingLeft: "0.22em" }}>Sarah</span>
           </span>
-        ) : <>Sarah &amp; Jordan</>}
+        ) : <>Jordan &amp; Sarah</>}
       </h1>
     </header>
   )

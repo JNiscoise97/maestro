@@ -26,7 +26,7 @@
 import type { Capability } from "@/types/permissions"
 import type { AppRole, DomainePhase, PlanningMilestone } from "@/types/domain"
 
-export const EVENT_NAME = import.meta.env.VITE_EVENT_NAME ?? "Fiançailles de Sarah & Jordan"
+export const EVENT_NAME = import.meta.env.VITE_EVENT_NAME ?? "Fiançailles de Jordan & Sarah"
 
 export const EVENT_DATE = import.meta.env.VITE_EVENT_DATE ?? "2026-07-25"
 

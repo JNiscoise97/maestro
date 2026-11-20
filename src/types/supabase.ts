@@ -70,7 +70,7 @@ type DomaineResponsableRow = {
   created_at: string
 }
 
-// Réservée à Sarah & Jordan (voir types/domain.ts) — l'enum app_role reste
+// Réservée à Jordan & Sarah (voir types/domain.ts) — l'enum app_role reste
 // inchangé côté base (utilisé aussi par les anciens RPC), mais seule la
 // valeur 'fiance' doit subsister ici une fois la migration 0025 appliquée.
 type PersonRow = {

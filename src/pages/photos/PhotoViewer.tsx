@@ -272,7 +272,7 @@ function ReportPanel({ photo, memberId, onDone }: { photo: GalleryPhoto; memberI
       e.preventDefault()
       if (selected.length === 0) return
       submit.mutate({ photoId: photo.id, reasons: selected, forSelf }, {
-        onSuccess: () => { toast.success("Merci. La photo est masquée le temps que Sarah et Jordan l'examinent."); onDone() },
+        onSuccess: () => { toast.success("Merci. La photo est masquée le temps que Jordan et Sarah l'examinent."); onDone() },
         onError: () => toast.error("Le signalement n'a pas pu être envoyé."),
       })
     }}>

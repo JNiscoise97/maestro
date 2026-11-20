@@ -81,7 +81,7 @@ export const SOURCE_LABEL: Record<Source, { object: string }> = {
  */
 export async function sendMail(to: string[], subject: string, html: string): Promise<void> {
   const key = Deno.env.get("RESEND_API_KEY")
-  const from = Deno.env.get("MAIL_FROM") ?? "Sarah & Jordan <connexion@20260725.geniius.io>"
+  const from = Deno.env.get("MAIL_FROM") ?? "Jordan & Sarah <connexion@20260725.geniius.io>"
   if (!key || to.length === 0) return
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
       const url = sourceUrl(request.source)
       await sendMail([request.email], `Votre accès à ${SOURCE_LABEL[sourceOf(request.source)].object} est ouvert`,
         mailLayout("Bienvenue !",
-          `Bonjour ${escapeHtml(request.first_name)},<br><br>Sarah et Jordan ont accepté votre demande. ` +
+          `Bonjour ${escapeHtml(request.first_name)},<br><br>Jordan et Sarah ont accepté votre demande. ` +
           `Vous pouvez dès maintenant vous connecter avec votre adresse e-mail :<br><br>` +
           `<a href="${url}" style="color:#7a1f2b;">${url}</a>`))
       return json({ ok: true, memberId: id })
@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
       await sendMail([request.email], `Votre demande d'accès à ${SOURCE_LABEL[sourceOf(request.source)].object}`,
         mailLayout("Votre demande",
           `Bonjour ${escapeHtml(request.first_name)},<br><br>Votre demande d'accès n'a pas pu être acceptée. ` +
-          `Si vous pensez qu'il s'agit d'une erreur, contactez directement Sarah ou Jordan.`))
+          `Si vous pensez qu'il s'agit d'une erreur, contactez directement Jordan ou Sarah.`))
       return json({ ok: true })
     }
 

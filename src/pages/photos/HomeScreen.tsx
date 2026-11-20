@@ -9,7 +9,7 @@ import { Masthead } from "./GalleryChrome"
 import { JustifiedGrid } from "./JustifiedGrid"
 
 /**
- * Accueil (CDCF NAV-01/02/03) : texte de Sarah et Jordan puis la sélection d'au plus 50 photos,
+ * Accueil (CDCF NAV-01/02/03) : texte de Jordan et Sarah puis la sélection d'au plus 50 photos,
  * dans le mode de défilement choisi en réglages. Une photo signalée disparaît sans remplacement.
  */
 export function HomeScreen({ photos, settings, limited = false, onOpen, onPresent }: {

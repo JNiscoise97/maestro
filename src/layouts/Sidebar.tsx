@@ -17,7 +17,7 @@ export function Sidebar() {
           className="text-3xl font-normal"
           style={{ fontFamily: "'Nickainley', serif", color: "#7a272c" }}
         >
-          Sarah &amp; Jordan
+          Jordan &amp; Sarah
         </span>
       </div>
       <nav className="flex flex-1 flex-col gap-1 px-3">

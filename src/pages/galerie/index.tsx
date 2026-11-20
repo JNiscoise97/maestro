@@ -261,7 +261,7 @@ function AccessForm({ onAccess }: { onAccess: (name: string, p: AlbumPartage) =>
           <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <p style={{ fontFamily: "Nickainley, serif", fontSize: "3.4rem", lineHeight: 1, color: "var(--bordeaux)", margin: 0 }}>
-                Sarah & Jordan
+                Jordan & Sarah
               </p>
               <Divider />
               <p style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "color-mix(in oklch, var(--brun) 42%, transparent 58%)", margin: 0 }}>
@@ -323,7 +323,7 @@ function GalleryView({
           position: "sticky", top: 0, zIndex: 10,
         }}>
           <p style={{ fontFamily: "Nickainley, serif", fontSize: "1.5rem", lineHeight: 1, color: "var(--bordeaux)", margin: 0, flexShrink: 0 }}>
-            Sarah & Jordan
+            Jordan & Sarah
           </p>
           <div style={{ height: 26, width: 1, backgroundColor: "color-mix(in oklch, var(--dore) 30%, transparent 70%)", flexShrink: 0 }} />
           <p style={{ fontSize: 12, color: "color-mix(in oklch, var(--brun) 45%, transparent 55%)", margin: 0, flex: 1 }}>
@@ -369,7 +369,7 @@ function GalleryView({
           marginTop: 16,
         }}>
           <p style={{ fontFamily: "Nickainley, serif", fontSize: "1.7rem", color: "var(--ivoire)", margin: "0 0 6px", lineHeight: 1 }}>
-            Sarah & Jordan
+            Jordan & Sarah
           </p>
           <p style={{ fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", color: "color-mix(in oklch, var(--ivoire) 38%, transparent 62%)", margin: 0 }}>
             Fiançailles · 25 juillet 2026

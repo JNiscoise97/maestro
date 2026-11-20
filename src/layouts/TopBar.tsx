@@ -10,7 +10,7 @@ function useCurrentPageLabel() {
   const match = NAV_ITEMS.find((item) =>
     item.path === "/" ? pathname === "/" : pathname.startsWith(item.path)
   )
-  return match?.label ?? "Sarah & Jordan"
+  return match?.label ?? "Jordan & Sarah"
 }
 
 export function TopBar() {
@@ -29,7 +29,7 @@ export function TopBar() {
         className="text-2xl font-normal lg:hidden"
         style={{ fontFamily: "'Nickainley', serif", color: "#7a272c" }}
       >
-        Sarah &amp; Jordan
+        Jordan &amp; Sarah
       </span>
       <span className="hidden font-heading text-base font-medium text-foreground lg:inline">{label}</span>
 

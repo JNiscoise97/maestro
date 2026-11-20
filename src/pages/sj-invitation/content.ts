@@ -370,7 +370,11 @@ export const UI = {
   },
   places: { directions: "Itinéraire", mapAria: "Plan des lieux autour de Montpellier" },
   /** song : morceau joué en cliquant sur le tourne-disque (fichier dans public/sj-invitation/). */
-  ambiance: { record: "Mettons l'ambiance", song: "/sj-invitation/ambiance.aac", play: "Lancer la musique", pause: "Mettre la musique en pause" },
+  ambiance: { record: "Mettons l'ambiance", song: "/sj-invitation/ambiance.aac", play: "Lancer la musique", pause: "Mettre la musique en pause",
+    /** Consigne sur le couvercle du tourne-disque (une ligne par élément, trois au plus). */
+    playHint: ["▶ Clique ici", "pour écouter", "notre ambiance"],
+    pauseHint: ["❚❚ Clique ici", "pour arrêter", "la musique"],
+  },
   travel: { stay: "Où dormir", book: "Réserver" },
   polaroids: { first: "1ère photo de nous, 2020 !", mexico: "Mexique, 2023", reunion: "La Réunion, 2023", us: "À nous !" },
   rsvp: {

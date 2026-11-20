@@ -671,7 +671,8 @@ function AmbianceSection({ days }: { days: Day[] }) {
   return (
     <Section id="ambiance" eyebrow={UI.sections.ambiance.eyebrow} title={UI.sections.ambiance.title} width="max-w-8xl" picto="robe" decor={
       // Tourne-disque flottant en biais, en haut à gauche (comme le bouquet du programme).
-      <Deco className="-left-4 -top-12 w-32 sm:-left-10 sm:-top-16 sm:w-48" from="left"><RecordPlayer className="w-full -rotate-12" caption={UI.ambiance.record} src={UI.ambiance.song} playLabel={UI.ambiance.play} pauseLabel={UI.ambiance.pause} /></Deco>
+      <Deco className="-left-4 -top-12 w-40 sm:-left-10 sm:-top-16 sm:w-52" from="left"><RecordPlayer className="w-full -rotate-12" caption={UI.ambiance.record} src={UI.ambiance.song} playLabel={UI.ambiance.play} pauseLabel={UI.ambiance.pause}
+          playHint={UI.ambiance.playHint} pauseHint={UI.ambiance.pauseHint} /></Deco>
     }>
       <div className="mx-auto max-w-2xl space-y-3 text-center">
         <p className="text-xl leading-relaxed sm:text-2xl" style={heading}><T>{AMBIANCE.intro}</T></p>

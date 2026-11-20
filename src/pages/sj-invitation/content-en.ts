@@ -286,7 +286,10 @@ export const UI = {
     limited: "Limited places",
   },
   places: { directions: "Directions", mapAria: "Map of the venues around Montpellier" },
-  ambiance: { record: "Let's set the mood", song: "/sj-invitation/ambiance.aac", play: "Play the music", pause: "Pause the music" },
+  ambiance: { record: "Let's set the mood", song: "/sj-invitation/ambiance.aac", play: "Play the music", pause: "Pause the music",
+    playHint: ["▶ Click here", "to hear", "our music"],
+    pauseHint: ["❚❚ Click here", "to stop", "the music"],
+  },
   travel: { stay: "Where to stay", book: "Book" },
   polaroids: { first: "Our first photo, 2020!", mexico: "Mexico, 2023", reunion: "Réunion Island, 2023", us: "Cheers to us!" },
   rsvp: {

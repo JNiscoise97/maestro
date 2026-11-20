@@ -117,8 +117,11 @@ export function FlowerCluster({ className = "", flip = false, kind = "bouquet-ro
  * Avec src : bouton lecture / pause ; le disque ne tourne et le bras ne se pose que pendant la lecture (en boucle).
  * Fichier introuvable ou illisible : le tourne-disque redevient un simple décor.
  */
-export function RecordPlayer({ className = "", caption = "Mettons l'ambiance", src, playLabel = "Lancer la musique", pauseLabel = "Mettre la musique en pause" }: {
+export function RecordPlayer({ className = "", caption = "Mettons l'ambiance", src, playLabel = "Lancer la musique", pauseLabel = "Mettre la musique en pause",
+  playHint, pauseHint }: {
   className?: string; caption?: string; src?: string; playLabel?: string; pauseLabel?: string
+  /** Consigne sur le couvercle (une ligne par élément) quand la musique est arrêtée / en cours ; sinon caption. */
+  playHint?: string[]; pauseHint?: string[]
 }) {
   const audio = useRef<HTMLAudioElement | null>(null)
   const [playing, setPlaying] = useState(false)
@@ -148,7 +151,16 @@ export function RecordPlayer({ className = "", caption = "Mettons l'ambiance", s
       {/* Couvercle ouvert */}
       <path d="M30 18h180l-6 70H36Z" fill="#f8f4ec" stroke="#cfc4b0" strokeWidth="1.5" />
       <path d="M40 26h160l-5 54H45Z" fill="none" stroke={MATTE_GOLD} strokeWidth=".8" opacity=".6" />
-      <text x="120" y="60" textAnchor="middle" fontFamily="'Cormorant Garamond', serif" fontStyle="italic" fontSize="17" fill={MATTE_GOLD}>{caption}</text>
+      {interactive && playHint && pauseHint ? (
+        // Consigne explicite : « ▶ Clique ici / pour écouter / l'ambiance » (ou pour arrêter pendant la lecture).
+        <text textAnchor="middle" fontFamily="'Cormorant Garamond', serif" fill={MATTE_GOLD}>
+          {(playing ? pauseHint : playHint).map((line, i) => (
+            <tspan key={i} x="120" y={44 + i * 17} fontSize={i === 0 ? 19 : 16} fontWeight={i === 0 ? 700 : 500} fontStyle={i === 0 ? "normal" : "italic"}>{line}</tspan>
+          ))}
+        </text>
+      ) : (
+        <text x="120" y="60" textAnchor="middle" fontFamily="'Cormorant Garamond', serif" fontStyle="italic" fontSize="17" fill={MATTE_GOLD}>{caption}</text>
+      )}
       {/* Charnières */}
       <rect x="60" y="86" width="14" height="6" rx="1" fill="#c7a160" />
       <rect x="166" y="86" width="14" height="6" rx="1" fill="#c7a160" />

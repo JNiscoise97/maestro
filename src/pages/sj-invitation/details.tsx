@@ -292,6 +292,8 @@ async function printInvitation(fileName: string) {
 // ── En-tête et navigation ─────────────────────────────────────────────────────
 
 const HERO_PHOTO = "/sj-invitation/details-fond.webp"
+/** Téléphone (moins de 640 px) : recadrage vertical sur les mains et les verres (pas un visage coupé sur deux). */
+const HERO_PHOTO_MOBILE = "/sj-invitation/details-fond-mobile.webp"
 const HERO_SHADOW = "0 1px 12px rgba(0,0,0,.4)"
 
 function Hero({ member }: { member: GalleryMember }) {
@@ -301,7 +303,10 @@ function Hero({ member }: { member: GalleryMember }) {
     // Photo des mariés en fond (public/sj-invitation/details-fond.webp, tirée de S&J397.jpg) sous un voile sombre :
     // textes en blanc, comme sur l'accueil.
     <header className="relative isolate flex min-h-svh flex-col items-center justify-center overflow-hidden px-6 py-12 text-center text-white">
-      <img src={HERO_PHOTO} alt="" aria-hidden className="absolute inset-0 -z-10 size-full object-cover" />
+      <picture>
+        <source media="(max-width: 639px)" srcSet={HERO_PHOTO_MOBILE} />
+        <img src={HERO_PHOTO} alt="" aria-hidden className="absolute inset-0 -z-10 size-full object-cover" />
+      </picture>
       <LangSwitch tone="light" className="absolute right-4 top-4 print:hidden" />
       <div aria-hidden className="absolute inset-0 -z-10"
         style={{ background: "linear-gradient(180deg, rgba(20,16,12,.55) 0%, rgba(20,16,12,.45) 50%, rgba(20,16,12,.65) 100%)" }} />

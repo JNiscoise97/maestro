@@ -439,7 +439,7 @@ function InvitationSection() {
         <p className="mt-8 text-lg italic sm:text-xl">{INVITATION.announce}</p>
         {/* Capitales fines espacées, même police que la couverture, or mat de la carte.
             Téléphone : prénoms empilés, « & » italique entre deux filets ; à partir de 640 px : « Jordan & Sarah » sur une ligne. */}
-        <p className="my-8 flex flex-col items-center text-5xl font-light uppercase leading-none sm:text-6xl"
+        <p className="my-8 flex flex-col items-center text-4xl font-light uppercase leading-none sm:text-5xl"
           style={{ fontFamily: "var(--p-names-font, var(--p-heading))", color: MATTE_GOLD }}>
           <span className="sm:hidden" style={{ letterSpacing: "0.22em", paddingLeft: "0.22em" }}>Jordan</span>
           <span aria-hidden className="my-3 flex items-center gap-3.5 normal-case sm:hidden">

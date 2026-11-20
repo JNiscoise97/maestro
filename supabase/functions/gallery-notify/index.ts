@@ -4,7 +4,7 @@
 // pour les alertes nées dans la base : signalements, connexions d'invités et connexions inhabituelles.
 // (Demandes d'accès, rattachements automatiques et volumes de téléchargement sont déjà
 //  envoyés par gallery-identify / gallery-download.)
-// Connexions et visites : payload.source = « photos » (/photos) ou « invitation » (/Sarah-Jordan-2027/invitation),
+// Connexions et visites : payload.source = « photos » (/photos) ou « invitation » (/Jordan-Sarah-2027/invitation),
 // même base de comptes ; l'e-mail nomme la page concernée. Sans source (anciennes alertes) : galerie.
 // Sécurité : en-tête « x-webhook-secret » égal au secret GALLERY_WEBHOOK_SECRET.
 //
@@ -104,7 +104,7 @@ export function normalizeName(s: string): string {
 
 /** Adresse publique de l'invitation (même base de comptes que la galerie). */
 export function invitationUrl(): string {
-  return (Deno.env.get("GALLERY_PUBLIC_URL") ?? "").replace(/\/$/, "") + "/Sarah-Jordan-2027/invitation"
+  return (Deno.env.get("GALLERY_PUBLIC_URL") ?? "").replace(/\/$/, "") + "/Jordan-Sarah-2027/invitation"
 }
 
 type Source = "photos" | "invitation"

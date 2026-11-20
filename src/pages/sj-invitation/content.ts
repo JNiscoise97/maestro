@@ -1,5 +1,5 @@
 /**
- * Contenu de l'invitation complète (/Sarah-Jordan-2027/invitation/details).
+ * Contenu de l'invitation complète (/Jordan-Sarah-2027/invitation/details).
  *
  * Tout le texte de la page est ici : il suffit de remplacer les valeurs.
  * Un texte qui commence par « À compléter » s'affiche en italique grisé, pour repérer ce qui manque.

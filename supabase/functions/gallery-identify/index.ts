@@ -1,7 +1,7 @@
 // gallery-identify — étape d'identification de la galerie privée (CDCF ACC-02, ACC-06).
 //
 // Entrée : { email, firstName?, lastName?, source? }  ou  { email, birthYear, source? }  (connexion par année)
-//   source : "photos" (défaut, /photos) ou "invitation" (/Sarah-Jordan-2027/invitation) — même base de comptes.
+//   source : "photos" (défaut, /photos) ou "invitation" (/Jordan-Sarah-2027/invitation) — même base de comptes.
 //   L'origine est notée dans user_metadata.login_source (lue par le modèle d'e-mail du code) et sur la
 //   demande d'accès, et adapte les e-mails envoyés aux administrateurs.
 // Sortie : { status: "ready", yearLogin? } → le navigateur demande le code (signInWithOtp, shouldCreateUser: false),
@@ -70,7 +70,7 @@ export type Source = "photos" | "invitation"
 /** Adresse publique de l'interface d'origine (galerie ou invitation), pour les liens des e-mails. */
 export function sourceUrl(source: Source): string {
   return source === "invitation"
-    ? (Deno.env.get("GALLERY_PUBLIC_URL") ?? "").replace(/\/$/, "") + "/Sarah-Jordan-2027/invitation"
+    ? (Deno.env.get("GALLERY_PUBLIC_URL") ?? "").replace(/\/$/, "") + "/Jordan-Sarah-2027/invitation"
     : galleryUrl()
 }
 

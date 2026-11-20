@@ -23,7 +23,7 @@ import { DetailsScreen } from "./details"
 import { EnvelopeScreen, LandingScreen, OpenedEnvelopeScreen } from "./screens"
 
 /**
- * Interface invitation S&J — /Sarah-Jordan-2027/invitation/…
+ * Interface invitation S&J — /Jordan-Sarah-2027/invitation/…
  * Page publique, hors ProtectedLayout / AppShell : aucune dépendance à l'interface admin de l'appli.
  *
  * Écrans (une adresse chacun) :

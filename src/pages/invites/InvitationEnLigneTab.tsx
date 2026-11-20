@@ -22,7 +22,7 @@ import { simulateResponses } from "./invitation-demo"
 import { InvitationStats, type MomentStat, type SideStat, type Slice } from "./InvitationStats"
 
 /**
- * Invités › Invitation en ligne : suivi de l'invitation /Sarah-Jordan-2027/invitation.
+ * Invités › Invitation en ligne : suivi de l'invitation /Jordan-Sarah-2027/invitation.
  *   · statistiques (graphiques dépliables) ;
  *   · par moment : conviés, réponses, personnes annoncées ;
  *   · par invité, regroupés par groupe : liste (A, B…), moments conviés, réponse, aperçu de sa page,

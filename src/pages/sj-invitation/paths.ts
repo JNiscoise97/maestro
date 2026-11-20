@@ -1,5 +1,5 @@
 /** Adresse de l'interface invitation (doit correspondre à la route de src/app/routes.tsx et aux e-mails). */
-export const INVITATION_PATH = "/Sarah-Jordan-2027/invitation"
+export const INVITATION_PATH = "/Jordan-Sarah-2027/invitation"
 
 /** Écrans de l'invitation, chacun à sa propre adresse. */
 export const INVITATION_ROUTES = {
@@ -18,7 +18,7 @@ export const INVITATION_ROUTES = {
 } as const
 
 /**
- * Photos plein écran de l'accueil (/Sarah-Jordan-2027/invitation), une par format :
+ * Photos plein écran de l'accueil (/Jordan-Sarah-2027/invitation), une par format :
  *   - ordinateur (écran de 640 px de large et plus) : photo en paysage, idéalement 2400 × 1600 px ;
  *   - téléphone (moins de 640 px)                    : photo en portrait, idéalement 1080 × 1920 px.
  * Provisoires : paysages Unsplash (licence libre). Pour les remplacer, déposer les images dans

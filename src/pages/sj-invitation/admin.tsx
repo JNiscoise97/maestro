@@ -6,7 +6,7 @@ import { AccessAdmin } from "@/pages/photos/admin/AccessAdmin"
 import { INVITATION_ROUTES } from "./paths"
 
 /**
- * Administration de l'invitation : /Sarah-Jordan-2027/invitation/admin (lien des e-mails : …/admin/acces).
+ * Administration de l'invitation : /Jordan-Sarah-2027/invitation/admin (lien des e-mails : …/admin/acces).
  * Réservée aux comptes admin de la base galerie (même base, mêmes droits côté serveur : RLS + gallery-admin).
  * Pour l'instant, un seul écran : les demandes d'accès et les comptes.
  */

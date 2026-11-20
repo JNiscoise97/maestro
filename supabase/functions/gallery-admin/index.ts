@@ -66,7 +66,7 @@ export const sourceOf = (s: unknown): Source => (s === "invitation" ? "invitatio
 /** Adresse publique de l'interface d'origine, pour les liens des e-mails. */
 export function sourceUrl(source: unknown): string {
   return sourceOf(source) === "invitation"
-    ? (Deno.env.get("GALLERY_PUBLIC_URL") ?? "").replace(/\/$/, "") + "/Sarah-Jordan-2027/invitation"
+    ? (Deno.env.get("GALLERY_PUBLIC_URL") ?? "").replace(/\/$/, "") + "/Jordan-Sarah-2027/invitation"
     : galleryUrl()
 }
 

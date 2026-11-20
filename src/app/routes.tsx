@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom"
+import { Routes, Route, Navigate, useLocation } from "react-router-dom"
 
 import { AppShell } from "@/layouts/AppShell"
 import { ProtectedLayout } from "@/layouts/ProtectedLayout"
@@ -45,7 +45,9 @@ export function AppRoutes() {
       <Route path="/galerie" element={<GaleriePage />} />
       <Route path="/photos/prototype" element={<GaleriePrototypePage />} />
       <Route path="/photos/*" element={<GalleryPage />} />
-      <Route path="/Sarah-Jordan-2027/invitation/*" element={<SjInvitationPage />} />
+      <Route path="/Jordan-Sarah-2027/invitation/*" element={<SjInvitationPage />} />
+      {/* Ancienne adresse (liens déjà envoyés ou imprimés) : même page, sous-chemin, paramètres et ancre conservés. */}
+      <Route path="/Sarah-Jordan-2027/*" element={<LegacyInvitationRedirect />} />
       <Route path="/connexion" element={<LoginPage />} />
 
       <Route element={<ProtectedLayout />}>
@@ -241,4 +243,10 @@ export function AppRoutes() {
       </Route>
     </Routes>
   )
+}
+
+/** /Sarah-Jordan-2027/… → /Jordan-Sarah-2027/… (l'adresse de l'invitation met Jordan en premier). */
+function LegacyInvitationRedirect() {
+  const { pathname, search, hash } = useLocation()
+  return <Navigate to={pathname.replace(/^\/Sarah-Jordan-2027/, "/Jordan-Sarah-2027") + search + hash} replace />
 }

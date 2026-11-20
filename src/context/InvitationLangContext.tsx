@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 
 /**
- * Langue de l'invitation en ligne (/Sarah-Jordan-2027/invitation) : français ou anglais.
+ * Langue de l'invitation en ligne (/Jordan-Sarah-2027/invitation) : français ou anglais.
  *
  * Ordre de priorité :
  *   1. choix fait sur cet appareil avec le sélecteur FR / EN (mémorisé) ;

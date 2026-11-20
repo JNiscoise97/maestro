@@ -131,7 +131,10 @@ export function DetailsScreen({ member }: { member: GalleryMember }) {
       <Nav active={current} hidden={hiddenTabs} />
       <main>
         <div id={TAB_TOP} />
-        {show("invitation") && <InvitationSection />}
+        {show("invitation") && <>
+          <InvitationSection />
+          <InvitationPhoto />
+        </>}
         {show("mot") && <OurWordSection />}
         {show("programme") && <ProgrammeSection view={view} />}
         {show("pratique") && <>
@@ -435,6 +438,22 @@ function InvitationSection() {
         <p className="mx-auto max-w-xl text-lg leading-relaxed sm:text-xl"><T>{INVITATION.context}</T></p>
       </div>
     </Section>
+  )
+}
+
+/**
+ * Sous le faire-part : grand polaroïd des mariés (photo SJ-0434 de la galerie, recadrée dans
+ * public/sj-invitation/polaroid-invitation.webp), légèrement penché, qui apparaît en zoom.
+ */
+const INVITATION_PHOTO = "/sj-invitation/polaroid-invitation.webp"
+
+function InvitationPhoto() {
+  return (
+    <section aria-hidden className="px-4 pb-4 pt-10 sm:pt-14">
+      <Reveal from="zoom" className="mx-auto w-[82%] max-w-md sm:max-w-lg">
+        <Polaroid src={INVITATION_PHOTO} rotate={-2.5} />
+      </Reveal>
+    </section>
   )
 }
 

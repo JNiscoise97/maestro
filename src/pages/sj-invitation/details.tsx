@@ -431,9 +431,11 @@ function InvitationSection() {
       </>
     }>
       <div className="text-center" style={heading}>
-        <div className="grid gap-x-12 gap-y-8 text-base sm:grid-cols-2 sm:text-xl">
-          {/* Parents de Jordan puis ceux de Sarah (même ordre que « Jordan & Sarah »). */}
+        {/* Parents de Jordan « et » ceux de Sarah (même ordre que « Jordan & Sarah ») : côte à côte à partir de 640 px,
+            l'un sous l'autre sur téléphone, « et » en italique doré entre les deux. */}
+        <div className="grid items-center gap-x-10 gap-y-4 text-base sm:grid-cols-[1fr_auto_1fr] sm:text-xl">
           <ul className="space-y-1">{INVITATION.groomParents.map((p) => <li key={p} className="whitespace-nowrap"><T>{p}</T></li>)}</ul>
+          <p className="text-lg italic sm:text-2xl" style={{ color: MATTE_GOLD }}>{UI.common.and}</p>
           <ul className="space-y-1">{INVITATION.brideParents.map((p) => <li key={p} className="whitespace-nowrap"><T>{p}</T></li>)}</ul>
         </div>
         <p className="mt-8 text-lg italic sm:text-xl">{INVITATION.announce}</p>

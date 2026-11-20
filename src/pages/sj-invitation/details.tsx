@@ -438,7 +438,9 @@ function InvitationSection() {
         </div>
         <p className="mt-8 text-lg italic sm:text-xl">{INVITATION.announce}</p>
         <p className="my-6 text-4xl font-light uppercase tracking-[0.18em] sm:text-5xl" style={{ color: MATTE_GOLD }}>
-          Jordan <span className="text-[0.6em] normal-case italic tracking-normal">&amp;</span> Sarah
+          {/* Téléphone : « & Sarah » à la ligne sous « Jordan » ; à partir de 640 px, sur une seule ligne. */}
+          <span className="block sm:inline">Jordan</span>{" "}
+          <span className="whitespace-nowrap"><span className="text-[0.6em] normal-case italic tracking-normal">&amp;</span> Sarah</span>
         </p>
         <p className="text-lg sm:text-xl"><T>{INVITATION.date}</T></p>
         <Fleuron className="my-8" />

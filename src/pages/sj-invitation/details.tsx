@@ -437,10 +437,19 @@ function InvitationSection() {
           <ul className="space-y-1">{INVITATION.brideParents.map((p) => <li key={p} className="whitespace-nowrap"><T>{p}</T></li>)}</ul>
         </div>
         <p className="mt-8 text-lg italic sm:text-xl">{INVITATION.announce}</p>
-        <p className="my-6 text-4xl font-light uppercase tracking-[0.18em] sm:text-5xl" style={{ color: MATTE_GOLD }}>
-          {/* Téléphone : « & Sarah » à la ligne sous « Jordan » ; à partir de 640 px, sur une seule ligne. */}
-          <span className="block sm:inline">Jordan</span>{" "}
-          <span className="whitespace-nowrap"><span className="text-[0.6em] normal-case italic tracking-normal">&amp;</span> Sarah</span>
+        {/* Capitales fines espacées, même police que la couverture, or mat de la carte.
+            Téléphone : prénoms empilés, « & » italique entre deux filets ; à partir de 640 px : « Jordan & Sarah » sur une ligne. */}
+        <p className="my-8 flex flex-col items-center text-5xl font-light uppercase leading-none sm:text-6xl"
+          style={{ fontFamily: "var(--p-names-font, var(--p-heading))", color: MATTE_GOLD }}>
+          <span className="sm:hidden" style={{ letterSpacing: "0.22em", paddingLeft: "0.22em" }}>Jordan</span>
+          <span aria-hidden className="my-3 flex items-center gap-3.5 normal-case sm:hidden">
+            <span className="h-px w-10 bg-current opacity-55" />
+            <span className="text-[0.45em] italic tracking-normal">&amp;</span>
+            <span className="h-px w-10 bg-current opacity-55" />
+          </span>
+          <span className="sr-only sm:hidden">&amp;</span>
+          <span className="sm:hidden" style={{ letterSpacing: "0.22em", paddingLeft: "0.22em" }}>Sarah</span>
+          <span className="hidden sm:inline" style={{ letterSpacing: "0.22em", paddingLeft: "0.22em" }}>Jordan &amp; Sarah</span>
         </p>
         <p className="text-lg sm:text-xl"><T>{INVITATION.date}</T></p>
         <Fleuron className="my-8" />

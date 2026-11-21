@@ -14,22 +14,24 @@ type IdentifyResult =
   | { status: "signed"; tokenHash: string }
   | { status: "wrong_year"; remaining: number }
 
+/** Envoi du code (gallery-identify) : même code pendant 30 min ; mailed = false si envoyé il y a moins d'une minute. */
+type CodeResult = { status: "code_sent"; expiresAt: string; reused: boolean; mailed: boolean } | { status: "pending" }
+
 /** Textes de la connexion : français (galerie et invitation) ou anglais (invitation des invités anglophones). */
 const TEXTS = {
   fr: {
-    tooMany: "Trop de demandes. Patientez une minute avant de redemander un code.",
     sendFailed: "L'envoi du code a échoué. Réessayez dans un instant.",
     errorAddress: "Une erreur est survenue. Vérifiez votre adresse et réessayez.",
     loginFailed: "La connexion a échoué. Réessayez dans un instant.",
     wrongYear: (n: number) => `Année incorrecte. Il vous reste ${n} essai${n > 1 ? "s" : ""}.`,
     yearLocked: "Pour votre sécurité, la connexion par année est suspendue. Un code vous a été envoyé par e-mail.",
     error: "Une erreur est survenue. Réessayez dans un instant.",
-    badCode: "Code incorrect ou expiré. Vérifiez-le ou demandez-en un nouveau.",
-    emailIntro: "Indiquez votre adresse e-mail : nous vous envoyons un code de connexion.",
+    badCode: "Code incorrect ou expiré. Vérifiez-le, ou cliquez sur « Renvoyer le code ».",
+    emailIntro: "Indiquez votre adresse e-mail pour vous connecter.",
     emailLabel: "Adresse e-mail",
     emailPlaceholder: "vous@exemple.com",
     wait: "Un instant…",
-    getCode: "Recevoir mon code",
+    getCode: "Continuer",
     unknown: "Nous ne connaissons pas encore cette adresse. Indiquez votre prénom et votre nom.",
     firstName: "Prénom",
     lastName: "Nom",
@@ -48,25 +50,28 @@ const TEXTS = {
     pending1: "Votre demande a bien été transmise à Jordan et Sarah.",
     pending2: "Vous recevrez un e-mail dès qu'elle sera acceptée ; vous pourrez alors vous connecter avec cette adresse.",
     codeBefore: "Saisissez le code envoyé à ",
-    codeAfter: ". Il est valable 15 minutes.",
+    codeAfter: (until: string) => `. Il est valable jusqu'à ${until}.`,
+    spam: "Vous ne le trouvez pas ? Regardez dans vos courriers indésirables (spams).",
+    reused: "Un code vous a déjà été envoyé il y a moins de 30 minutes : il est toujours valable.",
+    resent: "Le même code vient de vous être renvoyé.",
+    justSent: "Le code vous a été envoyé il y a moins d'une minute : patientez un instant.",
     codeLabel: "Code à 6 chiffres",
-    resend: "Renvoyer un code",
+    resend: "Renvoyer le code",
     back: "← Revenir",
   },
   en: {
-    tooMany: "Too many requests. Please wait a minute before asking for a new code.",
     sendFailed: "The code could not be sent. Please try again in a moment.",
     errorAddress: "Something went wrong. Please check your address and try again.",
     loginFailed: "Sign-in failed. Please try again in a moment.",
     wrongYear: (n: number) => `Incorrect year. You have ${n} attempt${n > 1 ? "s" : ""} left.`,
     yearLocked: "For your security, signing in with a year is suspended. A code has been sent to you by email.",
     error: "Something went wrong. Please try again in a moment.",
-    badCode: "Incorrect or expired code. Please check it or ask for a new one.",
-    emailIntro: "Enter your email address: we will send you a sign-in code.",
+    badCode: "Incorrect or expired code. Please check it, or click “Resend the code”.",
+    emailIntro: "Enter your email address to sign in.",
     emailLabel: "Email address",
     emailPlaceholder: "you@example.com",
     wait: "One moment…",
-    getCode: "Get my code",
+    getCode: "Continue",
     unknown: "We don't know this address yet. Please enter your first name and surname.",
     firstName: "First name",
     lastName: "Surname",
@@ -85,9 +90,13 @@ const TEXTS = {
     pending1: "Your request has been sent to Jordan and Sarah.",
     pending2: "You will receive an email as soon as it is accepted; you can then sign in with this address.",
     codeBefore: "Enter the code sent to ",
-    codeAfter: ". It is valid for 15 minutes.",
+    codeAfter: (until: string) => `. It is valid until ${until}.`,
+    spam: "Can't find it? Please check your spam or junk folder.",
+    reused: "A code was already sent to you less than 30 minutes ago: it is still valid.",
+    resent: "The same code has just been sent to you again.",
+    justSent: "The code was sent to you less than a minute ago: please wait a moment.",
     codeLabel: "6-digit code",
-    resend: "Send a new code",
+    resend: "Resend the code",
     back: "← Back",
   },
 }
@@ -134,21 +143,27 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
   const [yearKind, setYearKind] = useState<"birth" | "meeting">("birth")
   // Message affiché au-dessus du code (ex. bascule sur le mail après 2 années incorrectes).
   const [notice, setNotice] = useState<string | null>(null)
+  // Fin de validité du code envoyé (heure affichée sous le champ).
+  const [expiresAt, setExpiresAt] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function sendCode() {
-    const { error: otpError } = await galleryClient!.auth.signInWithOtp({
-      email: email.trim().toLowerCase(),
-      options: { shouldCreateUser: false },
-    })
-    if (otpError) {
-      setError(otpError.status === 429
-        ? t.tooMany
-        : t.sendFailed)
-      return
+  /**
+   * Code par mail (gallery-identify) : un code reste valable 30 minutes ; redemander dans ce délai renvoie
+   * le même code (jamais un nouveau qui annulerait le premier). resend : clic sur « Renvoyer le code ».
+   * prefix : message à garder au-dessus (ex. connexion par année suspendue).
+   */
+  async function sendCode(resend = false, prefix: string | null = null) {
+    try {
+      const res = await callGalleryFunction<CodeResult>("gallery-identify", { email, source, lang, sendCode: true })
+      if (res.status === "pending") { setStep("pending"); return }
+      setExpiresAt(res.expiresAt)
+      const info = !res.mailed ? t.justSent : resend ? t.resent : res.reused ? t.reused : null
+      setNotice([prefix, info].filter(Boolean).join(" ") || null)
+      setStep("code")
+    } catch {
+      setError(t.sendFailed)
     }
-    setStep("code")
   }
 
   async function identify(withName: boolean) {
@@ -182,8 +197,7 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
         setError(t.wrongYear(res.remaining))
       } else {
         // Bloqué (2 erreurs) ou plus sur liste blanche : code par mail.
-        setNotice(res.status === "locked" ? t.yearLocked : null)
-        await sendCode()
+        await sendCode(false, res.status === "locked" ? t.yearLocked : null)
       }
     } catch {
       setError(t.error)
@@ -195,9 +209,10 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
   async function verify() {
     setBusy(true)
     setError(null)
-    const { error: verifyError } = await galleryClient!.auth.verifyOtp({
-      email: email.trim().toLowerCase(), token: code.trim(), type: "email",
-    })
+    const address = email.trim().toLowerCase()
+    // Code généré par gallery-identify (generateLink) : accepté en « email », sinon en « magiclink ».
+    let { error: verifyError } = await galleryClient!.auth.verifyOtp({ email: address, token: code.trim(), type: "email" })
+    if (verifyError) ({ error: verifyError } = await galleryClient!.auth.verifyOtp({ email: address, token: code.trim(), type: "magiclink" }))
     setBusy(false)
     if (verifyError) setError(t.badCode)
   }
@@ -277,8 +292,11 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void verify() }}>
             {notice && <p className="text-sm">{notice}</p>}
             <p className="text-sm" style={{ color: "var(--p-muted)" }}>
-              {t.codeBefore}<b style={{ color: "var(--p-fg)" }}>{email}</b>{t.codeAfter}
+              {t.codeBefore}<b style={{ color: "var(--p-fg)" }}>{email}</b>
+              {t.codeAfter(expiresAt ? new Date(expiresAt).toLocaleTimeString(lang === "en" ? "en-GB" : "fr-FR", { hour: "2-digit", minute: "2-digit" }) : "—")}
             </p>
+            {/* Mail introuvable : penser aux indésirables. */}
+            <p className="text-xs" style={{ color: "var(--p-muted)" }}>{t.spam}</p>
             <input inputMode="numeric" autoComplete="one-time-code" maxLength={6} required value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="••••••" aria-label={t.codeLabel}
               className={`${input} text-center text-2xl tracking-[0.5em]`} style={{ borderColor: "var(--p-line)" }} />
@@ -288,7 +306,7 @@ export function LoginScreen({ mode, onToggleMode, compact = false, source = "pho
             </button>
             <div className="flex justify-between text-xs" style={{ color: "var(--p-muted)" }}>
               <button type="button" className="underline" onClick={() => { setCode(""); setNotice(null); setStep("email") }}>{t.changeAddress}</button>
-              <button type="button" className="underline" disabled={busy} onClick={() => void sendCode()}>{t.resend}</button>
+              <button type="button" className="underline" disabled={busy} onClick={() => { setError(null); void sendCode(true) }}>{t.resend}</button>
             </div>
           </form>
         )}

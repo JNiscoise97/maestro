@@ -1,11 +1,12 @@
 // gallery-identify — étape d'identification de la galerie privée (CDCF ACC-02, ACC-06).
 //
 // Entrée : { email, firstName?, lastName?, source? }  ou  { email, birthYear, source? }  (connexion par année)
+//          ou  { email, sendCode: true, source?, lang? }  (envoi du code par mail, voir sendLoginCode)
 //   source : "photos" (défaut, /photos) ou "invitation" (/Jordan-Sarah-2027/invitation) — même base de comptes.
 //   L'origine est notée dans user_metadata.login_source (lue par le modèle d'e-mail du code) et sur la
 //   demande d'accès, et adapte les e-mails envoyés aux administrateurs.
-// Sortie : { status: "ready", yearLogin? } → le navigateur demande le code (signInWithOtp, shouldCreateUser: false),
-//                                            ou l'année de naissance si yearLogin
+// Sortie : { status: "ready", yearLogin? } → le navigateur demande le code (sendCode), ou l'année de naissance si yearLogin
+//          { status: "code_sent", expiresAt, reused, mailed } → code envoyé (ou renvoyé : même code pendant 30 min)
 //          { status: "signed", tokenHash } → année correcte : session ouverte par verifyOtp(token_hash), sans mail
 //          { status: "wrong_year", remaining } / { status: "locked" } → 2 échecs : blocage 1 h, repli sur le code mail
 //          { status: "need_name" }  → adresse inconnue : demander prénom et nom
@@ -84,16 +85,18 @@ export const SOURCE_LABEL: Record<Source, { subject: string; object: string }> =
  * Envoi d'un e-mail transactionnel via l'API Resend (secrets RESEND_API_KEY et MAIL_FROM).
  * Sans clé configurée, l'envoi est ignoré sans erreur : l'alerte reste visible dans l'administration.
  */
-export async function sendMail(to: string[], subject: string, html: string): Promise<void> {
+/** true si le mail est parti (false : clé absente ou refus de Resend). */
+export async function sendMail(to: string[], subject: string, html: string): Promise<boolean> {
   const key = Deno.env.get("RESEND_API_KEY")
   const from = Deno.env.get("MAIL_FROM") ?? "Jordan & Sarah <connexion@20260725.geniius.io>"
-  if (!key || to.length === 0) return
+  if (!key || to.length === 0) return false
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({ from, to, subject, html }),
   })
   if (!res.ok) console.error("[sendMail]", res.status, await res.text())
+  return res.ok
 }
 
 /** Adresses e-mail des administrateurs actifs. */
@@ -133,7 +136,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
   if (req.method !== "POST") return json({ error: "method" }, 405)
 
-  let body: { email?: string; firstName?: string; lastName?: string; birthYear?: number | string; source?: string }
+  let body: {
+    email?: string; firstName?: string; lastName?: string; birthYear?: number | string; source?: string
+    sendCode?: boolean; lang?: string
+  }
   try { body = await req.json() } catch { return json({ error: "invalid_body" }, 400) }
 
   const email = (body.email ?? "").trim().toLowerCase()
@@ -148,6 +154,8 @@ Deno.serve(async (req) => {
 
   // 0. Connexion par année de naissance (liste blanche).
   if (body.birthYear != null) return yearLogin(db, email, Number(body.birthYear), source)
+  // 0 bis. Envoi du code par mail (même code pendant 30 minutes).
+  if (body.sendCode) return sendLoginCode(db, email, source, body.lang === "en" ? "en" : "fr")
 
   // 1. Compte existant : actif → code (ou année si liste blanche) ; désactivé → même réponse qu'une demande en attente.
   const { data: member } = await db.from(t("members"))
@@ -173,13 +181,14 @@ Deno.serve(async (req) => {
     return json({ status: "ready" })
   }
 
-  // 3. Adresse inconnue : il faut le prénom et le nom.
-  if (!firstName || !lastName) return json({ status: "need_name" })
-
-  // Demande déjà en attente pour cette adresse : ne pas la dupliquer.
+  // 3. Demande déjà en attente pour cette adresse : écran « demande en attente », sans redemander
+  //    prénom et nom ni créer de doublon.
   const { data: pending } = await db.from(t("access_requests"))
     .select("id").eq("email", email).eq("status", "pending").maybeSingle()
   if (pending) return json({ status: "pending" })
+
+  // Adresse inconnue : il faut le prénom et le nom.
+  if (!firstName || !lastName) return json({ status: "need_name" })
 
   // 4. Rapprochement avec la liste des invités des fiançailles (correspondance unique exigée).
   // Liste complète (quelques centaines de lignes) : la comparaison ignore accents et casse.
@@ -266,7 +275,80 @@ async function yearLogin(db: SupabaseClient, email: string, year: number, source
   const { data: link, error: linkError } = await db.auth.admin.generateLink({ type: "magiclink", email })
   const tokenHash = link?.properties?.hashed_token
   if (linkError || !tokenHash) { console.error("[identify] generateLink", linkError); return json({ error: "server" }, 500) }
+  // Ce jeton remplace tout code envoyé par mail : on l'oublie (le prochain envoi en créera un nouveau).
+  await db.from(t("login_codes")).delete().eq("email", email)
   return json({ status: "signed", tokenHash })
+}
+
+const CODE_TTL_MS = 30 * 60 * 1000
+const RESEND_MIN_MS = 60 * 1000
+
+/**
+ * Code de connexion par mail (migration 0185). Un code reste valable 30 minutes : toute nouvelle demande
+ * dans ce délai renvoie le MÊME code (au plus un mail par minute), au lieu d'en créer un qui annule le
+ * précédent. Le code vient de Supabase Auth (generateLink → email_otp, sans mail envoyé par Supabase) et
+ * le navigateur le vérifie avec verifyOtp. Code déjà utilisé (connexion depuis sa création) : nouveau code.
+ * Réponse : { status: "code_sent", expiresAt, reused, mailed } ; compte absent ou désactivé : « pending ».
+ */
+async function sendLoginCode(db: SupabaseClient, email: string, source: Source, lang: "fr" | "en"): Promise<Response> {
+  const { data: member } = await db.from(t("members")).select("id, status").eq("email", email).maybeSingle()
+  if (!member || member.status !== "active") return json({ status: "pending" })
+
+  const now = Date.now()
+  const { data: row } = await db.from(t("login_codes")).select("code, created_at, sent_at").eq("email", email).maybeSingle()
+  let valid = !!row && now - new Date(row.created_at).getTime() < CODE_TTL_MS
+  if (valid) {
+    // Code déjà utilisé pour se connecter : il ne marche plus, on en crée un nouveau.
+    const { data: user } = await db.auth.admin.getUserById(member.id)
+    const lastSignIn = user?.user?.last_sign_in_at
+    if (lastSignIn && new Date(lastSignIn).getTime() > new Date(row!.created_at).getTime()) valid = false
+  }
+
+  let code: string
+  let createdAt: number
+  if (valid) {
+    code = row!.code
+    createdAt = new Date(row!.created_at).getTime()
+    // Envoyé il y a moins d'une minute : pas de nouveau mail (il est sans doute en route).
+    if (now - new Date(row!.sent_at).getTime() < RESEND_MIN_MS) {
+      return json({ status: "code_sent", expiresAt: new Date(createdAt + CODE_TTL_MS).toISOString(), reused: true, mailed: false })
+    }
+  } else {
+    const { data: link, error } = await db.auth.admin.generateLink({ type: "magiclink", email })
+    const otp = link?.properties?.email_otp
+    if (error || !otp) { console.error("[identify] generateLink (code)", error); return json({ error: "server" }, 500) }
+    code = otp
+    createdAt = now
+  }
+
+  const expires = new Date(createdAt + CODE_TTL_MS)
+  const ok = await sendMail([email], ...codeMail(code, expires, source, lang))
+  if (!ok) return json({ error: "send_failed" }, 502)
+  const { error: saveError } = await db.from(t("login_codes")).upsert({
+    email, code, created_at: new Date(createdAt).toISOString(), sent_at: new Date(now).toISOString(),
+  })
+  if (saveError) console.error("[identify] login_codes", saveError)
+  return json({ status: "code_sent", expiresAt: expires.toISOString(), reused: valid, mailed: true })
+}
+
+/** Objet et contenu du mail du code, selon l'interface (invitation : tutoiement) et la langue. */
+function codeMail(code: string, expires: Date, source: Source, lang: "fr" | "en"): [string, string] {
+  const until = expires.toLocaleTimeString(lang === "en" ? "en-GB" : "fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })
+  const big = `<div style="margin:18px 0;font-family:Georgia,serif;font-size:32px;letter-spacing:8px;color:#2b2420;">${code}</div>`
+  if (lang === "en") {
+    const what = source === "invitation" ? "your invitation" : "the photo gallery"
+    return [`Your sign-in code: ${code}`, mailLayout("Your sign-in code",
+      `Here is your code to access ${what}:${big}It is valid for 30 minutes (until ${until}, Paris time).<br><br>` +
+      `If you did not request it, you can ignore this email.`)]
+  }
+  if (source === "invitation") {
+    return [`Ton code de connexion : ${code}`, mailLayout("Ton code de connexion",
+      `Voici ton code pour accéder à ton invitation :${big}Il est valable 30 minutes (jusqu'à ${until}).<br><br>` +
+      `Si tu n'as rien demandé, ignore simplement ce message.`)]
+  }
+  return [`Votre code de connexion : ${code}`, mailLayout("Votre code de connexion",
+    `Voici votre code pour accéder à la galerie photos :${big}Il est valable 30 minutes (jusqu'à ${until}).<br><br>` +
+    `Si vous n'avez rien demandé, ignorez simplement ce message.`)]
 }
 
 /**

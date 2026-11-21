@@ -11,8 +11,8 @@ export interface Communication {
   targetProspectStatuses: string[] | null
 }
 
-/** Qui se charge de l'envoi. */
-export type CommSender = "sarah" | "jordan"
+/** Qui se charge de l'envoi : Jordan, Sarah, ou les deux ensemble (« à deux »). */
+export type CommSender = "jordan" | "sarah" | "both"
 
 /** Préparation de l'envoi d'une communication à un invité (migration 0184). */
 export interface CommunicationPrep {

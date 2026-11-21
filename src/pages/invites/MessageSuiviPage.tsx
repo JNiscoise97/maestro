@@ -40,7 +40,9 @@ import { cn } from "@/lib/utils"
 type SendFilter = "pending" | "sent"
 /** Filtre « qui envoie » de la liste. */
 type SenderFilter = "all" | CommSender | "none"
-const SENDERS: { id: CommSender; label: string }[] = [{ id: "jordan", label: "Jordan" }, { id: "sarah", label: "Sarah" }]
+const SENDERS: { id: CommSender; label: string }[] = [
+  { id: "jordan", label: "Jordan" }, { id: "sarah", label: "Sarah" }, { id: "both", label: "À deux" },
+]
 const senderLabel = (s: CommSender | null | undefined) => SENDERS.find((x) => x.id === s)?.label ?? null
 
 function isUnder18(g: Guest): boolean {
@@ -308,6 +310,7 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
     ready: pendingList.filter((g) => prep(g.id).ready).length,
     jordan: pendingList.filter((g) => prep(g.id).sender === "jordan").length,
     sarah: pendingList.filter((g) => prep(g.id).sender === "sarah").length,
+    both: pendingList.filter((g) => prep(g.id).sender === "both").length,
     none: pendingList.filter((g) => !prep(g.id).sender).length,
   }
 
@@ -389,6 +392,7 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
             ["all", "Tous"],
             ["jordan", `Jordan (${prepCounts.jordan})`],
             ["sarah", `Sarah (${prepCounts.sarah})`],
+            ["both", `À deux (${prepCounts.both})`],
             ["none", `Non attribués (${prepCounts.none})`],
           ] as [SenderFilter, string][]).map(([id, label]) => (
             <button key={id} type="button" role="radio" aria-checked={senderFilter === id} onClick={() => setSenderFilter(id)}
@@ -444,7 +448,7 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
                           <span title="Inséparable : prête et envoi appliqués aux deux"><Link2 className="size-3.5 text-muted-foreground shrink-0" aria-hidden /></span>
                         )}
                         {status.kind !== "pending" && senderLabel(p.sender) && (
-                          <span className="text-xs text-muted-foreground shrink-0">par {senderLabel(p.sender)}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">{p.sender === "both" ? "à deux" : `par ${senderLabel(p.sender)}`}</span>
                         )}
                       </div>
                       {status.kind === "pending" && (
@@ -456,7 +460,7 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
                             {p.ready ? <Check className="size-3.5" aria-hidden /> : <Circle className="size-3" aria-hidden />}
                             {p.ready ? "Prête" : "Pas prête"}
                           </button>
-                          {/* Qui envoie : Jordan ou Sarah (un second clic retire l'attribution). */}
+                          {/* Qui envoie : Jordan, Sarah ou à deux (un second clic retire l'attribution). */}
                           <div className="inline-flex h-7 overflow-hidden rounded-full border text-xs" role="radiogroup" aria-label={`Qui envoie à ${g.fullName}`}>
                             {SENDERS.map((s) => (
                               <button key={s.id} type="button" role="radio" aria-checked={p.sender === s.id}

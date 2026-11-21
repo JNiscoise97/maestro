@@ -11,6 +11,16 @@ export interface Communication {
   targetProspectStatuses: string[] | null
 }
 
+/** Qui se charge de l'envoi. */
+export type CommSender = "sarah" | "jordan"
+
+/** Préparation de l'envoi d'une communication à un invité (migration 0184). */
+export interface CommunicationPrep {
+  guestId: string
+  ready: boolean
+  sender: CommSender | null
+}
+
 export interface CommunicationSend {
   id: string
   communicationId: string
@@ -110,6 +120,29 @@ export const communicationsService = {
       .from(tbl("communication_sends") as any)
       .delete()
       .eq("id", id)
+    if (error) throw error
+  },
+
+  async listPrep(communicationId: string): Promise<CommunicationPrep[]> {
+    if (!USE_SUPABASE) return []
+    const { data, error } = await supabase!
+      .from(tbl("communication_prep") as any)
+      .select("guest_id, ready, sender")
+      .eq("communication_id", communicationId)
+    if (error) throw error
+    return ((data ?? []) as unknown as { guest_id: string; ready: boolean; sender: CommSender | null }[])
+      .map((r) => ({ guestId: r.guest_id, ready: r.ready, sender: r.sender }))
+  },
+
+  /** Enregistre la préparation de plusieurs invités (un invité et son inséparable) : valeurs complètes. */
+  async savePrep(communicationId: string, rows: CommunicationPrep[]): Promise<void> {
+    if (!rows.length) return
+    const { error } = await supabase!
+      .from(tbl("communication_prep") as any)
+      .upsert(rows.map((r) => ({
+        communication_id: communicationId, guest_id: r.guestId, ready: r.ready, sender: r.sender,
+        updated_at: new Date().toISOString(),
+      })), { onConflict: "communication_id,guest_id" })
     if (error) throw error
   },
 

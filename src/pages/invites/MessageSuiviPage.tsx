@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { CheckCircle2, Circle, GripVertical, Link2, MessageSquare, Pencil, Plus, Trash2 } from "lucide-react"
+import { Check, CheckCircle2, Circle, GripVertical, Link2, MessageSquare, Pencil, Plus, Trash2 } from "lucide-react"
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core"
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
@@ -21,20 +21,27 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  useCommunicationPrep,
   useCommunicationSends,
   useCommunications,
   useCreateCommunication,
   useDeleteCommunication,
   useMarkCommunicationSent,
   useReorderCommunications,
+  useSaveCommunicationPrep,
   useUnmarkCommunicationSent,
   useUpdateCommunication,
 } from "@/hooks/queries/use-communications"
 import { useGuestGroups, useGuests } from "@/hooks/queries/use-guests"
 import type { GuestGroup } from "@/types/domain"
-import type { Communication } from "@/services/supabase/communications"
+import type { CommSender, Communication, CommunicationPrep } from "@/services/supabase/communications"
+import { cn } from "@/lib/utils"
 
 type SendFilter = "pending" | "sent"
+/** Filtre « qui envoie » de la liste. */
+type SenderFilter = "all" | CommSender | "none"
+const SENDERS: { id: CommSender; label: string }[] = [{ id: "jordan", label: "Jordan" }, { id: "sarah", label: "Sarah" }]
+const senderLabel = (s: CommSender | null | undefined) => SENDERS.find((x) => x.id === s)?.label ?? null
 
 function isUnder18(g: Guest): boolean {
   if (g.isChild) return true
@@ -226,7 +233,19 @@ type GuestStatus =
 
 function CommTracking({ comm, guests, groups }: { comm: Communication; guests: Guest[]; groups: GuestGroup[] }) {
   const [filter, setFilter] = useState<SendFilter>("pending")
+  const [senderFilter, setSenderFilter] = useState<SenderFilter>("all")
+  const [readyOnly, setReadyOnly] = useState(false)
   const { data: sends = [], isLoading } = useCommunicationSends(comm.id)
+  const { data: prepRows = [] } = useCommunicationPrep(comm.id)
+  const savePrep = useSaveCommunicationPrep(comm.id)
+  const prepOf = useMemo(() => new Map(prepRows.map((r) => [r.guestId, r])), [prepRows])
+  const prep = (id: string): CommunicationPrep => prepOf.get(id) ?? { guestId: id, ready: false, sender: null }
+
+  /** Modifie la préparation d'un invité et de son inséparable (mêmes valeurs pour les deux). */
+  function setPrep(g: Guest, change: Partial<Pick<CommunicationPrep, "ready" | "sender">>) {
+    const ids = [g.id, ...(g.pairedWithId ? [g.pairedWithId] : [])]
+    savePrep.mutate(ids.map((id) => ({ ...prep(id), ...change, guestId: id })))
+  }
   const markSent = useMarkCommunicationSent(comm.id)
   const unmark = useUnmarkCommunicationSent(comm.id)
 
@@ -278,7 +297,19 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
   const sentList = useMemo(() => eligible.filter((g) => statusOf.get(g.id)?.kind !== "pending"), [eligible, statusOf])
   const pendingList = useMemo(() => eligible.filter((g) => statusOf.get(g.id)?.kind === "pending"), [eligible, statusOf])
   const progress = eligible.length > 0 ? Math.round((sentList.length / eligible.length) * 100) : 0
-  const displayed = filter === "pending" ? pendingList : sentList
+  const byTab = filter === "pending" ? pendingList : sentList
+  const displayed = byTab.filter((g) => {
+    const p = prep(g.id)
+    if (senderFilter !== "all" && (senderFilter === "none" ? p.sender !== null : p.sender !== senderFilter)) return false
+    return !readyOnly || p.ready
+  })
+  // Compteurs de la préparation (invités restant à envoyer).
+  const prepCounts = {
+    ready: pendingList.filter((g) => prep(g.id).ready).length,
+    jordan: pendingList.filter((g) => prep(g.id).sender === "jordan").length,
+    sarah: pendingList.filter((g) => prep(g.id).sender === "sarah").length,
+    none: pendingList.filter((g) => !prep(g.id).sender).length,
+  }
 
   // Regrouper par famille, triée par sortOrder
   const groupsById = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups])
@@ -351,11 +382,34 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
         </TabsList>
       </Tabs>
 
+      {/* Préparation : qui envoie, invitations prêtes. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Qui envoie">
+          {([
+            ["all", "Tous"],
+            ["jordan", `Jordan (${prepCounts.jordan})`],
+            ["sarah", `Sarah (${prepCounts.sarah})`],
+            ["none", `Non attribués (${prepCounts.none})`],
+          ] as [SenderFilter, string][]).map(([id, label]) => (
+            <button key={id} type="button" role="radio" aria-checked={senderFilter === id} onClick={() => setSenderFilter(id)}
+              className={cn("rounded-full border px-3 py-1 text-xs transition-colors",
+                senderFilter === id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card hover:border-foreground/30")}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <label className="flex cursor-pointer items-center gap-2 text-xs">
+          <Checkbox checked={readyOnly} onCheckedChange={(v) => setReadyOnly(v === true)} />
+          Prêtes seulement ({prepCounts.ready}/{pendingList.length} à envoyer)
+        </label>
+      </div>
+
       {isLoading ? (
         <Skeleton className="h-40 rounded-2xl" />
       ) : displayed.length === 0 ? (
         <p className="text-sm text-center text-muted-foreground py-10">
-          {filter === "pending" ? "Tous les envois sont faits ✓" : "Aucun envoi enregistré pour l'instant"}
+          {byTab.length > 0 ? "Aucun invité pour ce filtre"
+            : filter === "pending" ? "Tous les envois sont faits ✓" : "Aucun envoi enregistré pour l'instant"}
         </p>
       ) : (
         <div className="space-y-3">
@@ -369,9 +423,10 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
               <div className="divide-y bg-card">
                 {groupGuests.map((g) => {
                   const status = statusOf.get(g.id)!
+                  const p = prep(g.id)
                   return (
-                    <div key={g.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                      <div className="flex items-center gap-2 min-w-0">
+                    <div key={g.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
                         {status.kind === "direct" ? (
                           <CheckCircle2 className="size-4 text-green-500 shrink-0" />
                         ) : status.kind === "via_partner" ? (
@@ -385,7 +440,35 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
                             via {status.partnerName}
                           </span>
                         )}
+                        {g.pairedWithId && status.kind === "pending" && (
+                          <span title="Inséparable : prête et envoi appliqués aux deux"><Link2 className="size-3.5 text-muted-foreground shrink-0" aria-hidden /></span>
+                        )}
+                        {status.kind !== "pending" && senderLabel(p.sender) && (
+                          <span className="text-xs text-muted-foreground shrink-0">par {senderLabel(p.sender)}</span>
+                        )}
                       </div>
+                      {status.kind === "pending" && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* Invitation prête à être envoyée (cochée à la main). */}
+                          <button type="button" onClick={() => setPrep(g, { ready: !p.ready })} aria-pressed={p.ready}
+                            className={cn("inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs transition-colors",
+                              p.ready ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-border text-muted-foreground hover:border-foreground/30")}>
+                            {p.ready ? <Check className="size-3.5" aria-hidden /> : <Circle className="size-3" aria-hidden />}
+                            {p.ready ? "Prête" : "Pas prête"}
+                          </button>
+                          {/* Qui envoie : Jordan ou Sarah (un second clic retire l'attribution). */}
+                          <div className="inline-flex h-7 overflow-hidden rounded-full border text-xs" role="radiogroup" aria-label={`Qui envoie à ${g.fullName}`}>
+                            {SENDERS.map((s) => (
+                              <button key={s.id} type="button" role="radio" aria-checked={p.sender === s.id}
+                                onClick={() => setPrep(g, { sender: p.sender === s.id ? null : s.id })}
+                                className={cn("px-2.5 transition-colors",
+                                  p.sender === s.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}>
+                                {s.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {status.kind === "direct" ? (
                         <Button
                           variant="ghost"

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { communicationsService } from "@/services/supabase/communications"
+import { communicationsService, type CommunicationPrep } from "@/services/supabase/communications"
 
 const COMM_KEY = ["communications"] as const
 
@@ -64,6 +64,37 @@ export function useUnmarkCommunicationSent(commId: string) {
   return useMutation({
     mutationFn: (sendId: string) => communicationsService.unmarkSent(sendId),
     onSuccess: () => qc.invalidateQueries({ queryKey: sendsKey(commId) }),
+  })
+}
+
+function prepKey(commId: string) {
+  return ["communication-prep", commId] as const
+}
+
+/** Préparation de l'envoi (prête, qui envoie) pour une communication. */
+export function useCommunicationPrep(commId: string | null) {
+  return useQuery({
+    queryKey: prepKey(commId ?? ""),
+    queryFn: () => communicationsService.listPrep(commId!),
+    enabled: !!commId,
+  })
+}
+
+/** Enregistre la préparation (mise à jour immédiate de l'écran, annulée en cas d'erreur). */
+export function useSaveCommunicationPrep(commId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (rows: CommunicationPrep[]) => communicationsService.savePrep(commId, rows),
+    onMutate: async (rows) => {
+      await qc.cancelQueries({ queryKey: prepKey(commId) })
+      const previous = qc.getQueryData<CommunicationPrep[]>(prepKey(commId))
+      const byId = new Map((previous ?? []).map((r) => [r.guestId, r]))
+      for (const r of rows) byId.set(r.guestId, r)
+      qc.setQueryData(prepKey(commId), [...byId.values()])
+      return { previous }
+    },
+    onError: (_e, _rows, ctx) => { if (ctx?.previous) qc.setQueryData(prepKey(commId), ctx.previous) },
+    onSettled: () => qc.invalidateQueries({ queryKey: prepKey(commId) }),
   })
 }
 

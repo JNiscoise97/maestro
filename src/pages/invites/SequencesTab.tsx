@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
-import { ChevronDown, Search, X } from "lucide-react"
+import { ChevronDown, Link2, Search, Unlink, X } from "lucide-react"
 
 import type { EventSequence, Guest, GuestGroup, ProspectStatus } from "@/types/domain"
 import { groupLabel } from "@/lib/groups"
@@ -31,6 +31,10 @@ function IndeterminateCheckbox({
   )
 }
 
+/** Couples d'inséparables dissociés dans cet onglet (stockage de l'appareil). */
+const SPLIT_KEY = "sj-sequences-inseparables-dissocies"
+const pairKey = (a: string, b: string) => [a, b].sort().join(":")
+
 // ── Onglet principal ───────────────────────────────────────────────────────────
 
 export function SequencesTab() {
@@ -49,6 +53,16 @@ export function SequencesTab() {
 
   // Séquence active (vue mobile)
   const [mobileSeqId, setMobileSeqId] = useState<string | null>(null)
+
+  // Inséparables dissociés (une ligne et des cases par personne), mémorisés sur l'appareil.
+  // Un couple dont les séquences diffèrent est de toute façon affiché séparé (cases fiables).
+  const [splitKeys, setSplitKeys] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(SPLIT_KEY) ?? "[]") as string[]) } catch { return new Set() }
+  })
+  const saveSplit = (next: Set<string>) => {
+    setSplitKeys(next)
+    try { localStorage.setItem(SPLIT_KEY, JSON.stringify([...next])) } catch { /* stockage indisponible */ }
+  }
 
   const isLoading = lSeq || lGuests || lGroups || lAssign
 
@@ -131,18 +145,57 @@ export function SequencesTab() {
   }, [allFilteredGuests])
 
   // Helpers
+  const sameSequences = (a: string, b: string) => {
+    const x = assignedByGuest[a] ?? [], y = assignedByGuest[b] ?? []
+    return x.length === y.length && x.every((id) => y.includes(id))
+  }
+  /** Couple affiché séparément : dissocié à la main, ou séquences différentes. */
+  function isSplit(guest: Guest): boolean {
+    if (!guest.pairedWithId || !guestById.has(guest.pairedWithId)) return false
+    return splitKeys.has(pairKey(guest.id, guest.pairedWithId)) || !sameSequences(guest.id, guest.pairedWithId)
+  }
+  function splitPair(guest: Guest) {
+    if (!guest.pairedWithId) return
+    saveSplit(new Set(splitKeys).add(pairKey(guest.id, guest.pairedWithId)))
+  }
+  /** Réassocier : seulement si les deux ont les mêmes séquences (sinon une case ne dirait pas la vérité). */
+  function joinPair(guest: Guest) {
+    if (!guest.pairedWithId) return
+    const next = new Set(splitKeys); next.delete(pairKey(guest.id, guest.pairedWithId)); saveSplit(next)
+  }
+  /** Contrôle du couple affiché sur la ligne : dissocier (ligne commune) ou réassocier (ligne séparée). */
+  function pairControl(guest: Guest, partners: Guest[]): React.ReactNode {
+    if (partners.length > 0) return (
+      <button type="button" onClick={(e) => { e.preventDefault(); splitPair(guest) }}
+        title="Dissocier : une ligne et des cases par personne"
+        className="inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-foreground/30 hover:text-foreground">
+        <Unlink className="size-3" aria-hidden />Dissocier
+      </button>
+    )
+    const partner = guest.pairedWithId ? guestById.get(guest.pairedWithId) : undefined
+    if (!partner || !isSplit(guest)) return null
+    const canJoin = sameSequences(guest.id, partner.id)
+    return (
+      <button type="button" disabled={!canJoin} onClick={(e) => { e.preventDefault(); joinPair(guest) }}
+        title={canJoin ? `Réassocier avec ${partner.fullName}` : `Inséparable de ${partner.fullName}, avec des séquences différentes`}
+        className="inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed px-1.5 py-0.5 text-[10px] text-muted-foreground enabled:hover:border-foreground/30 enabled:hover:text-foreground disabled:cursor-default">
+        <Link2 className="size-3" aria-hidden />{canJoin ? "Réassocier" : `séparé de ${partner.firstName}`}
+      </button>
+    )
+  }
+
   function dedupedGuests(list: Guest[]): Guest[] {
     const ids = new Set(list.map((g) => g.id)); const seen = new Set<string>()
     return list.filter((g) => {
       if (seen.has(g.id)) return false
       seen.add(g.id)
-      if (g.pairedWithId && ids.has(g.pairedWithId)) seen.add(g.pairedWithId)
+      if (g.pairedWithId && ids.has(g.pairedWithId) && !isSplit(g)) seen.add(g.pairedWithId)
       return true
     })
   }
 
   function partnersIn(guest: Guest, list: Guest[]): Guest[] {
-    if (!guest.pairedWithId) return []
+    if (!guest.pairedWithId || isSplit(guest)) return []
     const partner = guestById.get(guest.pairedWithId)
     if (!partner) return []
     const ids = new Set(list.map((g) => g.id))
@@ -153,7 +206,8 @@ export function SequencesTab() {
     const doAssign = !assignedPairs.has(`${guestId}:${seqId}`)
     const guest    = guestById.get(guestId)
     const targets  = [guestId]
-    if (guest?.pairedWithId && guestById.has(guest.pairedWithId)) targets.push(guest.pairedWithId)
+    // Couple réuni sur une ligne : la case vaut pour les deux ; dissocié : pour cette personne seulement.
+    if (guest?.pairedWithId && guestById.has(guest.pairedWithId) && !isSplit(guest)) targets.push(guest.pairedWithId)
     for (const id of targets) {
       if (doAssign) assign.mutate({ guestId: id, sequenceId: seqId })
       else          unassign.mutate({ guestId: id, sequenceId: seqId })
@@ -358,6 +412,7 @@ export function SequencesTab() {
                           </span>
                         ))}
                         {absent && <span className="text-[10px] rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 px-1.5 py-0.5 font-medium">~absent</span>}
+                        {pairControl(guest, partners)}
                       </span>
                       <input
                         type="checkbox"
@@ -400,6 +455,7 @@ export function SequencesTab() {
                           </span>
                         ))}
                         {absent && <span className="text-[10px] rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 px-1.5 py-0.5 font-medium">~absent</span>}
+                        {pairControl(guest, partners)}
                       </span>
                       <input type="checkbox" checked={checked} onChange={() => toggleGuest(guest.id, mobileSeqId)}
                         className="size-5 cursor-pointer rounded border-border accent-primary flex-shrink-0" />
@@ -457,6 +513,7 @@ export function SequencesTab() {
                   sequences={sorted}
                   assignedPairs={assignedPairs}
                   partnersOf={(g) => partnersIn(g, filtered)}
+                  pairControlOf={(g) => pairControl(g, partnersIn(g, filtered))}
                   onToggleGuest={toggleGuest}
                   onToggleGroup={toggleGroup}
                 />
@@ -479,7 +536,8 @@ export function SequencesTab() {
                   </tr>
                   {deduped.map((guest) => (
                     <DesktopGuestRow key={guest.id} guest={guest} partners={partnersIn(guest, filtered)}
-                      sequences={sorted} assignedPairs={assignedPairs} onToggle={toggleGuest} />
+                      sequences={sorted} assignedPairs={assignedPairs} onToggle={toggleGuest}
+                      pairControl={pairControl(guest, partnersIn(guest, filtered))} />
                   ))}
                 </>
               )
@@ -547,10 +605,11 @@ function DesktopGroupCell({ guests, seqId, assignedPairs, onToggleGroup }: {
   )
 }
 
-function DesktopGroupRows({ group, allGroups, rawGuests, dedupedGuests, sequences, assignedPairs, partnersOf, onToggleGuest, onToggleGroup }: {
+function DesktopGroupRows({ group, allGroups, rawGuests, dedupedGuests, sequences, assignedPairs, partnersOf, pairControlOf, onToggleGuest, onToggleGroup }: {
   group: GuestGroup; allGroups: GuestGroup[]; rawGuests: Guest[]; dedupedGuests: Guest[]
   sequences: EventSequence[]; assignedPairs: Set<string>
   partnersOf: (g: Guest) => Guest[]
+  pairControlOf: (g: Guest) => React.ReactNode
   onToggleGuest: (id: string, seqId: string) => void
   onToggleGroup: (guests: Guest[], seqId: string) => void
 }) {
@@ -566,15 +625,17 @@ function DesktopGroupRows({ group, allGroups, rawGuests, dedupedGuests, sequence
       </tr>
       {dedupedGuests.map((guest) => (
         <DesktopGuestRow key={guest.id} guest={guest} partners={partnersOf(guest)}
-          sequences={sequences} assignedPairs={assignedPairs} onToggle={onToggleGuest} />
+          sequences={sequences} assignedPairs={assignedPairs} onToggle={onToggleGuest} pairControl={pairControlOf(guest)} />
       ))}
     </>
   )
 }
 
-function DesktopGuestRow({ guest, partners, sequences, assignedPairs, onToggle }: {
+function DesktopGuestRow({ guest, partners, sequences, assignedPairs, onToggle, pairControl }: {
   guest: Guest; partners: Guest[]; sequences: EventSequence[]
   assignedPairs: Set<string>; onToggle: (id: string, seqId: string) => void
+  /** Dissocier / réassocier le couple d'inséparables. */
+  pairControl?: React.ReactNode
 }) {
   const absent = guest.likelyAbsent || partners.some((p) => p.likelyAbsent)
   const nameNodes = [guest, ...partners].map((g, i) => (
@@ -591,6 +652,7 @@ function DesktopGuestRow({ guest, partners, sequences, assignedPairs, onToggle }
         <span className="flex items-center gap-1.5">
           {nameNodes}
           {absent && <span className="text-[10px] rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 px-1.5 py-0.5 font-medium shrink-0">~absent</span>}
+          {pairControl}
         </span>
       </td>
       {sequences.map((seq) => (

@@ -429,8 +429,10 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
                   const status = statusOf.get(g.id)!
                   const p = prep(g.id)
                   return (
-                    <div key={g.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                    // Téléphone : nom complet sur une ligne, actions (prête, qui envoie, envoyé) sur la suivante.
+                    // À partir de 640 px : tout sur une ligne, nom tronqué si besoin.
+                    <div key={g.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 sm:min-w-0 sm:flex-1 sm:flex-nowrap">
                         {status.kind === "direct" ? (
                           <CheckCircle2 className="size-4 text-green-500 shrink-0" />
                         ) : status.kind === "via_partner" ? (
@@ -438,7 +440,7 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
                         ) : (
                           <Circle className="size-4 text-muted-foreground shrink-0" />
                         )}
-                        <span className="text-sm truncate">{g.fullName}</span>
+                        <span className="text-sm sm:truncate">{g.fullName}</span>
                         {status.kind === "via_partner" && (
                           <span className="text-xs text-muted-foreground shrink-0">
                             via {status.partnerName}
@@ -451,8 +453,9 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
                           <span className="text-xs text-muted-foreground shrink-0">{p.sender === "both" ? "à deux" : `par ${senderLabel(p.sender)}`}</span>
                         )}
                       </div>
+                      <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                       {status.kind === "pending" && (
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-2">
                           {/* Invitation prête à être envoyée (cochée à la main). */}
                           <button type="button" onClick={() => setPrep(g, { ready: !p.ready })} aria-pressed={p.ready}
                             className={cn("inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs transition-colors",
@@ -493,6 +496,7 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
                           Envoyé ✓
                         </Button>
                       ) : null}
+                      </div>
                     </div>
                   )
                 })}

@@ -228,6 +228,19 @@ export const rsvpService = {
     return rows[0] ? rowToRsvp(rows[0]) : null
   },
 
+  /** Remplace les personnes d'une réponse (ex. rattachement manuel d'une personne à un invité de la liste). */
+  async updateParty(id: string, party: PartyMember[]): Promise<void> {
+    if (USE_SUPABASE) {
+      const { error } = await (supabase! as any)
+        .from(tbl("rsvp_responses") as any)
+        .update({ party })
+        .eq("id", id)
+      if (error) throw error
+      return
+    }
+    await mockRsvp.update(id, { party })
+  },
+
   async list(): Promise<RsvpResponse[]> {
     if (USE_SUPABASE) {
       const { data, error } = await (supabase! as any)

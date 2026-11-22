@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { ExternalLink, FlaskConical, Search } from "lucide-react"
+import { ExternalLink, FlaskConical, Link2, Search, UserX } from "lucide-react"
 
 import type { Guest, GuestGroup, ProspectStatus } from "@/types/domain"
 import type { MomentAnswer, PartyMember, RsvpResponse } from "@/services/rsvp.service"
@@ -9,7 +9,7 @@ import { buildGuestTree, type GuestTreeNode } from "@/components/invites/GuestTr
 import { MAILED_STATUSES, defaultInvitationName, effectiveProspect } from "@/lib/invitations"
 import { useEventSequences } from "@/hooks/queries/use-event-sequences"
 import { useGuestSequences } from "@/hooks/queries/use-guest-sequences"
-import { useRsvpResponses } from "@/hooks/queries/use-rsvp"
+import { useLinkPartyMember, useRsvpResponses } from "@/hooks/queries/use-rsvp"
 import { groupLabel } from "@/lib/groups"
 import { PROSPECT_LISTS, guestList } from "@/lib/prospect"
 import { sequenceColor } from "@/lib/sequence-colors"
@@ -243,6 +243,15 @@ export function InvitationEnLigneTab() {
     [invited, coverage],
   )
 
+  // Personnes déclarées dans une réponse mais introuvables dans la liste (nom saisi librement, homonymes…) :
+  // à rattacher à la main. La personne qui répond, si son compte est relié à un invité, n'en fait pas partie.
+  const outsiders = useMemo(() => responses
+    .filter((r) => r.wave === "invitation" && r.party?.length)
+    .flatMap((r) => r.party!.map((m, index) => ({ r, m, index })))
+    .filter(({ r, m, index }) => !(index === 0 && r.guestId && guestById.has(r.guestId)) && !memberGuestId(m))
+    .sort((a, b) => b.r.createdAt.localeCompare(a.r.createdAt)),
+  [responses, guestById, memberGuestId])
+
   const unlinked = useMemo(
     () => invitationResponses.filter((r) => !r.guestId || !guestById.has(r.guestId)),
     [invitationResponses, guestById],
@@ -470,6 +479,25 @@ export function InvitationEnLigneTab() {
         </div>
       </section>
 
+      {/* Personnes hors liste : rattachement manuel à un invité */}
+      {outsiders.length > 0 && (
+        <section className="space-y-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Personnes hors liste ({outsiders.length})
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Personnes déclarées dans une réponse sans correspondance dans la liste (nom saisi autrement, homonyme…).
+            Rattache-les à un invité pour qu'elles comptent dans le suivi et les statistiques.
+          </p>
+          <div className="divide-y rounded-xl border">
+            {outsiders.map(({ r, m, index }) => (
+              <OutsiderRow key={`${r.id}-${index}`} response={r} member={m} index={index} guests={guests}
+                responderName={(r.guestId && guestById.get(r.guestId)?.fullName) || r.name} momentName={momentName} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Réponses non rattachées */}
       {unlinked.length > 0 && (
         <section className="space-y-3">
@@ -492,6 +520,68 @@ export function InvitationEnLigneTab() {
           </div>
         </section>
       )}
+    </div>
+  )
+}
+
+// ── Personne hors liste ───────────────────────────────────────────────────────
+
+/** Une personne hors liste : son contexte (réponse, moments) et la recherche d'un invité auquel la rattacher. */
+function OutsiderRow({ response: r, member: m, index, guests, responderName, momentName }: {
+  response: RsvpResponse; member: PartyMember; index: number; guests: Guest[]; responderName: string
+  momentName: (id: string) => string
+}) {
+  const link = useLinkPartyMember()
+  const [query, setQuery] = useState("")
+  const name = `${m.firstName} ${m.lastName}`.trim() || "Sans nom"
+  const answers = Object.entries(m.moments ?? {})
+  // Suggestions : la recherche saisie, sinon les invités au même nom ou prénom.
+  const suggestions = useMemo(() => {
+    const q = normalize(query)
+    const score = (g: Guest) => {
+      if (q) return normalize(`${g.firstName}${g.lastName}${g.fullName}`).includes(q) ? 1 : 0
+      return (normalize(g.lastName) === normalize(m.lastName) ? 2 : 0) + (normalize(g.firstName) === normalize(m.firstName) ? 1 : 0)
+    }
+    return guests.map((g) => ({ g, s: score(g) })).filter((x) => x.s > 0)
+      .sort((a, b) => b.s - a.s || a.g.lastName.localeCompare(b.g.lastName, "fr")).slice(0, 6).map((x) => x.g)
+  }, [guests, query, m.firstName, m.lastName])
+
+  function attach(g: Guest) {
+    link.mutate({ responseId: r.id, party: r.party ?? [], index, guestId: g.id }, {
+      onSuccess: () => toast.success(`${name} rattaché(e) à ${g.fullName}`),
+      onError: () => toast.error("Le rattachement a échoué. Réessaie dans un instant."),
+    })
+  }
+
+  return (
+    <div className="space-y-2 p-3 text-sm">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <UserX className="size-3.5 shrink-0 self-center text-amber-600" aria-hidden />
+        <span className="font-medium">{name}</span>
+        {m.under10 && <span className="text-xs text-muted-foreground">moins de 10 ans</span>}
+        <span className="text-xs text-muted-foreground">
+          {index === 0 ? "a répondu" : `dans la réponse de ${responderName}`} · {formatDate(r.createdAt)}
+        </span>
+      </div>
+      {answers.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {answers.map(([id, a]) => `${momentName(id)} ${ANSWER_MARK[a]}`).join(" · ")}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-48 flex-1 sm:max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher l'invité…"
+            className="h-8 pl-8 text-sm" aria-label={`Invité à rattacher à ${name}`} />
+        </div>
+        {suggestions.map((g) => (
+          <button key={g.id} type="button" disabled={link.isPending} onClick={() => attach(g)}
+            className="inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-xs transition-colors hover:border-primary hover:bg-primary/5 disabled:opacity-50">
+            <Link2 className="size-3" aria-hidden />{g.fullName}
+          </button>
+        ))}
+        {query && suggestions.length === 0 && <span className="text-xs text-muted-foreground">Aucun invité trouvé.</span>}
+      </div>
     </div>
   )
 }

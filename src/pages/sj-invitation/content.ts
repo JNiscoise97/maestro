@@ -30,6 +30,18 @@ export const INVITATION = {
   date: "qui sera célébré le lundi 28 juin 2027 à Montpellier.",
   /** Explique pourquoi les festivités durent quatre jours et pourquoi chacun n'est pas convié à tout. */
   context: "Les festivités se dérouleront en plusieurs temps (civils, religieux et conviviaux) du vendredi 25 au lundi 28 juin 2027. Les lieux ne pouvant pas tous accueillir l'ensemble des invités, tu es convié à une partie de ces moments.",
+  /** Sous le texte ci-dessus : présentation des onglets (beaucoup d'invités lisent sur téléphone et ne voient pas le menu). */
+  guide: {
+    intro: "Pour tout savoir, parcours les onglets du menu en haut de la page :",
+    tabs: {
+      mot: "quelques mots de notre part",
+      programme: "les moments auxquels tu es convié, avec les horaires",
+      pratique: "les lieux, comment venir et où se loger",
+      ambiance: "notre musique et comment s'habiller",
+      questions: "les réponses à tes questions",
+      reponse: "pour nous dire si tu seras des nôtres",
+    },
+  },
 }
 
 // ── 2. Un mot de nous ─────────────────────────────────────────────────────────

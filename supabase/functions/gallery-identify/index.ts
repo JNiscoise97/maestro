@@ -190,9 +190,9 @@ Deno.serve(async (req) => {
   // Adresse inconnue : il faut le prénom et le nom.
   if (!firstName || !lastName) return json({ status: "need_name" })
 
-  // 4. Rapprochement avec la liste des invités des fiançailles (correspondance unique exigée).
-  // Liste complète (quelques centaines de lignes) : la comparaison ignore accents et casse.
-  // Puis, à défaut, avec celle du mariage (mêmes identifiants pour les invités repris des fiançailles).
+  // 4. Rapprochement avec la liste des invités (correspondance unique exigée), sans accents ni casse.
+  //    Invitation : liste du mariage uniquement. Galerie : fiançailles, puis à défaut mariage
+  //    (mêmes identifiants pour les invités repris des fiançailles).
   const wantedFirst = normalizeName(firstName)
   const wantedLast = normalizeName(lastName)
   const findIn = async (table: string) => {
@@ -202,8 +202,8 @@ Deno.serve(async (req) => {
       && normalizeName(g.first_name ?? "") === wantedFirst
       && normalizeName(g.last_name ?? "") === wantedLast) as { id: string }[]
   }
-  let matches = await findIn("_20260725_guests")
-  if (matches.length === 0) matches = await findIn("_20270628_guests")
+  let matches = await findIn(source === "invitation" ? "_20270628_guests" : "_20260725_guests")
+  if (matches.length === 0 && source !== "invitation") matches = await findIn("_20270628_guests")
   const matched = matches.length === 1 ? matches[0] : null
 
   const { data: settings } = await db.from(t("settings")).select("auto_link_known_names").eq("id", 1).single()

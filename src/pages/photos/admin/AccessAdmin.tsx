@@ -11,7 +11,7 @@ import {
 } from "@/features/gallery/api"
 import { SearchableSelect } from "@/components/shared/SearchableSelect"
 import { GalleryError } from "@/features/gallery/client"
-import { useFiancaillesGuests, type FiancaillesGuest } from "@/features/gallery/guests"
+import { useFiancaillesGuests, type FiancaillesGuest, type GuestListEvent } from "@/features/gallery/guests"
 import type { AccessRequest, GalleryMember } from "@/features/gallery/types"
 import { AdminNavContext } from "@/context/GalleryAdminNavContext"
 import { memberName } from "./format"
@@ -41,6 +41,8 @@ export function AccessAdmin({ scope = "photos" }: { scope?: AccessRequest["sourc
   // Absent hors de l'administration de la galerie (ex. administration de l'invitation).
   const nav = useContext(AdminNavContext)
   const galleryScope = scope === "photos"
+  // Invités proposés au rattachement : liste du mariage pour l'invitation, des fiançailles pour la galerie.
+  const guestEvent: GuestListEvent = galleryScope ? "fiancailles" : "mariage"
   const update = useAdminUpdate("members")
   const [filter, setFilter] = useState("")
   const pending = requests.filter((r) => r.status === "pending")
@@ -67,7 +69,7 @@ export function AccessAdmin({ scope = "photos" }: { scope?: AccessRequest["sourc
             <ul className="divide-y divide-border">
               {pending.map((r) => (
                 <PendingRequest key={r.id} request={r} busy={action.isPending}
-                  takenGuestIds={takenGuestIds}
+                  takenGuestIds={takenGuestIds} guestEvent={guestEvent}
                   onApprove={(guestId) => run({ action: "approve_request", requestId: r.id, guestId },
                     guestId ? "Accès ouvert et lié à l'invité, la personne est prévenue." : "Accès ouvert (nouvelle personne), la personne est prévenue.")}
                   onReject={() => run({ action: "reject_request", requestId: r.id }, "Demande refusée.")} />
@@ -110,7 +112,7 @@ export function AccessAdmin({ scope = "photos" }: { scope?: AccessRequest["sourc
                   </td>
                   <td className="pr-2">
                     {m.role === "admin" ? <span className="text-xs text-muted-foreground">—</span> : (
-                      <GuestLinkSelect member={m} takenGuestIds={takenGuestIds}
+                      <GuestLinkSelect member={m} takenGuestIds={takenGuestIds} guestEvent={guestEvent}
                         onChange={(guestId) => update.mutate({ match: { id: m.id }, patch: { guest_id: guestId } }, {
                           onSuccess: () => toast.success(guestId ? "Compte lié à l'invité." : "Compte détaché : personne hors liste."),
                           onError: () => toast.error("Lien non enregistré."),
@@ -170,14 +172,15 @@ export function AccessAdmin({ scope = "photos" }: { scope?: AccessRequest["sourc
  * Liée à un invité, la personne passe dans la colonne « Accès » du kanban de la page Album à la place
  * de cet invité ; sinon une nouvelle carte y est ajoutée.
  */
-function PendingRequest({ request: r, busy, takenGuestIds, onApprove, onReject }: {
+function PendingRequest({ request: r, busy, takenGuestIds, guestEvent, onApprove, onReject }: {
+  guestEvent: GuestListEvent
   request: AccessRequest
   busy: boolean
   takenGuestIds: Set<string>
   onApprove: (guestId: string | null) => void
   onReject: () => void
 }) {
-  const { data: guests = [] } = useFiancaillesGuests()
+  const { data: guests = [] } = useFiancaillesGuests(guestEvent)
   const [choice, setChoice] = useState<string>(r.matched_guest_id ?? NEW_PERSON)
   const free = guests.filter((g) => !takenGuestIds.has(g.id) || g.id === r.matched_guest_id)
   return (
@@ -210,12 +213,13 @@ const NEW_PERSON = "__nouvelle_personne__"
  * Invité lié à un compte : modifiable après coup (ex. demande autorisée trop vite en « nouvelle
  * personne » alors qu'elle était invitée). Le kanban de la page Album suit automatiquement.
  */
-function GuestLinkSelect({ member, takenGuestIds, onChange }: {
+function GuestLinkSelect({ member, takenGuestIds, guestEvent, onChange }: {
+  guestEvent: GuestListEvent
   member: GalleryMember
   takenGuestIds: Set<string>
   onChange: (guestId: string | null) => void
 }) {
-  const { data: guests = [] } = useFiancaillesGuests()
+  const { data: guests = [] } = useFiancaillesGuests(guestEvent)
   const free = guests.filter((g) => !takenGuestIds.has(g.id) || g.id === member.guest_id)
   return (
     <SearchableSelect className="max-w-60" value={member.guest_id ?? NEW_PERSON} clearable={false}

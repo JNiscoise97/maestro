@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
-import { Check, ChevronDown, CircleHelp, Download, Lock, LockOpen, MapPin, Pause, Pencil, Play, TriangleAlert, X } from "lucide-react"
+import { CalendarDays, Check, ChevronDown, ChevronRight, CircleHelp, Download, Heart, Lock, LockOpen, MapPin, Music, Pause, Pencil, Play, Send, TriangleAlert, X } from "lucide-react"
 
 import { useGalleryAuth } from "@/context/GalleryAuthContext"
 import { MATTE_GOLD } from "@/features/gallery/gilded"
@@ -132,7 +132,7 @@ export function DetailsScreen({ member }: { member: GalleryMember }) {
       <main>
         <div id={TAB_TOP} />
         {show("invitation") && <>
-          <InvitationSection />
+          <InvitationSection hidden={hiddenTabs} />
           <InvitationPhoto />
         </>}
         {show("mot") && <OurWordSection />}
@@ -420,8 +420,16 @@ function Deco({ className, children, delay = 300, from = "zoom" }: {
 
 // ── 1. Invitation ─────────────────────────────────────────────────────────────
 
-function InvitationSection() {
+/** Pictogramme de chaque onglet dans le guide de l'invitation. */
+const GUIDE_ICON = { mot: Heart, programme: CalendarDays, pratique: MapPin, ambiance: Music, questions: CircleHelp, reponse: Send }
+
+function InvitationSection({ hidden }: { hidden: TabId[] }) {
   const { INVITATION, UI } = useContent()
+  const go = useGo()
+  // Onglets présentés sous le texte (sauf l'invitation elle-même et les onglets masqués).
+  const guide = (["mot", "programme", "pratique", "ambiance", "questions", "reponse"] as const)
+    .filter((id) => !hidden.includes(id))
+    .map((id) => ({ id, label: id === "reponse" ? UI.nav.reply : UI.nav[id], text: INVITATION.guide.tabs[id] }))
   return (
     <Section id="invitation" eyebrow={UI.sections.invitation.eyebrow} title={UI.sections.invitation.title} carte decor={
       <>
@@ -456,6 +464,38 @@ function InvitationSection() {
         <p className="text-lg sm:text-xl"><T>{INVITATION.date}</T></p>
         <Fleuron className="my-8" />
         <p className="mx-auto max-w-xl text-lg leading-relaxed sm:text-xl"><T>{INVITATION.context}</T></p>
+        {/* Guide des onglets (beaucoup d'invités sur téléphone ne voient pas le menu) :
+            chaque nom est un lien qui ouvre l'onglet, en haut de son contenu. */}
+        <div className="mx-auto mt-10 max-w-md print:hidden">
+          <p className="text-base italic sm:text-lg">{INVITATION.guide.intro}</p>
+          {/* Une carte par onglet : pastille dorée, nom en capitales fines, description en italique, chevron. */}
+          <ul className="mt-5 overflow-hidden rounded-2xl border text-left"
+            style={{ borderColor: `${MATTE_GOLD}55`, background: "rgba(255,255,255,0.45)" }}>
+            {guide.map(({ id, label, text }, i) => {
+              const Icon = GUIDE_ICON[id]
+              const reply = id === "reponse"
+              return (
+                <li key={id} style={i > 0 ? { borderTop: `1px solid ${MATTE_GOLD}33` } : undefined}>
+                  <button type="button" onClick={() => go(id)}
+                    className="group flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-white/60 sm:gap-4 sm:px-5"
+                    style={reply ? { background: `${MATTE_GOLD}14` } : undefined}>
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full border"
+                      style={reply
+                        ? { background: MATTE_GOLD, borderColor: MATTE_GOLD, color: "#fff" }
+                        : { borderColor: `${MATTE_GOLD}80`, color: MATTE_GOLD }}>
+                      <Icon className="size-4" aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm uppercase tracking-[0.14em] sm:text-[15px]" style={{ color: MATTE_GOLD }}>{label}</span>
+                      <span className="mt-0.5 block text-[15px] italic leading-snug opacity-80 sm:text-base"><T>{text}</T></span>
+                    </span>
+                    <ChevronRight className="size-4 shrink-0 opacity-40 transition-transform group-hover:translate-x-0.5 group-hover:opacity-70" aria-hidden />
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
       </div>
     </Section>
   )

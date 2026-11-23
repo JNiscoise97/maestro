@@ -5,7 +5,7 @@ import { formatDisplayName } from "@/lib/utils"
 import { supabase } from "@/supabase/client"
 import type { GuestGroup, GuestSide } from "@/types/domain"
 
-/** Invité de la liste des fiançailles (_20260725_guests), quel que soit le déploiement. */
+/** Invité d'une liste (fiançailles _20260725_ ou mariage _20270628_), quel que soit le déploiement. */
 export type FiancaillesGuest = {
   id: string
   first_name: string | null
@@ -39,20 +39,25 @@ export function guestLabel(g: Pick<FiancaillesGuest, "fullName">): string {
   return g.fullName || "Sans nom"
 }
 
+/** Liste d'invités : fiançailles (galerie) ou mariage (invitation en ligne). */
+export type GuestListEvent = "fiancailles" | "mariage"
+const GUEST_PREFIX: Record<GuestListEvent, string> = { fiancailles: "_20260725_", mariage: "_20270628_" }
+
 /**
- * Invités des fiançailles triés comme dans Invités (tri par défaut « famille ») :
- * ordre des groupes, puis nom affiché ; les invités sans groupe en dernier.
+ * Invités triés comme dans Invités (tri par défaut « famille ») : ordre des groupes, puis nom affiché ;
+ * les invités sans groupe en dernier. event : liste des fiançailles (défaut, galerie) ou du mariage (invitation).
  */
-export function useFiancaillesGuests() {
+export function useFiancaillesGuests(event: GuestListEvent = "fiancailles") {
+  const prefix = GUEST_PREFIX[event]
   return useQuery({
-    queryKey: ["gal", "fiancailles-guests"],
+    queryKey: ["gal", "event-guests", event],
     enabled: !!supabase,
     queryFn: async (): Promise<FiancaillesGuest[]> => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any
       const [{ data: rows, error }, { data: groupRows, error: groupError }] = await Promise.all([
-        db.from("_20260725_guests").select("id, first_name, last_name, nickname, group_id, is_active, is_child, rsvp_status, checked_in_at, age_range, paired_with_id").range(0, 4999),
-        db.from("_20260725_guest_groups").select("id, family_name, notes, sort_order, side"),
+        db.from(`${prefix}guests`).select("id, first_name, last_name, nickname, group_id, is_active, is_child, rsvp_status, checked_in_at, age_range, paired_with_id").range(0, 4999),
+        db.from(`${prefix}guest_groups`).select("id, family_name, notes, sort_order, side"),
       ])
       if (error) throw error
       if (groupError) throw groupError

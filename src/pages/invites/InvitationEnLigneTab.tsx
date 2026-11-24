@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { ExternalLink, FlaskConical, Link2, Search, UserX } from "lucide-react"
+import { ExternalLink, FlaskConical, Link2, MailX, Search, TriangleAlert, UserX } from "lucide-react"
 
 import type { Guest, GuestGroup, ProspectStatus } from "@/types/domain"
 import type { MomentAnswer, PartyMember, RsvpResponse } from "@/services/rsvp.service"
@@ -10,6 +10,8 @@ import { MAILED_STATUSES, defaultInvitationName, effectiveProspect } from "@/lib
 import { useEventSequences } from "@/hooks/queries/use-event-sequences"
 import { useGuestSequences } from "@/hooks/queries/use-guest-sequences"
 import { useLinkPartyMember, useRsvpResponses } from "@/hooks/queries/use-rsvp"
+import { useCommunicationSends, useCommunications } from "@/hooks/queries/use-communications"
+import { useInvitationActivity } from "./use-invitation-activity"
 import { groupLabel } from "@/lib/groups"
 import { PROSPECT_LISTS, guestList } from "@/lib/prospect"
 import { sequenceColor } from "@/lib/sequence-colors"
@@ -394,6 +396,29 @@ export function InvitationEnLigneTab() {
         <p className="text-xs text-muted-foreground">Cliquez sur un moment pour filtrer la liste des invités.</p>
       </section>
 
+      {/* Personnes hors liste : alerte, à rattacher à la main avant de lire la liste des invités */}
+      {outsiders.length > 0 && (
+        <section className="space-y-3 rounded-xl border border-amber-400 bg-amber-50 p-4 dark:border-amber-500/60 dark:bg-amber-950/30" role="alert">
+          <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+            <TriangleAlert className="size-4" aria-hidden />
+            Personnes hors liste ({outsiders.length})
+          </h3>
+          <p className="text-xs text-amber-900/80 dark:text-amber-200/80">
+            Personnes déclarées dans une réponse sans correspondance dans la liste (nom saisi autrement, homonyme…).
+            Rattache-les à un invité pour qu'elles comptent dans le suivi et les statistiques.
+          </p>
+          <div className="divide-y rounded-lg border bg-background">
+            {outsiders.map(({ r, m, index }) => (
+              <OutsiderRow key={`${r.id}-${index}`} response={r} member={m} index={index} guests={guests}
+                responderName={(r.guestId && guestById.get(r.guestId)?.fullName) || r.name} momentName={momentName} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Invitation envoyée (Communications) mais pas encore ouverte */}
+      <NotConnected guestById={guestById} answered={(id) => coverage.has(id)} />
+
       {/* Par invité */}
       <section className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -479,25 +504,6 @@ export function InvitationEnLigneTab() {
         </div>
       </section>
 
-      {/* Personnes hors liste : rattachement manuel à un invité */}
-      {outsiders.length > 0 && (
-        <section className="space-y-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Personnes hors liste ({outsiders.length})
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            Personnes déclarées dans une réponse sans correspondance dans la liste (nom saisi autrement, homonyme…).
-            Rattache-les à un invité pour qu'elles comptent dans le suivi et les statistiques.
-          </p>
-          <div className="divide-y rounded-xl border">
-            {outsiders.map(({ r, m, index }) => (
-              <OutsiderRow key={`${r.id}-${index}`} response={r} member={m} index={index} guests={guests}
-                responderName={(r.guestId && guestById.get(r.guestId)?.fullName) || r.name} momentName={momentName} />
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* Réponses non rattachées */}
       {unlinked.length > 0 && (
         <section className="space-y-3">
@@ -521,6 +527,76 @@ export function InvitationEnLigneTab() {
         </section>
       )}
     </div>
+  )
+}
+
+// ── Invitation reçue, pas encore connecté ────────────────────────────────────
+
+/**
+ * Invités notés « envoyé » dans une communication (par défaut celle dont le nom contient « M-6 ») qui ne se sont
+ * jamais connectés à l'invitation (journal 0182 : connexions rattachées à leur fiche). À relancer.
+ */
+function NotConnected({ guestById, answered }: { guestById: Map<string, Guest>; answered: (guestId: string) => boolean }) {
+  const { data: comms = [] } = useCommunications()
+  const sorted = useMemo(() => [...comms].sort((a, b) => a.sortOrder - b.sortOrder), [comms])
+  const [chosen, setChosen] = useState<string | null>(null)
+  const commId = chosen ?? (sorted.find((c) => /m\s*-?\s*6/i.test(c.name)) ?? sorted[0])?.id ?? null
+  const { data: sends = [], isLoading: lSends } = useCommunicationSends(commId)
+  const { data: activity = [], isLoading: lActivity, error } = useInvitationActivity()
+
+  const rows = useMemo(() => {
+    const connected = new Set(activity.map((v) => v.guest_id).filter((id): id is string => !!id))
+    return sends
+      .map((s) => ({ s, g: guestById.get(s.guestId) }))
+      .filter((x): x is { s: typeof x.s; g: Guest } => !!x.g && !connected.has(x.g.id))
+      .map(({ s, g }) => ({
+        s, g,
+        partner: g.pairedWithId && connected.has(g.pairedWithId) ? guestById.get(g.pairedWithId) : undefined,
+        answered: answered(g.id),
+      }))
+      // D'abord ceux sans nouvelle (ni réponse, ni conjoint connecté), puis les plus anciens envois.
+      .sort((a, b) => Number(!!a.partner || a.answered) - Number(!!b.partner || b.answered) || a.s.sentAt.localeCompare(b.s.sentAt))
+  }, [sends, activity, guestById, answered])
+
+  if (sorted.length === 0) return null
+  const silent = rows.filter((x) => !x.partner && !x.answered).length
+
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="mr-auto flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          <MailX className="size-4" aria-hidden />
+          Invitation reçue, pas encore connecté{" "}
+          <span className="font-normal normal-case">({lSends || lActivity ? "…" : rows.length})</span>
+        </h3>
+        <select value={commId ?? ""} onChange={(e) => setChosen(e.target.value)} aria-label="Communication"
+          className="h-9 rounded-md border bg-background px-2 text-sm">
+          {sorted.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Invités notés « envoyé » dans Communications qui ne se sont jamais connectés à l'invitation.
+        {silent > 0 && ` ${silent} sans aucune nouvelle à relancer en priorité.`}
+      </p>
+      {error ? (
+        <p className="text-sm text-destructive">Impossible de charger les connexions : {(error as Error).message}</p>
+      ) : !lSends && !lActivity && rows.length === 0 ? (
+        <p className="rounded-xl border p-4 text-center text-sm text-muted-foreground">
+          {sends.length === 0 ? "Aucun envoi noté pour cette communication." : "Tous les destinataires se sont connectés."}
+        </p>
+      ) : (
+        <div className="divide-y rounded-xl border">
+          {rows.map(({ s, g, partner, answered: done }) => (
+            <div key={s.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 p-3 text-sm">
+              <span className="font-medium">{g.fullName}</span>
+              <span className="text-xs text-muted-foreground">envoyée le {formatDate(s.sentAt)}</span>
+              {partner && <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">{partner.firstName} s'est connecté(e)</span>}
+              {done && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">réponse reçue via un proche</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
 

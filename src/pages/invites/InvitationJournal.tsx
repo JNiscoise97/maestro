@@ -1,18 +1,16 @@
 import { useMemo, useState, type ReactNode } from "react"
-import { useQuery } from "@tanstack/react-query"
 import { Check, ChevronRight, CircleHelp, LogIn, MailCheck, RotateCcw, Search, X } from "lucide-react"
 
 
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { KEYS } from "@/features/gallery/api"
-import { galleryClient } from "@/features/gallery/client"
 import { useGuests } from "@/hooks/queries/use-guests"
 import { useRsvpResponses } from "@/hooks/queries/use-rsvp"
 import { cn } from "@/lib/utils"
 import type { MomentAnswer, PartyMember, RsvpResponse } from "@/services/rsvp.service"
 import { DAYS } from "@/pages/sj-invitation/content"
 import type { Guest } from "@/types/domain"
+import { useInvitationActivity, type Visit } from "./use-invitation-activity"
 
 /**
  * Journal de l'invitation en ligne (Invités › Invitations › Journal), du plus récent au plus ancien :
@@ -23,12 +21,6 @@ import type { Guest } from "@/types/domain"
  */
 export function InvitationJournal() {
   return <Journal />
-}
-
-/** Une connexion ou un retour sur l'invitation (fonction _20260725_gal_invitation_journal). */
-type Visit = {
-  id: number; created_at: string; event: "login" | "visit"; member_id: string | null
-  first_name: string | null; last_name: string | null; guest_id: string | null; role: string | null
 }
 
 type Kind = "login" | "visit" | "rsvp"
@@ -45,21 +37,6 @@ const FILTERS = [
   { value: "rsvp", label: "Réponses" },
 ] as const
 type Filter = (typeof FILTERS)[number]["value"]
-
-/** Connexions et retours sur l'invitation (journal de la galerie), 1 000 derniers. */
-function useInvitationActivity() {
-  return useQuery({
-    queryKey: [...KEYS.admin, "activity", "invitation-journal"],
-    enabled: !!galleryClient,
-    refetchInterval: 60_000,
-    queryFn: async (): Promise<Visit[]> => {
-      const { data, error } = await (galleryClient! as any) // eslint-disable-line @typescript-eslint/no-explicit-any
-        .rpc("_20260725_gal_invitation_journal", { p_limit: 1000 })
-      if (error) throw error
-      return (data ?? []) as Visit[]
-    },
-  })
-}
 
 function Journal() {
   const { data: guests = [] } = useGuests()
@@ -141,8 +118,7 @@ function Journal() {
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Personnes venues sur l'invitation" value={stats.visitors} />
         <Stat label="Invités ayant répondu" value={stats.respondents} />
-        <Stat label="Venus sans répondre" value={stats.silent.length}
-          hint={stats.silent.length > 0 ? stats.silent.map(nameOf).sort((a, b) => a.localeCompare(b, "fr")).join(", ") : undefined} />
+        <Stat label="Venus sans répondre" value={stats.silent.length} />
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
-import { Check, CheckCircle2, Circle, GripVertical, Link2, MessageSquare, Pencil, Plus, Trash2 } from "lucide-react"
+import { toast } from "sonner"
+import { Ban, Check, CheckCircle2, Circle, GripVertical, Link2, MessageSquare, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react"
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core"
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
@@ -37,7 +38,7 @@ import type { GuestGroup } from "@/types/domain"
 import type { CommSender, Communication, CommunicationPrep } from "@/services/supabase/communications"
 import { cn } from "@/lib/utils"
 
-type SendFilter = "pending" | "sent"
+type SendFilter = "pending" | "sent" | "excluded"
 /** Filtre « qui envoie » de la liste. */
 type SenderFilter = "all" | CommSender | "none"
 const SENDERS: { id: CommSender; label: string }[] = [
@@ -241,12 +242,22 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
   const { data: prepRows = [] } = useCommunicationPrep(comm.id)
   const savePrep = useSaveCommunicationPrep(comm.id)
   const prepOf = useMemo(() => new Map(prepRows.map((r) => [r.guestId, r])), [prepRows])
-  const prep = (id: string): CommunicationPrep => prepOf.get(id) ?? { guestId: id, ready: false, sender: null }
+  const prep = (id: string): CommunicationPrep => prepOf.get(id) ?? { guestId: id, ready: false, sender: null, excluded: false }
 
   /** Modifie la préparation d'un invité et de son inséparable (mêmes valeurs pour les deux). */
-  function setPrep(g: Guest, change: Partial<Pick<CommunicationPrep, "ready" | "sender">>) {
+  function setPrep(g: Guest, change: Partial<Pick<CommunicationPrep, "ready" | "sender" | "excluded">>) {
     const ids = [g.id, ...(g.pairedWithId ? [g.pairedWithId] : [])]
-    savePrep.mutate(ids.map((id) => ({ ...prep(id), ...change, guestId: id })))
+    // « excluded » n'est envoyé que s'il est utilisé : sans la migration 0186, « Prête » et « Qui envoie » marchent encore.
+    const rows = ids.map((id) => {
+      const { excluded, ...rest } = { ...prep(id), ...change, guestId: id }
+      return "excluded" in change || excluded ? { ...rest, excluded } : rest
+    })
+    savePrep.mutate(rows, {
+      onError: (e) => {
+        const msg = (e as Error).message ?? ""
+        toast.error(/excluded/i.test(msg) ? "Migration 0186 à exécuter pour « Ne pas envoyer »." : "Enregistrement impossible. Réessaie dans un instant.")
+      },
+    })
   }
   const markSent = useMarkCommunicationSent(comm.id)
   const unmark = useUnmarkCommunicationSent(comm.id)
@@ -297,9 +308,13 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
   }, [eligible, sentDirectMap, nameById])
 
   const sentList = useMemo(() => eligible.filter((g) => statusOf.get(g.id)?.kind !== "pending"), [eligible, statusOf])
-  const pendingList = useMemo(() => eligible.filter((g) => statusOf.get(g.id)?.kind === "pending"), [eligible, statusOf])
-  const progress = eligible.length > 0 ? Math.round((sentList.length / eligible.length) * 100) : 0
-  const byTab = filter === "pending" ? pendingList : sentList
+  // Hors envoi (ne peut pas recevoir cette communication) : ni à envoyer, ni dans le total.
+  const isExcluded = (id: string) => prepOf.get(id)?.excluded === true
+  const excludedList = eligible.filter((g) => statusOf.get(g.id)?.kind === "pending" && isExcluded(g.id))
+  const pendingList = eligible.filter((g) => statusOf.get(g.id)?.kind === "pending" && !isExcluded(g.id))
+  const total = eligible.length - excludedList.length
+  const progress = total > 0 ? Math.round((sentList.length / total) * 100) : 0
+  const byTab = filter === "pending" ? pendingList : filter === "excluded" ? excludedList : sentList
   const displayed = byTab.filter((g) => {
     const p = prep(g.id)
     if (senderFilter !== "all" && (senderFilter === "none" ? p.sender !== null : p.sender !== senderFilter)) return false
@@ -367,7 +382,7 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
           </div>
           <span className="text-2xl font-bold tabular-nums shrink-0">
             {sentList.length}
-            <span className="text-base font-normal text-muted-foreground">/{eligible.length}</span>
+            <span className="text-base font-normal text-muted-foreground">/{total}</span>
           </span>
         </div>
         <div className="h-2 rounded-full bg-muted overflow-hidden">
@@ -382,6 +397,7 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
         <TabsList>
           <TabsTrigger value="pending">À envoyer ({pendingList.length})</TabsTrigger>
           <TabsTrigger value="sent">Envoyés ({sentList.length})</TabsTrigger>
+          {(excludedList.length > 0 || filter === "excluded") && <TabsTrigger value="excluded">Hors envoi ({excludedList.length})</TabsTrigger>}
         </TabsList>
       </Tabs>
 
@@ -413,7 +429,7 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
       ) : displayed.length === 0 ? (
         <p className="text-sm text-center text-muted-foreground py-10">
           {byTab.length > 0 ? "Aucun invité pour ce filtre"
-            : filter === "pending" ? "Tous les envois sont faits ✓" : "Aucun envoi enregistré pour l'instant"}
+            : filter === "pending" ? "Tous les envois sont faits ✓" : filter === "excluded" ? "Personne n'est hors envoi" : "Aucun envoi enregistré pour l'instant"}
         </p>
       ) : (
         <div className="space-y-3">
@@ -454,7 +470,12 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
-                      {status.kind === "pending" && (
+                      {status.kind === "pending" && isExcluded(g.id) && (
+                        <Button variant="outline" size="sm" className="h-7 shrink-0 gap-1" onClick={() => setPrep(g, { excluded: false })}>
+                          <RotateCcw className="size-3.5" aria-hidden />Remettre à envoyer
+                        </Button>
+                      )}
+                      {status.kind === "pending" && !isExcluded(g.id) && (
                         <div className="flex items-center gap-2">
                           {/* Invitation prête à être envoyée (cochée à la main). */}
                           <button type="button" onClick={() => setPrep(g, { ready: !p.ready })} aria-pressed={p.ready}
@@ -486,7 +507,13 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
                         >
                           Annuler
                         </Button>
-                      ) : status.kind === "pending" ? (
+                      ) : status.kind === "pending" && !isExcluded(g.id) ? (<>
+                        {/* Ne peut pas recevoir cette communication (pas d'appareil, très âgé…) : hors envoi. */}
+                        <Button variant="ghost" size="sm" className="h-7 shrink-0 gap-1 text-muted-foreground"
+                          title="Ne peut pas recevoir cette communication : la retirer des envois et du total"
+                          onClick={() => setPrep(g, { excluded: true })}>
+                          <Ban className="size-3.5" aria-hidden />Ne pas envoyer
+                        </Button>
                         <Button
                           size="sm"
                           className="h-7 shrink-0"
@@ -495,7 +522,7 @@ function CommTracking({ comm, guests, groups }: { comm: Communication; guests: G
                         >
                           Envoyé ✓
                         </Button>
-                      ) : null}
+                      </>) : null}
                       </div>
                     </div>
                   )

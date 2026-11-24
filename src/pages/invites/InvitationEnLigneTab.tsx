@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { ExternalLink, FlaskConical, Link2, MailX, Search, TriangleAlert, UserX } from "lucide-react"
+import { ChevronDown, ExternalLink, FlaskConical, Link2, MailX, Search, TriangleAlert, Users, UserX } from "lucide-react"
+import type { ReactNode } from "react"
 
 import type { Guest, GuestGroup, ProspectStatus } from "@/types/domain"
 import type { MomentAnswer, PartyMember, RsvpResponse } from "@/services/rsvp.service"
@@ -419,12 +420,10 @@ export function InvitationEnLigneTab() {
       {/* Invitation envoyée (Communications) mais pas encore ouverte */}
       <NotConnected guestById={guestById} answered={(id) => coverage.has(id)} />
 
-      {/* Par invité */}
-      <section className="space-y-3">
+      {/* Par invité (bloc dépliable) */}
+      <Fold storageKey="sj-suivi-invites-ouvert" icon={<Users className="size-4 text-muted-foreground" />}
+        title="Invités" summary={`${rows.length} affiché${rows.length > 1 ? "s" : ""}`}>
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="mr-auto text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Invités <span className="font-normal normal-case">({rows.length})</span>
-          </h3>
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher" className="h-9 w-44 pl-8" aria-label="Rechercher un invité" />
@@ -502,7 +501,7 @@ export function InvitationEnLigneTab() {
             )
           })}
         </div>
-      </section>
+      </Fold>
 
       {/* Réponses non rattachées */}
       {unlinked.length > 0 && (
@@ -562,13 +561,10 @@ function NotConnected({ guestById, answered }: { guestById: Map<string, Guest>; 
   const silent = rows.filter((x) => !x.partner && !x.answered).length
 
   return (
-    <section className="space-y-3">
+    <Fold storageKey="sj-suivi-pas-connectes-ouvert" icon={<MailX className="size-4 text-muted-foreground" />}
+      title="Invitation reçue, pas encore connecté"
+      summary={lSends || lActivity ? "…" : `${rows.length} personne${rows.length > 1 ? "s" : ""}${silent > 0 ? ` · ${silent} sans nouvelle` : ""}`}>
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="mr-auto flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          <MailX className="size-4" aria-hidden />
-          Invitation reçue, pas encore connecté{" "}
-          <span className="font-normal normal-case">({lSends || lActivity ? "…" : rows.length})</span>
-        </h3>
         <select value={commId ?? ""} onChange={(e) => setChosen(e.target.value)} aria-label="Communication"
           className="h-9 rounded-md border bg-background px-2 text-sm">
           {sorted.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -596,6 +592,26 @@ function NotConnected({ guestById, answered }: { guestById: Map<string, Guest>; 
           ))}
         </div>
       )}
+    </Fold>
+  )
+}
+
+/** Bloc dépliable (comme les statistiques) : état ouvert / fermé mémorisé sur l'appareil. */
+function Fold({ storageKey, icon, title, summary, children }: {
+  storageKey: string; icon: ReactNode; title: string; summary?: string; children: ReactNode
+}) {
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem(storageKey) !== "0" } catch { return true } })
+  const toggle = () => setOpen((o) => { try { localStorage.setItem(storageKey, o ? "0" : "1") } catch { /* stockage indisponible */ } return !o })
+  return (
+    <section className="overflow-hidden rounded-xl border border-border bg-card">
+      <button type="button" onClick={toggle} aria-expanded={open}
+        className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/30">
+        {icon}
+        <span className="text-sm font-semibold">{title}</span>
+        {summary && <span className="text-xs text-muted-foreground">{summary}</span>}
+        <ChevronDown className={cn("ml-auto size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
+      </button>
+      {open && <div className="space-y-3 border-t border-border p-4">{children}</div>}
     </section>
   )
 }

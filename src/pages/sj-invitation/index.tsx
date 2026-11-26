@@ -40,6 +40,7 @@ import { EnvelopeScreen, LandingScreen, OpenedEnvelopeScreen } from "./screens"
  */
 export function SjInvitationPage() {
   useNoIndex()
+  useReloadOnNewVersion()
   return (
     <GalleryAuthProvider source="invitation">
       <InvitationLangProvider>
@@ -171,5 +172,31 @@ function useNoIndex() {
     meta.content = "noindex, nofollow, noarchive"
     document.head.appendChild(meta)
     return () => { document.head.removeChild(meta) }
+  }, [])
+}
+
+/**
+ * Invité qui revient sur un onglet resté ouvert : si une nouvelle version de l'invitation a été mise en ligne
+ * depuis (/version.json différent de __BUILD_ID__), la page se recharge pour afficher la dernière version.
+ * Vérifié au retour sur l'onglet (au plus une fois par minute). Jamais pendant la saisie de la réponse
+ * (onglet Répondre ouvert) ni en développement.
+ */
+function useReloadOnNewVersion() {
+  useEffect(() => {
+    if (import.meta.env.DEV) return
+    let lastCheck = 0
+    const check = async () => {
+      if (document.visibilityState !== "visible" || Date.now() - lastCheck < 60_000) return
+      lastCheck = Date.now()
+      try {
+        const res = await fetch(`/version.json?t=${Date.now()}`, { cache: "no-store" })
+        if (!res.ok) return
+        const { id } = (await res.json()) as { id?: string }
+        if (id && id !== __BUILD_ID__ && location.hash !== "#reponse") location.reload()
+      } catch { /* hors ligne : on réessaiera au prochain retour */ }
+    }
+    document.addEventListener("visibilitychange", check)
+    window.addEventListener("focus", check)
+    return () => { document.removeEventListener("visibilitychange", check); window.removeEventListener("focus", check) }
   }, [])
 }

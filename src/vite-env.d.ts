@@ -8,6 +8,9 @@ interface ImportMetaEnv {
   readonly VITE_EVENT_DATE?: string
 }
 
+/** Version construite (vite.config.ts), comparée à /version.json pour recharger une page périmée. */
+declare const __BUILD_ID__: string
+
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }

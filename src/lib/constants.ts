@@ -20,6 +20,7 @@
   PiggyBank,
   Image,
   Clapperboard,
+  KanbanSquare,
   type LucideIcon,
 } from "lucide-react"
 
@@ -64,6 +65,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Introduction", path: "/introduction", icon: Heart, capability: "view:introduction" },
   { label: "Mon rôle", path: "/ma-mission", icon: UserCheck, capability: "view:role" },
   { label: "Tableau de bord", path: "/", icon: Home, capability: "view:dashboard", visibleToRoles: ["admin"] },
+  { label: "Semaines", path: "/semaines", icon: KanbanSquare, capability: "view:semaines", visibleToRoles: ["admin"] },
   { label: "Accueil", path: "/", icon: Home, capability: "view:referent-home" },
   {
     label: "Les missions",

@@ -35,6 +35,7 @@ import { GaleriePrototypePage } from "@/pages/photos/prototype"
 import { GalleryPage } from "@/pages/photos"
 import { ConducteurPage } from "@/pages/conducteur"
 import { SjInvitationPage } from "@/pages/sj-invitation"
+import { SemainesPage } from "@/pages/semaines"
 
 export function AppRoutes() {
   return (
@@ -179,6 +180,14 @@ export function AppRoutes() {
             element={
               <RoleGuard capability="view:ideas">
                 <IdeasPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="semaines"
+            element={
+              <RoleGuard capability="view:semaines">
+                <SemainesPage />
               </RoleGuard>
             }
           />

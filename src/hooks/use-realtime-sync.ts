@@ -25,6 +25,9 @@ const TABLE_KEYS: Record<string, QueryKey[]> = {
   people: [["people"]],
   guests: [["guests"]],
   guest_groups: [["guest-groups"]],
+  // Semaines (migration 0189) : ce que l'autre fiancé change apparaît tout de suite.
+  sprints: [["sprints"]],
+  sprint_tasks: [["sprint-tasks"]],
 }
 
 /** Délai de regroupement : une rafale de changements (lot, réordonnancement) = un seul rechargement. */
